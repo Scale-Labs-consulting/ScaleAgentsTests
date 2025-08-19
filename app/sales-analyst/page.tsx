@@ -210,10 +210,12 @@ export default function SalesAnalystPage() {
       if (!response.ok) {
         let errorMessage = 'Upload failed'
         try {
-          const errorData = await response.json()
+          // Clone the response before reading it
+          const responseClone = response.clone()
+          const errorData = await responseClone.json()
           errorMessage = errorData.error || 'Upload failed'
         } catch (parseError) {
-          // If response is not JSON, get the text
+          // If response is not JSON, get the text from the original response
           const errorText = await response.text()
           errorMessage = `Upload failed: ${response.status} - ${errorText.substring(0, 200)}`
         }
@@ -274,7 +276,9 @@ export default function SalesAnalystPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
+        // Clone the response before reading it
+        const responseClone = response.clone()
+        const errorData = await responseClone.json()
         throw new Error(errorData.error || 'Transcription failed')
       }
 

@@ -52,7 +52,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     // Persist session across browser sessions
     persistSession: true,
     // Auto refresh token before it expires
-    autoRefreshToken: false, // Disabled to reduce noise
+    autoRefreshToken: true, // Enabled for better session management
     // Detect session in URL (for OAuth flows)
     detectSessionInUrl: false, // Disabled to prevent auto-login issues
     // Storage key for session
@@ -60,7 +60,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     // Storage type (localStorage is more persistent than sessionStorage)
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     // Flow type for better session management
-    flowType: 'implicit', // Changed from 'pkce' to 'implicit' for better logout
+    flowType: 'pkce', // Changed back to 'pkce' for better security
     // Debug mode for development
     debug: false, // Disabled to reduce console noise
   },

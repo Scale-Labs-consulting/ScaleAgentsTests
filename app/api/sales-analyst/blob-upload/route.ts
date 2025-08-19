@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { put } from '@vercel/blob'
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
@@ -7,10 +8,35 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File
     const userId = formData.get('userId') as string
     const accessToken = formData.get('accessToken') as string
+    const isConverted = formData.get('isConverted') === 'true'
+    const originalFileName = formData.get('originalFileName') as string
+
+    console.log('📁 Blob upload request received:', {
+      fileName: file?.name,
+      fileSize: file?.size,
+      userId: userId
+    })
 
     if (!file || !userId || !accessToken) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
+        { status: 400 }
+      )
+    }
+
+    // Validate file type (video or audio)
+    if (!file.type.startsWith('video/') && !file.type.startsWith('audio/')) {
+      return NextResponse.json(
+        { error: 'Only video or audio files are allowed' },
+        { status: 400 }
+      )
+    }
+
+    // Validate file size (500MB limit for Vercel Blob)
+    const maxSize = 500 * 1024 * 1024 // 500MB in bytes
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: `File too large: ${(file.size / (1024 * 1024)).toFixed(1)}MB. Maximum size is 500MB.` },
         { status: 400 }
       )
     }
@@ -28,43 +54,36 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    // Upload directly to Supabase Storage (which handles large files)
-    const storageFileName = `${userId}/${Date.now()}-${file.name}`
-    console.log(`Uploading to Supabase Storage: ${storageFileName}`)
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('sales-calls')
-      .upload(storageFileName, file)
+    // Upload to Vercel Blob
+    console.log('📤 Uploading to Vercel Blob...')
+    const blob = await put(`${userId}/${Date.now()}-${file.name}`, file, {
+      access: 'public',
+      addRandomSuffix: false
+    })
 
-    if (uploadError) {
-      console.error('Upload error:', uploadError)
-      return NextResponse.json(
-        { error: 'Failed to upload file' },
-        { status: 500 }
-      )
-    }
-
-    console.log('File uploaded to Supabase successfully')
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('sales-calls')
-      .getPublicUrl(storageFileName)
-
-    console.log(`Public URL: ${publicUrl}`)
+    console.log('✅ File uploaded to Vercel Blob:', blob.url)
 
     // Create database record
     const salesCallData = {
       user_id: userId,
-      title: file.name.replace(/\.[^/.]+$/, ''),
-      file_url: publicUrl,
-      file_path: storageFileName,
+      title: (originalFileName || file.name).replace(/\.[^/.]+$/, ''),
+      file_url: blob.url,
+      file_path: blob.pathname,
       file_size: file.size,
       duration: 0,
-      status: 'uploaded'
+      status: 'uploaded',
+      metadata: {
+        isConverted,
+        originalFileName: originalFileName || file.name,
+        fileType: file.type,
+        conversionInfo: isConverted ? {
+          originalSize: file.size,
+          convertedAt: new Date().toISOString()
+        } : null
+      }
     }
 
-    console.log('Creating database record:', salesCallData)
+    console.log('📝 Creating database record:', salesCallData)
 
     const { data: salesCall, error: dbError } = await supabase
       .from('sales_calls')
@@ -73,28 +92,26 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (dbError) {
-      console.error('Database error:', dbError)
-      await supabase.storage
-        .from('sales-calls')
-        .remove([storageFileName])
-      
+      console.error('❌ Database error:', dbError)
       return NextResponse.json(
         { error: 'Failed to create database record' },
         { status: 500 }
       )
     }
 
-    console.log('Database record created successfully:', salesCall)
+    console.log('✅ Database record created:', salesCall.id)
 
     return NextResponse.json({
       success: true,
-      salesCall: salesCall
+      salesCall: salesCall,
+      blobUrl: blob.url,
+      message: 'File uploaded successfully'
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    console.error('❌ Blob upload error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: `Upload failed: ${error instanceof Error ? error.message : String(error)}` },
       { status: 500 }
     )
   }

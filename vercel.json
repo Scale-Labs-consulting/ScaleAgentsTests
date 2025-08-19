@@ -2,5 +2,13 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "installCommand": "pnpm install"
+  "installCommand": "pnpm install",
+  "functions": {
+    "app/api/sales-analyst/blob-upload/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/sales-analyst/blob-transcribe/route.ts": {
+      "maxDuration": 300
+    }
+  }
 }

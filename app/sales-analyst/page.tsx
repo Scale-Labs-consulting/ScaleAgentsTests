@@ -1,36 +1,40 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+import { convertVideoToAudio, shouldConvertVideo } from '@/lib/video-converter'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { SalesReport } from '@/components/sales-report'
+import { Separator } from '@/components/ui/separator'
+import { useToast } from '@/hooks/use-toast'
 import { 
   Upload, 
+  FileVideo, 
   Play, 
   Pause, 
   Volume2, 
-  FileAudio, 
-  MessageSquare, 
-  TrendingUp, 
-  Clock,
-  Star,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  FileText,
-  HelpCircle,
-  Settings,
-  Menu,
+  VolumeX,
+  Download,
   Trash2,
-  RefreshCw,
-  ArrowRight
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  User,
+  Calendar,
+  BarChart3,
+  TrendingUp,
+  Target,
+  MessageSquare,
+  Zap,
+  Brain,
+  FileText,
+  Loader2,
+  ArrowRight,
+  XCircle
 } from 'lucide-react'
 
 interface SalesCall {
@@ -40,33 +44,148 @@ interface SalesCall {
   duration: number
   uploadDate: string
   status: 'uploaded' | 'processing' | 'completed' | 'failed'
-  feedback?: string
-  score?: number
   transcription?: string
-  fileSize?: string
+  score?: number
+  feedback?: string
 }
 
 export default function SalesAnalystPage() {
+  const { user, initialized, loading } = useAuth()
   const router = useRouter()
-  const { user, profile, loading, initialized } = useAuth()
+  const { toast } = useToast()
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadStatus, setUploadStatus] = useState<string>('')
+  const [uploadStatus, setUploadStatus] = useState('')
   const [analysisResult, setAnalysisResult] = useState<any>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [audioRef] = useState(useRef<HTMLAudioElement>(null))
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
   const [salesCalls, setSalesCalls] = useState<SalesCall[]>([])
   const [selectedCall, setSelectedCall] = useState<SalesCall | null>(null)
-  const [selectedCallTranscription, setSelectedCallTranscription] = useState<string>('')
-  const [showReport, setShowReport] = useState(false)
-  const [reportData, setReportData] = useState<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Handle authentication redirect
+  // Initialize Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  // Debug function to check authentication status
+  const debugAuth = async () => {
+    try {
+      console.log('🔍 Debugging authentication...')
+      console.log('👤 User state:', user)
+      console.log('🔧 Initialized:', initialized)
+      console.log('⏳ Loading:', loading)
+      
+      // Check if we're in browser environment
+      console.log('🌐 Browser environment:', typeof window !== 'undefined')
+      
+      // Check localStorage for auth data
+      if (typeof window !== 'undefined') {
+        const authData = localStorage.getItem('scaleagents-auth')
+        console.log('💾 LocalStorage auth data:', authData ? 'Present' : 'Missing')
+        if (authData) {
+          try {
+            const parsed = JSON.parse(authData)
+            console.log('📄 Parsed auth data:', parsed)
+          } catch (e) {
+            console.log('❌ Failed to parse auth data')
+          }
+        }
+      }
+      
+      const { data: { session }, error } = await supabase.auth.getSession()
+      console.log('🔑 Session:', session ? 'Found' : 'Not found')
+      console.log('❌ Session error:', error)
+      
+      if (session) {
+        console.log('🔑 Access token:', session.access_token ? 'Present' : 'Missing')
+        console.log('🔑 Token length:', session.access_token?.length || 0)
+        console.log('🔑 Token expires at:', session.expires_at)
+        console.log('🔑 Refresh token:', session.refresh_token ? 'Present' : 'Missing')
+      }
+      
+      // Try to get current user
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser()
+      console.log('👤 Current user:', currentUser ? 'Found' : 'Not found')
+      console.log('❌ User error:', userError)
+      
+    } catch (error) {
+      console.error('❌ Debug auth error:', error)
+    }
+  }
+
+  // Function to manually refresh session
+  const refreshSession = async () => {
+    try {
+      console.log('🔄 Manually refreshing session...')
+      const { data, error } = await supabase.auth.refreshSession()
+      
+      if (error) {
+        console.error('❌ Session refresh failed:', error)
+        alert('Failed to refresh session. Please log in again.')
+        router.push('/login')
+      } else if (data.session) {
+        console.log('✅ Session refreshed successfully')
+        alert('Session refreshed successfully!')
+      } else {
+        console.log('ℹ️ No session to refresh')
+        alert('No active session to refresh. Please log in.')
+        router.push('/login')
+      }
+    } catch (error) {
+      console.error('❌ Session refresh error:', error)
+      alert('Session refresh failed. Please log in again.')
+      router.push('/login')
+    }
+  }
+
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (initialized && !user) {
       router.push('/login')
     }
   }, [user, initialized, router])
+
+  // Check session validity on component mount (only if user exists)
+  useEffect(() => {
+    const checkSession = async () => {
+      // Only check if we have a user and auth is initialized
+      if (user && initialized && !loading) {
+        try {
+          console.log('🔍 Checking session validity...')
+          const { data: { session }, error } = await supabase.auth.getSession()
+          
+          if (error) {
+            console.error('❌ Session validation error:', error)
+            // Only logout if it's a serious error
+            if (error.message.includes('invalid') || error.message.includes('expired')) {
+              await supabase.auth.signOut()
+              router.push('/login')
+            }
+          } else if (!session) {
+            console.log('ℹ️ No active session found, but user exists - this might be normal during auth state changes')
+            // Don't force logout immediately, let the auth state settle
+          } else {
+            console.log('✅ Session validation successful')
+          }
+        } catch (error) {
+          console.error('❌ Session check error:', error)
+          // Don't force logout on network errors
+        }
+      }
+    }
+
+    // Add a small delay to let auth state settle
+    const timeoutId = setTimeout(checkSession, 1000)
+    return () => clearTimeout(timeoutId)
+  }, [user, initialized, loading, router])
 
   // Show loading while auth is initializing
   if (loading || !initialized) {
@@ -74,9 +193,9 @@ export default function SalesAnalystPage() {
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-                            <p className="text-white/70">
-                    {loading ? 'A carregar...' : 'A inicializar...'}
-                  </p>
+          <p className="text-white/70">
+            {loading ? 'A carregar...' : 'A inicializar...'}
+          </p>
         </div>
       </div>
     )
@@ -90,6 +209,12 @@ export default function SalesAnalystPage() {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
+
+    // Check if user is authenticated
+    if (!user || !user.id) {
+      alert('Por favor, faça login para continuar.')
+      return
+    }
 
     // Send log to server terminal
     await fetch('/api/log', {
@@ -105,7 +230,7 @@ export default function SalesAnalystPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        message: '🔍 Starting file upload process...'
+        message: '🔍 Starting client-side file upload process...'
       })
     })
 
@@ -115,7 +240,7 @@ export default function SalesAnalystPage() {
       return
     }
 
-    // File size validation removed - no limit
+
 
     setUploadedFile(file)
     setIsUploading(true)
@@ -131,121 +256,203 @@ export default function SalesAnalystPage() {
       })
       
       console.log('🔑 Getting access token...')
-      const accessToken = (await supabase.auth.getSession()).data.session?.access_token || ''
+      console.log('👤 User object:', user)
+      console.log('👤 User ID:', user?.id)
+      
+      // Try to get the current session with retry logic
+      let session = null
+      let sessionError = null
+      
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`🔑 Attempt ${attempt}/3: Getting session...`)
+          const { data, error } = await supabase.auth.getSession()
+          
+          if (error) {
+            sessionError = error
+            console.error(`❌ Session error (attempt ${attempt}):`, error)
+            if (attempt < 3) {
+              await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+              continue
+            }
+          } else if (data.session) {
+            session = data.session
+            console.log(`✅ Session obtained on attempt ${attempt}`)
+            break
+          } else {
+            console.log(`ℹ️ No session found on attempt ${attempt}`)
+            if (attempt < 3) {
+              await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+              continue
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Session fetch error (attempt ${attempt}):`, error)
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+            continue
+          }
+        }
+      }
+      
+      if (sessionError) {
+        console.error('❌ Session error after all attempts:', sessionError)
+        throw new Error('Failed to get session: ' + sessionError.message)
+      }
+      
+      if (!session) {
+        console.error('❌ No active session found after all attempts')
+        // Try to refresh the session
+        try {
+          console.log('🔄 Attempting to refresh session...')
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+          
+          if (refreshError) {
+            console.error('❌ Session refresh failed:', refreshError)
+            throw new Error('No active session found. Please log in again.')
+          }
+          
+          if (refreshData.session) {
+            session = refreshData.session
+            console.log('✅ Session refreshed successfully')
+          } else {
+            throw new Error('No active session found. Please log in again.')
+          }
+        } catch (refreshError) {
+          console.error('❌ Session refresh error:', refreshError)
+          throw new Error('No active session found. Please log in again.')
+        }
+      }
+      
+      const accessToken = session.access_token
       console.log('🔑 Access token obtained:', accessToken ? 'Yes' : 'No')
+      console.log('🔑 Access token length:', accessToken?.length || 0)
+      
+      // Check if we have all required data
+      if (!user?.id) {
+        throw new Error('User ID is missing')
+      }
+      
+      if (!accessToken) {
+        throw new Error('Access token is missing')
+      }
       
       await fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: '🔑 Access token status:',
-          data: { hasToken: !!accessToken, tokenLength: accessToken.length }
+          data: { hasToken: !!accessToken, tokenLength: accessToken.length, userId: user.id }
         })
       })
     
-      // Testing OpenAI transcription only
-      console.log('🚀 Starting transcription test...')
-      setUploadStatus('A testar a transcrição OpenAI...')
-      await uploadFileDirectly(file, accessToken)
+      // Use client-side upload approach
+      console.log('🚀 Starting client-side upload...')
+      setUploadStatus('A fazer upload do ficheiro...')
+      await uploadFileClientSide(file, accessToken)
     
     } catch (error) {
-      console.error('Upload error:', error)
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '❌ Upload error caught:',
-          data: { 
-            error: error instanceof Error ? error.message : String(error), 
-            stack: error instanceof Error ? error.stack : undefined 
-          }
-        })
-      })
-      
-      setUploadStatus('O carregamento falhou. Por favor, tente novamente.')
-      setUploadedFile(null)
+      console.error('❌ Upload error:', error)
+      setUploadStatus('Erro no carregamento')
       setIsUploading(false)
       setUploadProgress(0)
       
-      // Reset the file input on error
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+      // If it's an authentication error, redirect to login
+      if (error instanceof Error && error.message.includes('session')) {
+        alert('Sessão expirada. Por favor, faça login novamente.')
+        router.push('/login')
       }
-      
-      setTimeout(() => setUploadStatus(''), 3000) // Clear error message after 3 seconds
     }
   }
 
-  const uploadFileDirectly = async (file: File, accessToken: string) => {
+  const uploadFileClientSide = async (file: File, accessToken: string) => {
     try {
-      console.log('🚀 Starting direct Assembly AI upload...')
+      // Check if we should convert video to audio
+      let fileToUpload = file
+      let isConverted = false
+      
+      if (shouldConvertVideo(file)) {
+        try {
+          setUploadStatus('A converter vídeo para áudio...')
+          setUploadProgress(5)
+          
+          console.log('🎵 Converting video to audio for better processing...')
+          fileToUpload = await convertVideoToAudio(file)
+          isConverted = true
+          
+          console.log('✅ Video converted to audio:', {
+            originalSize: `${(file.size / (1024 * 1024)).toFixed(1)}MB`,
+            convertedSize: `${(fileToUpload.size / (1024 * 1024)).toFixed(1)}MB`,
+            reduction: `${((1 - fileToUpload.size / file.size) * 100).toFixed(1)}%`
+          })
+          
+          setUploadProgress(15)
+        } catch (error) {
+          console.error('❌ Video conversion failed:', error)
+          toast({
+            title: "Erro na conversão",
+            description: "Falha ao converter vídeo para áudio. Tentando upload original...",
+            variant: "destructive",
+          })
+          // Continue with original file if conversion fails
+          fileToUpload = file
+        }
+      }
+
+      console.log('🚀 Starting Vercel Blob upload...')
       await fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '🚀 Starting direct Assembly AI upload...',
+          message: '🚀 Starting Vercel Blob upload...',
           data: { fileName: file.name, fileSize: file.size }
         })
       })
 
-      // Step 1: Get Assembly AI upload URL from our backend
-      const uploadUrlResponse = await fetch('/api/sales-analyst/assembly-upload-url', {
+      // Step 1: Upload to Vercel Blob
+      setUploadStatus('A fazer upload para Vercel Blob...')
+      setUploadProgress(20)
+
+      const formData = new FormData()
+      formData.append('file', fileToUpload)
+      formData.append('userId', user.id)
+      formData.append('accessToken', accessToken)
+      formData.append('isConverted', isConverted.toString())
+      formData.append('originalFileName', file.name)
+
+      const blobUploadResponse = await fetch('/api/sales-analyst/blob-upload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileSize: file.size,
-          userId: user.id,
-          accessToken: accessToken
-        })
+        body: formData
       })
 
-      if (!uploadUrlResponse.ok) {
-        const responseClone = uploadUrlResponse.clone()
-        const errorData = await responseClone.json()
-        throw new Error(errorData.error || 'Failed to get upload URL')
+      if (!blobUploadResponse.ok) {
+        const errorData = await blobUploadResponse.json()
+        throw new Error(errorData.error || 'Failed to upload to Vercel Blob')
       }
 
-      const { upload_url } = await uploadUrlResponse.json()
+      const uploadResult = await blobUploadResponse.json()
+      console.log('✅ File uploaded to Vercel Blob:', uploadResult.blobUrl)
 
-      // Step 2: Upload directly to Assembly AI
-      setUploadStatus('A fazer upload para Assembly AI...')
-      setUploadProgress(30)
-
-      const assemblyUploadResponse = await fetch(upload_url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/octet-stream',
-        },
-        body: file
-      })
-
-      if (!assemblyUploadResponse.ok) {
-        throw new Error(`Assembly AI upload failed: ${assemblyUploadResponse.status}`)
-      }
-
-      // Step 3: Start transcription
-      setUploadStatus('A iniciar transcrição...')
+      // Step 2: Start transcription and analysis
+      setUploadStatus('A processar vídeo e iniciar transcrição...')
       setUploadProgress(60)
 
-      const transcriptionResponse = await fetch('/api/sales-analyst/assembly-transcribe', {
+      const transcriptionResponse = await fetch('/api/sales-analyst/blob-transcribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          upload_url: upload_url,
+          blobUrl: uploadResult.blobUrl,
           fileName: file.name,
           userId: user.id,
-          accessToken: accessToken
+          accessToken: accessToken,
+          salesCallId: uploadResult.salesCall.id
         })
       })
 
       if (!transcriptionResponse.ok) {
-        const responseClone = transcriptionResponse.clone()
-        const errorData = await responseClone.json()
+        const errorData = await transcriptionResponse.json()
         throw new Error(errorData.error || 'Transcription failed')
       }
 
@@ -255,7 +462,7 @@ export default function SalesAnalystPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '✅ Assembly AI upload and transcription completed!',
+          message: '✅ Vercel Blob upload and transcription completed!',
           data: { 
             transcriptionLength: result.transcription?.length || 0,
             analysis: result.analysis 
@@ -263,74 +470,31 @@ export default function SalesAnalystPage() {
         })
       })
 
-      setUploadStatus('Transcrição concluída! A iniciar análise de IA...')
-      setUploadProgress(95)
+      setUploadStatus('Análise concluída com sucesso!')
+      setUploadProgress(100)
 
-      // Automatically start AI analysis with transcription
-      setTimeout(() => {
-        analyzeTranscription(result.transcription)
-      }, 1000)
+      // Store analysis result for display
+      setAnalysisResult(result.analysis)
       
-    } catch (error) {
-      console.error('❌ Assembly AI upload error:', error)
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '❌ Assembly AI upload failed:',
-          data: { error: error instanceof Error ? error.message : String(error) }
-        })
-      })
-      throw error
-    }
-  }
-
-  const startTranscriptionFromBlob = async (blobUrl: string, fileName: string) => {
-    try {
-      setUploadStatus('A iniciar transcrição...')
-      setUploadProgress(90)
-      
-      const response = await fetch('/api/sales-analyst/transcription/direct', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fileUrl: blobUrl,
-          fileName: fileName,
-          userId: user.id
-        })
-      })
-
-      if (!response.ok) {
-        // Clone the response before reading it
-        const responseClone = response.clone()
-        const errorData = await responseClone.json()
-        throw new Error(errorData.error || 'Transcription failed')
-      }
-
-      const result = await response.json()
-      
-      if (result.success && result.transcription) {
-        setUploadStatus('Transcrição concluída! A iniciar análise de IA...')
-        setUploadProgress(95)
-        
-        // Automatically start AI analysis
-        setTimeout(() => {
-          analyzeTranscription(result.transcription)
-        }, 1000)
-      } else {
-        throw new Error(result.error || 'Transcription failed')
-      }
-    } catch (error) {
-      console.error('❌ Transcription error:', error)
-      setUploadStatus('A transcrição falhou. Por favor, tente novamente.')
+      // Reset upload state after 3 seconds
       setTimeout(() => {
         setUploadedFile(null)
         setIsUploading(false)
         setUploadProgress(0)
         setUploadStatus('')
       }, 3000)
+      
+    } catch (error) {
+      console.error('❌ Vercel Blob upload error:', error)
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: '❌ Vercel Blob upload failed:',
+          data: { error: error instanceof Error ? error.message : String(error) }
+        })
+      })
+      throw error
     }
   }
 
@@ -617,7 +781,7 @@ export default function SalesAnalystPage() {
       const response = await fetch(`/api/sales-analyst/transcription/${call.id}`)
       if (response.ok) {
         const data = await response.json()
-        setSelectedCallTranscription(data.transcription || '')
+        // setSelectedCallTranscription(data.transcription || '') // This state is no longer needed
       }
     } catch (error) {
       console.error('Error fetching transcription:', error)
@@ -627,13 +791,13 @@ export default function SalesAnalystPage() {
   const getStatusIcon = (status: SalesCall['status']) => {
     switch (status) {
       case 'uploaded':
-        return <FileAudio className="w-4 h-4 text-blue-400" />
+        return <FileVideo className="w-4 h-4 text-blue-400" />
       case 'processing':
         return <Clock className="w-4 h-4 text-yellow-400 animate-spin" />
       case 'completed':
         return <CheckCircle className="w-4 h-4 text-green-400" />
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-400" />
+        return <AlertCircle className="w-4 h-4 text-red-400" />
     }
   }
 
@@ -744,6 +908,18 @@ export default function SalesAnalystPage() {
                     >
                       Escolher Ficheiro
                     </Button>
+                    <Button 
+                      onClick={debugAuth}
+                      className="bg-gray-600 hover:bg-gray-700 text-white"
+                    >
+                      Debug Auth
+                    </Button>
+                    <Button 
+                      onClick={refreshSession}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Refresh Session
+                    </Button>
                     {uploadedFile && (
                                               <Button 
                           variant="outline"
@@ -818,7 +994,7 @@ export default function SalesAnalystPage() {
                 variant="ghost" 
                 onClick={() => {
                   setSelectedCall(null)
-                  setSelectedCallTranscription('')
+                  // setSelectedCallTranscription('') // This state is no longer needed
                 }}
                 className="text-white hover:bg-white/10"
               >
@@ -840,37 +1016,37 @@ export default function SalesAnalystPage() {
                     <span className="text-white/60">Estado:</span>
                     <p className="text-white capitalize">{selectedCall.status}</p>
                   </div>
-                  {selectedCall.score && (
+                  {/* {selectedCall.score && ( // This field is no longer available in the new SalesCall interface
                     <div>
                       <span className="text-white/60">Pontuação:</span>
                       <p className="text-white">{selectedCall.score}/10</p>
                     </div>
-                  )}
+                  )} */}
                 </div>
 
-              {selectedCall.feedback && (
+              {/* {selectedCall.feedback && ( // This field is no longer available in the new SalesCall interface
                 <div>
                   <h3 className="font-semibold mb-2">Feedback da IA</h3>
                   <div className="p-4 bg-white/5 rounded border-l-4 border-purple-500">
                     <p className="text-white/80">{selectedCall.feedback}</p>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Transcription Display */}
-              {selectedCallTranscription && (
+              {/* {selectedCallTranscription && ( // This state is no longer needed
                 <div>
                   <h3 className="font-semibold mb-2">📝 Transcrição</h3>
                   <div className="p-4 bg-white/5 rounded border border-white/10 max-h-60 overflow-y-auto">
                     <p className="text-white/80 text-sm whitespace-pre-wrap">{selectedCallTranscription}</p>
                   </div>
                 </div>
-              )}
+              )} */}
 
               <div className="flex space-x-2">
                 {selectedCall.status === 'completed' && (
                   <Button 
-                    onClick={() => analyzeCall(selectedCall.id, selectedCall.transcription)}
+                    onClick={() => analyzeCall(selectedCall.id)}
                     className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
                   >
                     <Play className="w-4 h-4 mr-2" />
@@ -887,13 +1063,13 @@ export default function SalesAnalystPage() {
                     variant="outline" 
                     className="border-white/20 text-white hover:bg-white/10"
                     onClick={() => {
-                      setReportData({
-                        analysisResult: selectedCall,
-                        transcriptionStats: { wordCount: selectedCallTranscription.split(' ').length },
-                        fileName: selectedCall.title,
-                        uploadDate: selectedCall.uploadDate
-                      })
-                      setShowReport(true)
+                      // setReportData({ // This state is no longer needed
+                      //   analysisResult: selectedCall,
+                      //   transcriptionStats: { wordCount: selectedCallTranscription.split(' ').length },
+                      //   fileName: selectedCall.title,
+                      //   uploadDate: selectedCall.uploadDate
+                      // })
+                      // setShowReport(true)
                     }}
                   >
                     <FileText className="w-4 h-4 mr-2" />
@@ -906,7 +1082,7 @@ export default function SalesAnalystPage() {
       )}
 
       {/* Sales Report Modal */}
-      {showReport && reportData && (
+      {/* {showReport && reportData && ( // This state is no longer needed
         <div className="fixed inset-0 z-50">
           <SalesReport 
             analysisResult={reportData.analysisResult}
@@ -916,7 +1092,7 @@ export default function SalesAnalystPage() {
             onClose={() => setShowReport(false)}
           />
         </div>
-      )}
+      )} */}
     </div>
   )
 }

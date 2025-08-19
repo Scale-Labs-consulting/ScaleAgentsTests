@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { del } from '@vercel/blob'
 
 export async function POST(request: NextRequest) {
   try {
-    const { upload_url, fileName, userId, accessToken } = await request.json()
+    const { blobUrl, fileName, userId, accessToken, salesCallId } = await request.json()
 
-    if (!upload_url || !fileName || !userId || !accessToken) {
+    console.log('🎙️ Starting transcription for blob:', {
+      fileName,
+      blobUrl,
+      userId,
+      salesCallId
+    })
+
+    if (!blobUrl || !fileName || !userId || !accessToken || !salesCallId) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
-      )
-    }
-
-    // Check if Assembly AI API key is available
-    if (!process.env.ASSEMBLYAI_KEY) {
-      console.error('❌ Assembly AI API key not configured')
-      return NextResponse.json(
-        { error: 'Assembly AI API key not configured' },
-        { status: 500 }
       )
     }
 
@@ -30,83 +29,72 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('🎙️ Starting transcription for:', fileName)
+    // Create authenticated Supabase client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        }
+      }
+    )
 
-    // Step 1: Start transcription
-    console.log('🎙️ Starting transcription...')
-    const transcriptResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
+    // Update sales call status to processing
+    await supabase
+      .from('sales_calls')
+      .update({ status: 'processing' })
+      .eq('id', salesCallId)
+
+    console.log('🔄 Processing video from Vercel Blob...')
+
+    // Download the video from Vercel Blob
+    const videoResponse = await fetch(blobUrl)
+    if (!videoResponse.ok) {
+      throw new Error(`Failed to download video: ${videoResponse.statusText}`)
+    }
+
+    const videoBuffer = await videoResponse.arrayBuffer()
+    const videoBlob = new Blob([videoBuffer], { type: 'video/mp4' })
+
+    // Convert video to audio using OpenAI Whisper
+    console.log('🎵 Converting video to audio...')
+    
+    // Create FormData for Whisper API
+    const formData = new FormData()
+    formData.append('file', videoBlob, fileName)
+    formData.append('model', 'whisper-1')
+    formData.append('language', 'pt')
+    formData.append('response_format', 'verbose_json')
+    formData.append('timestamp_granularities', 'segment')
+
+    // Process with OpenAI Whisper
+    console.log('📤 Sending to OpenAI Whisper...')
+    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
-        'Authorization': process.env.ASSEMBLYAI_KEY!,
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_KEY}`
       },
-      body: JSON.stringify({
-        audio_url: upload_url,
-        language_code: 'pt', // Portuguese
-      }),
+      body: formData
     })
 
-    console.log('📥 Transcript response status:', transcriptResponse.status)
-
-    if (!transcriptResponse.ok) {
-      const errorText = await transcriptResponse.text()
-      console.error('❌ Assembly AI transcription error:', errorText)
-      return NextResponse.json(
-        { error: `Failed to start transcription: ${transcriptResponse.status} - ${errorText.substring(0, 200)}` },
-        { status: 500 }
-      )
+    if (!whisperResponse.ok) {
+      const errorText = await whisperResponse.text()
+      console.error('❌ Whisper API error:', errorText)
+      throw new Error(`Whisper API failed: ${whisperResponse.statusText}`)
     }
 
-    const transcriptData = await transcriptResponse.json()
-    const { id: transcriptId } = transcriptData
-    console.log('✅ Transcription started with ID:', transcriptId)
+    const whisperResult = await whisperResponse.json()
+    const transcription = whisperResult.text
 
-    // Step 2: Poll for completion
-    let transcription = null
-    let attempts = 0
-    const maxAttempts = 60 // 5 minutes with 5-second intervals
+    console.log('✅ Transcription completed:', transcription.length, 'characters')
 
-    while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
-      attempts++
-
-      const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
-        headers: {
-          'Authorization': process.env.ASSEMBLYAI_KEY!,
-        },
-      })
-
-      if (!statusResponse.ok) {
-        console.error('Failed to check transcription status:', statusResponse.status)
-        continue
-      }
-
-      const transcriptStatusData = await statusResponse.json()
-      console.log(`📊 Transcription status: ${transcriptStatusData.status} (attempt ${attempts})`)
-
-      if (transcriptStatusData.status === 'completed') {
-        transcription = transcriptStatusData.text
-        console.log('✅ Transcription completed!')
-        break
-      } else if (transcriptStatusData.status === 'error') {
-        return NextResponse.json(
-          { error: 'Transcription failed' },
-          { status: 500 }
-        )
-      }
-    }
-
-    if (!transcription) {
-      return NextResponse.json(
-        { error: 'Transcription timed out' },
-        { status: 500 }
-      )
-    }
-
-    // Step 3: Analyze with ChatGPT
-    console.log('🤖 Analyzing transcription with ChatGPT...')
+    // Analyze with ChatGPT
+    console.log('🤖 Analyzing with ChatGPT...')
     
-    // Truncate transcription to avoid token limits (keep first 8000 characters)
+    // Truncate transcription to avoid token limits
     const truncatedTranscription = transcription.length > 8000 
       ? transcription.substring(0, 8000) + '... [truncated]'
       : transcription
@@ -178,19 +166,13 @@ IMPORTANTE:
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text()
       console.error('❌ OpenAI analysis error:', errorText)
-      return NextResponse.json(
-        { error: `Failed to analyze with OpenAI: ${openaiResponse.status} - ${errorText.substring(0, 200)}` },
-        { status: 500 }
-      )
+      throw new Error(`OpenAI analysis failed: ${openaiResponse.statusText}`)
     }
 
     const openaiData = await openaiResponse.json()
     const analysisContent = openaiData.choices[0].message.content
     
-    // Parse the text response from ChatGPT
-    console.log('📝 ChatGPT analysis response:', analysisContent)
-    
-    // Extract information from the text response
+    // Parse the analysis
     const callTypeMatch = analysisContent.match(/\*\*TIPO DE CHAMADA:\*\*\s*(.+?)(?=\n\*\*|$)/i)
     const scoreMatch = analysisContent.match(/\*\*PONTUAÇÃO GERAL:\*\*\s*(\d+)/i)
     const strengthsMatch = analysisContent.match(/\*\*PONTOS FORTES:\*\*([\s\S]*?)(?=\n\*\*|$)/i)
@@ -199,7 +181,6 @@ IMPORTANTE:
     const objectionsMatch = analysisContent.match(/\*\*OBJEÇÕES E TRATAMENTO:\*\*([\s\S]*?)(?=\n\*\*|$)/i)
     const feedbackMatch = analysisContent.match(/\*\*FEEDBACK GERAL:\*\*([\s\S]*?)(?=\n\*\*|$)/i)
     
-    // Extract bullet points from sections
     const extractBulletPoints = (text: string) => {
       if (!text) return []
       return text
@@ -221,19 +202,7 @@ IMPORTANTE:
       }
     }
 
-    // Step 4: Store analysis in sales_call_analyses table
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
-        }
-      }
-    )
-
+    // Store analysis in database
     const analysisData = {
       user_id: userId,
       title: fileName.replace(/\.[^/.]+$/, ''),
@@ -243,13 +212,12 @@ IMPORTANTE:
       score: analysis.score,
       analysis: analysis.analysis,
       analysis_metadata: {
-        assembly_ai_transcript_id: transcriptId,
-        transcription_url: `https://api.assemblyai.com/v2/transcript/${transcriptId}`,
+        blob_url: blobUrl,
         original_transcription_length: transcription.length,
         truncated_transcription_length: truncatedTranscription.length,
         tokens_used: openaiData.usage?.total_tokens || 0
       },
-      transcription: truncatedTranscription // Store truncated version for reference
+      transcription: truncatedTranscription
     }
 
     const { data: salesAnalysis, error: dbError } = await supabase
@@ -259,25 +227,60 @@ IMPORTANTE:
       .single()
 
     if (dbError) {
-      console.error('Database error:', dbError)
+      console.error('❌ Database error:', dbError)
       return NextResponse.json(
         { error: 'Failed to create analysis record' },
         { status: 500 }
       )
     }
 
-    console.log('✅ Analysis record created:', salesAnalysis.id)
+    // Update sales call status to completed
+    await supabase
+      .from('sales_calls')
+      .update({ 
+        status: 'completed',
+        duration: 0 // Could calculate from video metadata if needed
+      })
+      .eq('id', salesCallId)
+
+    console.log('✅ Analysis completed and stored:', salesAnalysis.id)
+
+    // Delete the file from Vercel Blob to save storage costs
+    try {
+      console.log('🗑️ Deleting file from Vercel Blob to save storage costs...')
+      await del(blobUrl)
+      console.log('✅ File deleted from Vercel Blob successfully')
+      
+      // Update the sales call record to remove the blob URL since it's deleted
+      await supabase
+        .from('sales_calls')
+        .update({ 
+          file_url: null,
+          metadata: {
+            blob_deleted: true,
+            deleted_at: new Date().toISOString(),
+            original_blob_url: blobUrl
+          }
+        })
+        .eq('id', salesCallId)
+        
+    } catch (deleteError) {
+      console.warn('⚠️ Failed to delete blob file:', deleteError)
+      // Don't fail the entire process if blob deletion fails
+      // The file will eventually be cleaned up by Vercel's retention policies
+    }
 
     return NextResponse.json({
       success: true,
       analysis: salesAnalysis,
-      transcription: truncatedTranscription
+      transcription: truncatedTranscription,
+      message: 'Analysis completed successfully'
     })
 
   } catch (error) {
-    console.error('❌ Assembly AI transcription error:', error)
+    console.error('❌ Blob transcription error:', error)
     return NextResponse.json(
-      { error: `Internal server error: ${error instanceof Error ? error.message : String(error)}` },
+      { error: `Transcription failed: ${error instanceof Error ? error.message : String(error)}` },
       { status: 500 }
     )
   }

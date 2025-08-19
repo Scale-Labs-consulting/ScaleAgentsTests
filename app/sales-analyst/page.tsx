@@ -183,6 +183,22 @@ export default function SalesAnalystPage() {
       body: JSON.stringify({ message: '🚀 Starting upload process...' })
     })
     
+    // Check file size - use chunked upload for files larger than 4MB
+    const CHUNK_SIZE = 4 * 1024 * 1024 // 4MB chunks
+    const MAX_DIRECT_UPLOAD = 4 * 1024 * 1024 // 4MB
+    
+    if (file.size > MAX_DIRECT_UPLOAD) {
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: '📦 File is large, using chunked upload...',
+          data: { fileSize: file.size, chunkSize: CHUNK_SIZE }
+        })
+      })
+      return await uploadFileChunked(file, accessToken, CHUNK_SIZE)
+    }
+    
     const formData = new FormData()
     formData.append('file', file)
     formData.append('title', file.name.replace(/\.[^/.]+$/, ''))
@@ -307,6 +323,136 @@ export default function SalesAnalystPage() {
       }
       
       throw new Error(result.error || result.message || 'A transcrição falhou - estrutura de resposta inesperada')
+    }
+  }
+
+  const uploadFileChunked = async (file: File, accessToken: string, chunkSize: number) => {
+    const totalChunks = Math.ceil(file.size / chunkSize)
+    setUploadStatus(`A carregar ficheiro em ${totalChunks} partes...`)
+    
+    await fetch('/api/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        message: '📦 Starting chunked upload:',
+        data: { totalChunks, chunkSize, fileSize: file.size }
+      })
+    })
+
+    try {
+      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        const start = chunkIndex * chunkSize
+        const end = Math.min(start + chunkSize, file.size)
+        const chunk = file.slice(start, end)
+        
+        const formData = new FormData()
+        formData.append('chunk', chunk)
+        formData.append('chunkIndex', chunkIndex.toString())
+        formData.append('totalChunks', totalChunks.toString())
+        formData.append('fileName', file.name)
+        formData.append('userId', user.id)
+        formData.append('accessToken', accessToken)
+        formData.append('fileSize', file.size.toString())
+
+        setUploadStatus(`A carregar parte ${chunkIndex + 1} de ${totalChunks}...`)
+        setUploadProgress((chunkIndex / totalChunks) * 80) // 80% for upload, 20% for processing
+
+        await fetch('/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: `📦 Uploading chunk ${chunkIndex + 1}/${totalChunks}`
+          })
+        })
+
+        const response = await fetch('/api/sales-analyst/upload-chunked', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(`Chunk ${chunkIndex + 1} upload failed: ${errorData.error}`)
+        }
+
+        const result = await response.json()
+        
+        // If this is the last chunk, the file is complete
+        if (chunkIndex === totalChunks - 1 && result.success && result.salesCall) {
+          await fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              message: '✅ Chunked upload completed successfully!',
+              data: result.salesCall
+            })
+          })
+          
+          setUploadStatus('Ficheiro carregado! A iniciar transcrição...')
+          setUploadProgress(85)
+          
+          // Start transcription process
+          await startTranscription(result.salesCall.id, result.salesCall.file_url)
+          return
+        }
+      }
+    } catch (error) {
+      console.error('❌ Chunked upload error:', error)
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: '❌ Chunked upload failed:',
+          data: { error: error instanceof Error ? error.message : String(error) }
+        })
+      })
+      throw error
+    }
+  }
+
+  const startTranscription = async (callId: string, fileUrl: string) => {
+    try {
+      setUploadStatus('A iniciar transcrição...')
+      setUploadProgress(90)
+      
+      const response = await fetch('/api/sales-analyst/transcription/' + callId, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fileUrl: fileUrl,
+          userId: user.id
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Transcription failed')
+      }
+
+      const result = await response.json()
+      
+      if (result.success && result.transcription) {
+        setUploadStatus('Transcrição concluída! A iniciar análise de IA...')
+        setUploadProgress(95)
+        
+        // Automatically start AI analysis
+        setTimeout(() => {
+          analyzeTranscription(result.transcription)
+        }, 1000)
+      } else {
+        throw new Error(result.error || 'Transcription failed')
+      }
+    } catch (error) {
+      console.error('❌ Transcription error:', error)
+      setUploadStatus('A transcrição falhou. Por favor, tente novamente.')
+      setTimeout(() => {
+        setUploadedFile(null)
+        setIsUploading(false)
+        setUploadProgress(0)
+        setUploadStatus('')
+      }, 3000)
     }
   }
 

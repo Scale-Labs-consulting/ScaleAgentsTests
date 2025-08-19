@@ -208,8 +208,16 @@ export default function SalesAnalystPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Upload failed')
+        let errorMessage = 'Upload failed'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || 'Upload failed'
+        } catch (parseError) {
+          // If response is not JSON, get the text
+          const errorText = await response.text()
+          errorMessage = `Upload failed: ${response.status} - ${errorText.substring(0, 200)}`
+        }
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()

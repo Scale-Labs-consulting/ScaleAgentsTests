@@ -343,37 +343,22 @@ export function SalesReport({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {analysisResult.strengths ? (
+                {analysisResult.analysis?.strengths ? (
                   <div className="space-y-4">
-                    {(() => {
-                      const strengthsText = renderAnalysisField(analysisResult.strengths)
-                      
-                      // Handle different data structures
-                      let content = strengthsText
-                      if (typeof strengthsText === 'object') {
-                        if (strengthsText.raw) {
-                          content = strengthsText.raw
-                        } else if (strengthsText.description) {
-                          content = strengthsText.description
-                        } else if (Array.isArray(strengthsText)) {
-                          content = strengthsText.map(item => 
-                            typeof item === 'object' && item.description ? item.description : String(item)
-                          ).join('\n\n')
-                        }
-                      }
-                      
-                      // Convert bullet points to markdown format
-                      const markdownContent = content
-                        .replace(/(?:\n|^)(?:[-•]\s*|\.\s*-\s*)/g, '\n• ') // Convert bullet points to markdown
-                        .replace(/\n\n+/g, '\n\n') // Clean up multiple line breaks
-                        .trim()
-                      
-                      return (
-                        <div className="prose prose-invert max-w-none">
-                          <MarkdownRenderer content={markdownContent} />
-                        </div>
-                      )
-                    })()}
+                    {Array.isArray(analysisResult.analysis.strengths) ? (
+                      <ul className="space-y-2">
+                        {analysisResult.analysis.strengths.map((strength: string, index: number) => (
+                          <li key={index} className="flex items-start space-x-2">
+                            <span className="text-green-400 mt-1">•</span>
+                            <span className="text-white/90 text-sm">{strength}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="prose prose-invert max-w-none">
+                        <MarkdownRenderer content={String(analysisResult.analysis.strengths)} />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-white/60 text-sm">No specific strengths identified</p>
@@ -393,37 +378,22 @@ export function SalesReport({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {analysisResult.weaknesses ? (
+                {analysisResult.analysis?.improvements ? (
                   <div className="space-y-4">
-                    {(() => {
-                      const weaknessesText = renderAnalysisField(analysisResult.weaknesses)
-                      
-                      // Handle different data structures
-                      let content = weaknessesText
-                      if (typeof weaknessesText === 'object') {
-                        if (weaknessesText.raw) {
-                          content = weaknessesText.raw
-                        } else if (weaknessesText.description) {
-                          content = weaknessesText.description
-                        } else if (Array.isArray(weaknessesText)) {
-                          content = weaknessesText.map(item => 
-                            typeof item === 'object' && item.description ? item.description : String(item)
-                          ).join('\n\n')
-                        }
-                      }
-                      
-                      // Convert bullet points to markdown format
-                      const markdownContent = content
-                        .replace(/(?:\n|^)(?:[-•]\s*|\.\s*-\s*)/g, '\n• ') // Convert bullet points to markdown
-                        .replace(/\n\n+/g, '\n\n') // Clean up multiple line breaks
-                        .trim()
-                      
-                      return (
-                        <div className="prose prose-invert max-w-none">
-                          <MarkdownRenderer content={markdownContent} />
-                        </div>
-                      )
-                    })()}
+                    {Array.isArray(analysisResult.analysis.improvements) ? (
+                      <ul className="space-y-2">
+                        {analysisResult.analysis.improvements.map((improvement: string, index: number) => (
+                          <li key={index} className="flex items-start space-x-2">
+                            <span className="text-red-400 mt-1">•</span>
+                            <span className="text-white/90 text-sm">{improvement}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="prose prose-invert max-w-none">
+                        <MarkdownRenderer content={String(analysisResult.analysis.improvements)} />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-white/60 text-sm">No specific areas for improvement identified</p>

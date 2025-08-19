@@ -14,18 +14,7 @@ const nextConfig = {
     // Optimize for performance
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
-  api: {
-    bodyParser: {
-      sizeLimit: false, // No size limit for file uploads
-    },
-    responseLimit: false,
-  },
-  serverRuntimeConfig: {
-    // Increase timeout for large file processing
-    maxDuration: 1800, // 30 minutes in seconds
-  },
   // Optimize for Vercel
-  swcMinify: true,
   compress: true,
   poweredByHeader: false,
 }

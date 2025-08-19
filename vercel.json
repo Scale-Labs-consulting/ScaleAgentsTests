@@ -7,5 +7,6 @@
     "app/api/**/*.ts": {
       "maxDuration": 900
     }
-  }
+  },
+  "deploymentTimestamp": "2024-12-19T11:50:00Z"
 }

@@ -5,7 +5,7 @@
   "installCommand": "pnpm install",
   "functions": {
     "app/api/**/*.ts": {
-      "maxDuration": 1800
+      "maxDuration": 900
     }
   }
 }

@@ -180,29 +180,29 @@ export default function SalesAnalystPage() {
     await fetch('/api/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: '🚀 Starting Supabase upload...' })
+      body: JSON.stringify({ message: '🚀 Starting direct Assembly AI upload...' })
     })
     
     try {
-      setUploadStatus('A carregar ficheiro para Supabase Storage...')
+      setUploadStatus('A carregar ficheiro diretamente para Assembly AI...')
       setUploadProgress(25)
 
       await fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '📤 Starting upload to Supabase Storage',
+          message: '📤 Starting direct Assembly AI upload',
           data: { fileName: file.name, fileSize: file.size }
         })
       })
 
-      // Upload directly to Supabase Storage
+      // Upload directly to Assembly AI
       const formData = new FormData()
       formData.append('file', file)
       formData.append('userId', user.id)
       formData.append('accessToken', accessToken)
 
-      const response = await fetch('/api/sales-analyst/blob-upload', {
+      const response = await fetch('/api/sales-analyst/assembly-upload', {
         method: 'POST',
         body: formData
       })
@@ -218,24 +218,29 @@ export default function SalesAnalystPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '✅ Supabase upload completed!',
-          data: { salesCall: result.salesCall }
+          message: '✅ Assembly AI upload and transcription completed!',
+          data: { 
+            transcriptionLength: result.transcription?.length || 0,
+            salesCall: result.salesCall 
+          }
         })
       })
 
-      setUploadStatus('Ficheiro carregado! A iniciar transcrição...')
-      setUploadProgress(85)
+      setUploadStatus('Transcrição concluída! A iniciar análise de IA...')
+      setUploadProgress(95)
 
-      // Start transcription process with the Supabase URL
-      await startTranscriptionFromBlob(result.salesCall.file_url, file.name)
+      // Automatically start AI analysis with transcription
+      setTimeout(() => {
+        analyzeTranscription(result.transcription)
+      }, 1000)
       
     } catch (error) {
-      console.error('❌ Supabase upload error:', error)
+      console.error('❌ Assembly AI upload error:', error)
       await fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '❌ Supabase upload failed:',
+          message: '❌ Assembly AI upload failed:',
           data: { error: error instanceof Error ? error.message : String(error) }
         })
       })

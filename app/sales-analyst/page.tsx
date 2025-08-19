@@ -177,52 +177,79 @@ export default function SalesAnalystPage() {
   }
 
   const uploadFileDirectly = async (file: File, accessToken: string) => {
-    await fetch('/api/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: '🚀 Starting direct Assembly AI upload...' })
-    })
-    
     try {
-      setUploadStatus('A carregar ficheiro diretamente para Assembly AI...')
-      setUploadProgress(25)
-
+      console.log('🚀 Starting direct Assembly AI upload...')
       await fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '📤 Starting direct Assembly AI upload',
+          message: '🚀 Starting direct Assembly AI upload...',
           data: { fileName: file.name, fileSize: file.size }
         })
       })
 
-      // Upload directly to Assembly AI
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('userId', user.id)
-      formData.append('accessToken', accessToken)
-
-      const response = await fetch('/api/sales-analyst/assembly-upload', {
+      // Step 1: Get Assembly AI upload URL from our backend
+      const uploadUrlResponse = await fetch('/api/sales-analyst/assembly-upload-url', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileSize: file.size,
+          userId: user.id,
+          accessToken: accessToken
+        })
       })
 
-      if (!response.ok) {
-        let errorMessage = 'Upload failed'
-        try {
-          // Clone the response before reading it
-          const responseClone = response.clone()
-          const errorData = await responseClone.json()
-          errorMessage = errorData.error || 'Upload failed'
-        } catch (parseError) {
-          // If response is not JSON, get the text from the original response
-          const errorText = await response.text()
-          errorMessage = `Upload failed: ${response.status} - ${errorText.substring(0, 200)}`
-        }
-        throw new Error(errorMessage)
+      if (!uploadUrlResponse.ok) {
+        const responseClone = uploadUrlResponse.clone()
+        const errorData = await responseClone.json()
+        throw new Error(errorData.error || 'Failed to get upload URL')
       }
 
-      const result = await response.json()
+      const { upload_url } = await uploadUrlResponse.json()
+
+      // Step 2: Upload directly to Assembly AI
+      setUploadStatus('A fazer upload para Assembly AI...')
+      setUploadProgress(30)
+
+      const assemblyUploadResponse = await fetch(upload_url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+        body: file
+      })
+
+      if (!assemblyUploadResponse.ok) {
+        throw new Error(`Assembly AI upload failed: ${assemblyUploadResponse.status}`)
+      }
+
+      // Step 3: Start transcription
+      setUploadStatus('A iniciar transcrição...')
+      setUploadProgress(60)
+
+      const transcriptionResponse = await fetch('/api/sales-analyst/assembly-transcribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          upload_url: upload_url,
+          fileName: file.name,
+          userId: user.id,
+          accessToken: accessToken
+        })
+      })
+
+      if (!transcriptionResponse.ok) {
+        const responseClone = transcriptionResponse.clone()
+        const errorData = await responseClone.json()
+        throw new Error(errorData.error || 'Transcription failed')
+      }
+
+      const result = await transcriptionResponse.json()
 
       await fetch('/api/log', {
         method: 'POST',
@@ -231,7 +258,7 @@ export default function SalesAnalystPage() {
           message: '✅ Assembly AI upload and transcription completed!',
           data: { 
             transcriptionLength: result.transcription?.length || 0,
-            salesCall: result.salesCall 
+            analysis: result.analysis 
           }
         })
       })

@@ -11,7 +11,8 @@ const nextConfig = {
   },
   serverExternalPackages: ['@supabase/supabase-js'],
   experimental: {
-    // Remove deprecated serverComponentsExternalPackages
+    // Optimize for performance
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
   api: {
     bodyParser: {
@@ -23,6 +24,10 @@ const nextConfig = {
     // Increase timeout for large file processing
     maxDuration: 1800, // 30 minutes in seconds
   },
+  // Optimize for Vercel
+  swcMinify: true,
+  compress: true,
+  poweredByHeader: false,
 }
 
 export default nextConfig

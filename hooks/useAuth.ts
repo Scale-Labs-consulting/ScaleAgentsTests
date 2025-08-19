@@ -15,7 +15,7 @@ export function useAuth() {
   const authListenerRef = useRef<{ subscription: any } | null>(null)
   const isInitializingRef = useRef(false)
 
-  // Initialize auth state
+  // Simplified auth initialization
   const initializeAuth = useCallback(async () => {
     if (isInitializingRef.current) return
     isInitializingRef.current = true
@@ -23,99 +23,31 @@ export function useAuth() {
     try {
       console.log('🔐 Initializing auth state...')
       
-      // Add timeout to prevent infinite loading
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Auth initialization timeout')), 30000) // 30 second timeout
-      })
+      // Quick session check with timeout
+      const { data: { session }, error } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth timeout')), 5000)
+        )
+      ])
       
-      const authPromise = (async () => {
-        console.log('🔄 Starting auth initialization...')
+      if (error) {
+        console.error('❌ Session error:', error)
+        setUser(null)
+        setProfile(null)
+      } else if (session) {
+        console.log('✅ Active session found')
+        setUser(session.user)
         
-        // Get current session
-        console.log('🔄 Getting current session...')
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        console.log('🔄 Session result:', { hasSession: !!session, hasError: !!sessionError })
-        
-        if (sessionError) {
-          console.error('❌ Session error:', sessionError)
-          // Try to refresh the session
-          console.log('🔄 Attempting session refresh...')
-          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
-          console.log('🔄 Refresh result:', { hasSession: !!refreshedSession, hasError: !!refreshError })
-          
-          if (refreshError) {
-            console.error('❌ Refresh error:', refreshError)
-          } else if (refreshedSession) {
-            console.log('✅ Session refreshed')
-            setUser(refreshedSession.user)
-            // Fetch profile after setting user
-            console.log('🔄 Fetching profile for refreshed session...')
-            try {
-              const { data: profile, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', refreshedSession.user.id)
-                .single()
-
-              if (error) {
-                console.error('❌ Profile fetch error:', error)
-                if (error.code === 'PGRST116') {
-                  console.log('📝 Creating missing profile...')
-                  await createProfile(refreshedSession.user.id)
-                }
-              } else {
-                console.log('✅ Profile loaded')
-                setProfile(profile)
-              }
-            } catch (error) {
-              console.error('❌ Profile error:', error)
-            }
-          }
-        } else if (session) {
-          console.log('✅ Active session found:', session.user.email)
-          setUser(session.user)
-          // Fetch profile after setting user
-          console.log('🔄 Fetching profile for existing session...')
-          try {
-            const { data: profile, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single()
-
-            if (error) {
-              console.error('❌ Profile fetch error:', error)
-              if (error.code === 'PGRST116') {
-                console.log('📝 Creating missing profile...')
-                await createProfile(session.user.id)
-              }
-            } else {
-              console.log('✅ Profile loaded')
-              setProfile(profile)
-            }
-          } catch (error) {
-            console.error('❌ Profile error:', error)
-          }
-        } else {
-          console.log('ℹ️ No active session')
-        }
-        
-        console.log('✅ Auth initialization completed successfully')
-      })()
-      
-      try {
-        await Promise.race([authPromise, timeoutPromise])
-      } catch (timeoutError) {
-        if (timeoutError instanceof Error && timeoutError.message === 'Auth initialization timeout') {
-          console.warn('⚠️ Auth initialization timed out, continuing with current state...')
-          // Don't throw the error, just continue
-        } else {
-          throw timeoutError
-        }
+        // Fetch profile in background (don't block initialization)
+        fetchProfile(session.user.id).catch(console.error)
+      } else {
+        console.log('ℹ️ No active session')
+        setUser(null)
+        setProfile(null)
       }
     } catch (error) {
       console.error('❌ Auth initialization error:', error)
-      // Force initialization to complete even on error
       setUser(null)
       setProfile(null)
     } finally {
@@ -125,10 +57,9 @@ export function useAuth() {
     }
   }, [])
 
-  // Fetch user profile
+  // Fetch user profile (non-blocking)
   const fetchProfile = useCallback(async (userId: string) => {
     try {
-      console.log('👤 Fetching profile for:', userId)
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -138,11 +69,9 @@ export function useAuth() {
       if (error) {
         console.error('❌ Profile fetch error:', error)
         if (error.code === 'PGRST116') {
-          console.log('📝 Creating missing profile...')
           await createProfile(userId)
         }
       } else {
-        console.log('✅ Profile loaded')
         setProfile(profile)
       }
     } catch (error) {
@@ -167,7 +96,6 @@ export function useAuth() {
       if (error) {
         console.error('❌ Profile creation error:', error)
       } else {
-        console.log('✅ Profile created')
         setProfile(profile)
       }
     } catch (error) {
@@ -177,95 +105,45 @@ export function useAuth() {
 
   // Set up auth state listener
   useEffect(() => {
-    // Clean up previous listener
     if (authListenerRef.current?.subscription) {
       authListenerRef.current.subscription.unsubscribe()
       authListenerRef.current = null
     }
 
-    console.log('🔄 Setting up auth listener...')
-    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state change:', event, session?.user?.email)
+        console.log('🔄 Auth state change:', event)
         
         switch (event) {
           case 'SIGNED_IN':
-            console.log('✅ User signed in')
             setUser(session?.user ?? null)
             if (session?.user) {
-              // Fetch profile inline to avoid circular dependency
-              try {
-                const { data: profile, error } = await supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('id', session.user.id)
-                  .single()
-
-                if (error) {
-                  console.error('❌ Profile fetch error:', error)
-                  if (error.code === 'PGRST116') {
-                    console.log('📝 Creating missing profile...')
-                    await createProfile(session.user.id)
-                  }
-                } else {
-                  console.log('✅ Profile loaded')
-                  setProfile(profile)
-                }
-              } catch (error) {
-                console.error('❌ Profile error:', error)
-              }
+              fetchProfile(session.user.id).catch(console.error)
             }
             setLoading(false)
             break
             
           case 'SIGNED_OUT':
-            console.log('🚪 User signed out')
             setUser(null)
             setProfile(null)
             setLoading(false)
             break
             
           case 'TOKEN_REFRESHED':
-            console.log('🔄 Token refreshed')
             setUser(session?.user ?? null)
             if (session?.user) {
-              // Fetch profile inline to avoid circular dependency
-              try {
-                const { data: profile, error } = await supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('id', session.user.id)
-                  .single()
-
-                if (error) {
-                  console.error('❌ Profile fetch error:', error)
-                  if (error.code === 'PGRST116') {
-                    console.log('📝 Creating missing profile...')
-                    await createProfile(session.user.id)
-                  }
-                } else {
-                  console.log('✅ Profile loaded')
-                  setProfile(profile)
-                }
-              } catch (error) {
-                console.error('❌ Profile error:', error)
-              }
+              fetchProfile(session.user.id).catch(console.error)
             }
             break
             
           case 'USER_UPDATED':
-            console.log('👤 User updated')
             setUser(session?.user ?? null)
             break
         }
       }
     )
 
-    // Store the subscription for cleanup
     authListenerRef.current = { subscription }
-
-    // Initialize auth state
     initializeAuth()
 
     return () => {
@@ -274,9 +152,9 @@ export function useAuth() {
         authListenerRef.current = null
       }
     }
-  }, [initializeAuth])
+  }, [initializeAuth, fetchProfile])
 
-  // Handle navigation when auth state changes
+  // Simplified navigation handling
   useEffect(() => {
     if (!initialized) return
 
@@ -284,10 +162,8 @@ export function useAuth() {
     const publicPaths = ['/login', '/register', '/']
     
     if (!user && !publicPaths.includes(currentPath)) {
-      console.log('🚪 Redirecting to login - no user')
       router.push('/login')
     } else if (user && publicPaths.includes(currentPath) && currentPath !== '/') {
-      console.log('🏠 Redirecting to dashboard - user logged in')
       router.push('/dashboard')
     }
   }, [user, initialized, router])
@@ -315,18 +191,12 @@ export function useAuth() {
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('🔐 Attempting sign in...')
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) {
-        console.error('❌ Sign in error:', error)
-        throw error
-      }
-      
-      console.log('✅ Sign in successful')
+      if (error) throw error
       return data
     } catch (error) {
       console.error('❌ Sign in error:', error)
@@ -336,38 +206,17 @@ export function useAuth() {
 
   const signOut = async () => {
     try {
-      console.log('🚪 Signing out...')
-      console.log('🔍 Current user before signOut:', user?.email)
-      
-      // Clear state immediately
       setUser(null)
       setProfile(null)
       
-      // Sign out from Supabase
       const { error } = await supabase.auth.signOut()
-      console.log('🔍 Supabase signOut result:', { error: error?.message || 'No error' })
-      
       if (error) {
-        console.error('❌ Supabase signOut error:', error)
-        // Continue with logout even if Supabase fails
+        console.error('❌ Sign out error:', error)
       }
       
-      // Clear localStorage manually to ensure logout
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.removeItem('scaleagents-auth')
-          console.log('✅ localStorage cleared')
-        } catch (e) {
-          console.log('⚠️ Could not clear localStorage:', e)
-        }
-      }
-      
-      console.log('✅ Logout completed, redirecting to login...')
       router.push('/login')
-      console.log('✅ Redirect initiated')
     } catch (error) {
       console.error('❌ Sign out error:', error)
-      // Force redirect even if there's an error
       router.push('/login')
     }
   }
@@ -393,16 +242,6 @@ export function useAuth() {
     }
   }
 
-  // Reset auth state (useful for debugging)
-  const resetAuth = useCallback(() => {
-    console.log('🔄 Resetting auth state...')
-    setUser(null)
-    setProfile(null)
-    setLoading(false)
-    setInitialized(true)
-    isInitializingRef.current = false
-  }, [])
-
   return {
     user,
     profile,
@@ -412,6 +251,5 @@ export function useAuth() {
     signIn,
     signOut,
     updateProfile,
-    resetAuth,
   }
 }

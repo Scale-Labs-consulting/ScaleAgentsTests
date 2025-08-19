@@ -2,11 +2,5 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "installCommand": "pnpm install",
-  "functions": {
-    "app/api/**/*.ts": {
-      "maxDuration": 900
-    }
-  },
-  "deploymentTimestamp": "2024-12-19T11:50:00Z"
+  "installCommand": "pnpm install"
 }

@@ -180,229 +180,56 @@ export default function SalesAnalystPage() {
     await fetch('/api/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: '🚀 Starting upload process...' })
+      body: JSON.stringify({ message: '🚀 Starting Vercel Blob upload...' })
     })
     
-    // Check file size - use chunked upload for files larger than 4MB
-    const CHUNK_SIZE = 4 * 1024 * 1024 // 4MB chunks
-    const MAX_DIRECT_UPLOAD = 4 * 1024 * 1024 // 4MB
-    
-    if (file.size > MAX_DIRECT_UPLOAD) {
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '📦 File is large, using chunked upload...',
-          data: { fileSize: file.size, chunkSize: CHUNK_SIZE }
-        })
-      })
-      return await uploadFileChunked(file, accessToken, CHUNK_SIZE)
-    }
-    
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('title', file.name.replace(/\.[^/.]+$/, ''))
-    formData.append('userId', user.id)
-    formData.append('accessToken', accessToken)
-
-    await fetch('/api/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: '📤 Sending to API...' })
-    })
-    setUploadStatus('A enviar ficheiro para OpenAI... (Isto pode demorar 10-30 minutos para ficheiros grandes)')
-    setUploadProgress(25)
-
-    // Add timeout to prevent hanging - increased for large files
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 1800000) // 30 minutes timeout for large files
-    
-    const response = await fetch('/api/sales-analyst/upload', {
-      method: 'POST',
-      body: formData,
-      signal: controller.signal
-    })
-    
-    clearTimeout(timeoutId)
-
-    await fetch('/api/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        message: '📥 API Response status:',
-        data: { status: response.status }
-      })
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ API Error Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorText: errorText
-      })
-      throw new Error(`Upload failed: ${response.status} - ${errorText}`)
-    }
-    
-    // Check if the request was aborted (timeout)
-    if (response.status === 0) {
-      throw new Error('O carregamento expirou após 30 minutos. Por favor, tente com um ficheiro mais pequeno ou verifique a sua ligação à internet.')
-    }
-
-    const result = await response.json()
-    console.log('📥 API Response result:', result)
-    await fetch('/api/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        message: '📥 Frontend received result:',
-        data: { success: result.success, stats: result.stats }
-      })
-    })
-    
-    if (result.success && result.transcription) {
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: '✅ Transcription successful!' })
-      })
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '📊 Stats:',
-          data: result.stats
-        })
-      })
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '📝 Full transcription:',
-          data: result.transcription
-        })
-      })
-      
-      // Add to sales calls list with processing status
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '📝 Transcription completed:',
-          data: {
-            transcriptionLength: result.transcription?.length || 0,
-            transcriptionPreview: result.transcription?.substring(0, 100) + '...'
-          }
-        })
-      })
-     
-      setUploadStatus('Transcrição concluída! A iniciar análise de IA...')
-      setUploadProgress(90)
-      
-      // Keep upload state active during analysis
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-      
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: '🔄 Automatically starting AI analysis in 1 second...' })
-      })
-      
-      // Automatically start AI analysis with transcription
-      setTimeout(() => {
-        analyzeTranscription(result.transcription)
-      }, 1000) // Small delay to show the processing status
-    } else {
-      console.error('❌ Transcription failed:', result)
-      
-      // Reset the file input on error too
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-      
-      throw new Error(result.error || result.message || 'A transcrição falhou - estrutura de resposta inesperada')
-    }
-  }
-
-  const uploadFileChunked = async (file: File, accessToken: string, chunkSize: number) => {
-    const totalChunks = Math.ceil(file.size / chunkSize)
-    setUploadStatus(`A carregar ficheiro em ${totalChunks} partes...`)
-    
-    await fetch('/api/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        message: '📦 Starting chunked upload:',
-        data: { totalChunks, chunkSize, fileSize: file.size }
-      })
-    })
-
     try {
-      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-        const start = chunkIndex * chunkSize
-        const end = Math.min(start + chunkSize, file.size)
-        const chunk = file.slice(start, end)
-        
-        const formData = new FormData()
-        formData.append('chunk', chunk)
-        formData.append('chunkIndex', chunkIndex.toString())
-        formData.append('totalChunks', totalChunks.toString())
-        formData.append('fileName', file.name)
-        formData.append('userId', user.id)
-        formData.append('accessToken', accessToken)
-        formData.append('fileSize', file.size.toString())
+      // Use Vercel Blob for direct upload (no size limits)
+      const { upload } = await import('@vercel/blob/client')
+      
+      setUploadStatus('A carregar ficheiro diretamente para Vercel Blob...')
+      setUploadProgress(25)
 
-        setUploadStatus(`A carregar parte ${chunkIndex + 1} de ${totalChunks}...`)
-        setUploadProgress((chunkIndex / totalChunks) * 80) // 80% for upload, 20% for processing
-
-        await fetch('/api/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            message: `📦 Uploading chunk ${chunkIndex + 1}/${totalChunks}`
-          })
-        })
-
-        const response = await fetch('/api/sales-analyst/upload-chunked', {
-          method: 'POST',
-          body: formData
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(`Chunk ${chunkIndex + 1} upload failed: ${errorData.error}`)
-        }
-
-        const result = await response.json()
-        
-        // If this is the last chunk, the file is complete
-        if (chunkIndex === totalChunks - 1 && result.success && result.salesCall) {
-          await fetch('/api/log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              message: '✅ Chunked upload completed successfully!',
-              data: result.salesCall
-            })
-          })
-          
-          setUploadStatus('Ficheiro carregado! A iniciar transcrição...')
-          setUploadProgress(85)
-          
-          // Start transcription process
-          await startTranscription(result.salesCall.id, result.salesCall.file_url)
-          return
-        }
-      }
-    } catch (error) {
-      console.error('❌ Chunked upload error:', error)
       await fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '❌ Chunked upload failed:',
+          message: '📤 Starting direct upload to Vercel Blob',
+          data: { fileName: file.name, fileSize: file.size }
+        })
+      })
+
+      // Upload directly to Vercel Blob
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/sales-analyst/blob-upload',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      })
+
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: '✅ Vercel Blob upload completed!',
+          data: { blobUrl: blob.url }
+        })
+      })
+
+      setUploadStatus('Ficheiro carregado! A iniciar transcrição...')
+      setUploadProgress(85)
+
+      // Start transcription process with the blob URL
+      await startTranscriptionFromBlob(blob.url, file.name)
+      
+    } catch (error) {
+      console.error('❌ Vercel Blob upload error:', error)
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: '❌ Vercel Blob upload failed:',
           data: { error: error instanceof Error ? error.message : String(error) }
         })
       })
@@ -410,18 +237,19 @@ export default function SalesAnalystPage() {
     }
   }
 
-  const startTranscription = async (callId: string, fileUrl: string) => {
+  const startTranscriptionFromBlob = async (blobUrl: string, fileName: string) => {
     try {
       setUploadStatus('A iniciar transcrição...')
       setUploadProgress(90)
       
-      const response = await fetch('/api/sales-analyst/transcription/' + callId, {
+      const response = await fetch('/api/sales-analyst/transcription/direct', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          fileUrl: fileUrl,
+          fileUrl: blobUrl,
+          fileName: fileName,
           userId: user.id
         })
       })

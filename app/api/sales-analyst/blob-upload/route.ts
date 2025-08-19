@@ -1,90 +1,101 @@
-import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-export async function POST(request: Request): Promise<NextResponse> {
-  const body = (await request.json()) as HandleUploadBody
-
+export async function POST(request: NextRequest) {
   try {
-    const jsonResponse = await handleUpload({
-      body,
-      request,
-      onBeforeGenerateToken: async (pathname: string) => {
-        // Get user from request headers
-        const authHeader = request.headers.get('authorization')
-        if (!authHeader) {
-          throw new Error('No authorization header')
-        }
+    const formData = await request.formData()
+    const file = formData.get('file') as File
+    const userId = formData.get('userId') as string
+    const accessToken = formData.get('accessToken') as string
 
-        // Create Supabase client to verify user
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
+    if (!file || !userId || !accessToken) {
+      return NextResponse.json(
+        { error: 'Missing required parameters' },
+        { status: 400 }
+      )
+    }
 
-        // Verify the access token
-        const { data: { user }, error } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
-        
-        if (error || !user) {
-          throw new Error('Not authorized')
-        }
-
-        return {
-          allowedContentTypes: ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm'],
-          tokenPayload: JSON.stringify({
-            userId: user.id,
-            fileName: pathname.split('/').pop() || 'video.mp4'
-          }),
-        }
-      },
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        console.log('Video upload completed:', blob.url)
-        
-        try {
-          const { userId, fileName } = JSON.parse(tokenPayload)
-          
-          // Create Supabase client
-          const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-          )
-
-          // Create database record
-          const salesCallData = {
-            user_id: userId,
-            title: fileName.replace(/\.[^/.]+$/, ''),
-            file_url: blob.url,
-            file_path: blob.pathname,
-            file_size: blob.size,
-            duration: 0,
-            status: 'uploaded'
+    // Create authenticated Supabase client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
           }
-
-          const { data: salesCall, error: dbError } = await supabase
-            .from('sales_calls')
-            .insert(salesCallData)
-            .select()
-            .single()
-
-          if (dbError) {
-            console.error('Database error:', dbError)
-            throw new Error('Could not create database record')
-          }
-
-          console.log('Database record created:', salesCall)
-          
-        } catch (error) {
-          console.error('Error in onUploadCompleted:', error)
-          throw new Error('Could not process upload completion')
         }
-      },
+      }
+    )
+
+    // Upload directly to Supabase Storage (which handles large files)
+    const storageFileName = `${userId}/${Date.now()}-${file.name}`
+    console.log(`Uploading to Supabase Storage: ${storageFileName}`)
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('sales-calls')
+      .upload(storageFileName, file)
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError)
+      return NextResponse.json(
+        { error: 'Failed to upload file' },
+        { status: 500 }
+      )
+    }
+
+    console.log('File uploaded to Supabase successfully')
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('sales-calls')
+      .getPublicUrl(storageFileName)
+
+    console.log(`Public URL: ${publicUrl}`)
+
+    // Create database record
+    const salesCallData = {
+      user_id: userId,
+      title: file.name.replace(/\.[^/.]+$/, ''),
+      file_url: publicUrl,
+      file_path: storageFileName,
+      file_size: file.size,
+      duration: 0,
+      status: 'uploaded'
+    }
+
+    console.log('Creating database record:', salesCallData)
+
+    const { data: salesCall, error: dbError } = await supabase
+      .from('sales_calls')
+      .insert(salesCallData)
+      .select()
+      .single()
+
+    if (dbError) {
+      console.error('Database error:', dbError)
+      await supabase.storage
+        .from('sales-calls')
+        .remove([storageFileName])
+      
+      return NextResponse.json(
+        { error: 'Failed to create database record' },
+        { status: 500 }
+      )
+    }
+
+    console.log('Database record created successfully:', salesCall)
+
+    return NextResponse.json({
+      success: true,
+      salesCall: salesCall
     })
 
-    return NextResponse.json(jsonResponse)
   } catch (error) {
+    console.error('API error:', error)
     return NextResponse.json(
-      { error: (error as Error).message },
-      { status: 400 }
+      { error: 'Internal server error' },
+      { status: 500 }
     )
   }
 }

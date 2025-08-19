@@ -180,56 +180,62 @@ export default function SalesAnalystPage() {
     await fetch('/api/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: '🚀 Starting Vercel Blob upload...' })
+      body: JSON.stringify({ message: '🚀 Starting Supabase upload...' })
     })
     
     try {
-      // Use Vercel Blob for direct upload (no size limits)
-      const { upload } = await import('@vercel/blob/client')
-      
-      setUploadStatus('A carregar ficheiro diretamente para Vercel Blob...')
+      setUploadStatus('A carregar ficheiro para Supabase Storage...')
       setUploadProgress(25)
 
       await fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '📤 Starting direct upload to Vercel Blob',
+          message: '📤 Starting upload to Supabase Storage',
           data: { fileName: file.name, fileSize: file.size }
         })
       })
 
-      // Upload directly to Vercel Blob
-      const blob = await upload(file.name, file, {
-        access: 'public',
-        handleUploadUrl: '/api/sales-analyst/blob-upload',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
+      // Upload directly to Supabase Storage
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('userId', user.id)
+      formData.append('accessToken', accessToken)
+
+      const response = await fetch('/api/sales-analyst/blob-upload', {
+        method: 'POST',
+        body: formData
       })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Upload failed')
+      }
+
+      const result = await response.json()
 
       await fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '✅ Vercel Blob upload completed!',
-          data: { blobUrl: blob.url }
+          message: '✅ Supabase upload completed!',
+          data: { salesCall: result.salesCall }
         })
       })
 
       setUploadStatus('Ficheiro carregado! A iniciar transcrição...')
       setUploadProgress(85)
 
-      // Start transcription process with the blob URL
-      await startTranscriptionFromBlob(blob.url, file.name)
+      // Start transcription process with the Supabase URL
+      await startTranscriptionFromBlob(result.salesCall.file_url, file.name)
       
     } catch (error) {
-      console.error('❌ Vercel Blob upload error:', error)
+      console.error('❌ Supabase upload error:', error)
       await fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '❌ Vercel Blob upload failed:',
+          message: '❌ Supabase upload failed:',
           data: { error: error instanceof Error ? error.message : String(error) }
         })
       })

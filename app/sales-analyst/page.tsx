@@ -235,16 +235,24 @@ export default function SalesAnalystPage() {
       })
 
       if (!blobUploadResponse.ok) {
+        // Clone the response so we can read it multiple times if needed
+        const responseClone = blobUploadResponse.clone()
+        
         let errorData
         try {
-          errorData = await blobUploadResponse.json()
+          errorData = await responseClone.json()
+          throw new Error(errorData.error || 'Failed to upload to Vercel Blob')
         } catch (jsonError) {
-          // If JSON parsing fails, it might be an HTML error page
-          const errorText = await blobUploadResponse.text()
-          console.error('❌ Non-JSON response received:', errorText.substring(0, 500))
-          throw new Error('Server returned an invalid response. This might be a configuration issue with Vercel Blob.')
+          // If JSON parsing fails, try to get the text content
+          try {
+            const errorText = await blobUploadResponse.text()
+            console.error('❌ Non-JSON response received:', errorText.substring(0, 500))
+            throw new Error('Server returned an invalid response. This might be a configuration issue with Vercel Blob.')
+          } catch (textError) {
+            // If both JSON and text fail, throw a generic error
+            throw new Error(`Upload failed with status ${blobUploadResponse.status}: ${blobUploadResponse.statusText}`)
+          }
         }
-        throw new Error(errorData.error || 'Failed to upload to Vercel Blob')
       }
 
       const uploadResult = await blobUploadResponse.json()
@@ -269,8 +277,23 @@ export default function SalesAnalystPage() {
       })
 
       if (!transcriptionResponse.ok) {
-        const errorData = await transcriptionResponse.json()
-        throw new Error(errorData.error || 'Transcription failed')
+        // Clone the response so we can read it multiple times if needed
+        const responseClone = transcriptionResponse.clone()
+        
+        try {
+          const errorData = await responseClone.json()
+          throw new Error(errorData.error || 'Transcription failed')
+        } catch (jsonError) {
+          // If JSON parsing fails, try to get the text content
+          try {
+            const errorText = await transcriptionResponse.text()
+            console.error('❌ Non-JSON transcription response:', errorText.substring(0, 500))
+            throw new Error('Transcription service returned an invalid response.')
+          } catch (textError) {
+            // If both JSON and text fail, throw a generic error
+            throw new Error(`Transcription failed with status ${transcriptionResponse.status}: ${transcriptionResponse.statusText}`)
+          }
+        }
       }
 
       const result = await transcriptionResponse.json()
@@ -343,8 +366,23 @@ export default function SalesAnalystPage() {
       })
       
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Analysis failed')
+        // Clone the response so we can read it multiple times if needed
+        const responseClone = response.clone()
+        
+        try {
+          const errorData = await responseClone.json()
+          throw new Error(errorData.error || 'Analysis failed')
+        } catch (jsonError) {
+          // If JSON parsing fails, try to get the text content
+          try {
+            const errorText = await response.text()
+            console.error('❌ Non-JSON analysis response:', errorText.substring(0, 500))
+            throw new Error('Analysis service returned an invalid response.')
+          } catch (textError) {
+            // If both JSON and text fail, throw a generic error
+            throw new Error(`Analysis failed with status ${response.status}: ${response.statusText}`)
+          }
+        }
       }
       
       const result = await response.json()
@@ -491,16 +529,48 @@ export default function SalesAnalystPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        await fetch('/api/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            message: '❌ API Error:',
-            data: errorData
+        // Clone the response so we can read it multiple times if needed
+        const responseClone = response.clone()
+        
+        try {
+          const errorData = await responseClone.json()
+          await fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              message: '❌ API Error:',
+              data: errorData
+            })
           })
-        })
-        throw new Error(errorData.error || 'Analysis failed')
+          throw new Error(errorData.error || 'Analysis failed')
+        } catch (jsonError) {
+          // If JSON parsing fails, try to get the text content
+          try {
+            const errorText = await response.text()
+            console.error('❌ Non-JSON analysis response:', errorText.substring(0, 500))
+            await fetch('/api/log', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                message: '❌ Non-JSON API Error:',
+                data: { error: errorText.substring(0, 500) }
+              })
+            })
+            throw new Error('Analysis service returned an invalid response.')
+          } catch (textError) {
+            // If both JSON and text fail, throw a generic error
+            const genericError = `Analysis failed with status ${response.status}: ${response.statusText}`
+            await fetch('/api/log', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                message: '❌ Generic API Error:',
+                data: { error: genericError }
+              })
+            })
+            throw new Error(genericError)
+          }
+        }
       }
 
       const result = await response.json()

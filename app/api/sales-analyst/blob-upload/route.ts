@@ -11,7 +11,17 @@ export async function POST(request: Request): Promise<NextResponse> {
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         // Extract user information from the request
-        const payload = clientPayload as unknown as { userId: string; accessToken: string; originalFileName?: string }
+        let payload: { userId: string; accessToken: string; originalFileName?: string }
+        
+        try {
+          if (typeof clientPayload === 'string') {
+            payload = JSON.parse(clientPayload)
+          } else {
+            payload = clientPayload as unknown as { userId: string; accessToken: string; originalFileName?: string }
+          }
+        } catch (error) {
+          throw new Error('Invalid client payload format')
+        }
 
         if (!payload?.userId || !payload?.accessToken) {
           throw new Error('Missing required parameters: userId and accessToken')

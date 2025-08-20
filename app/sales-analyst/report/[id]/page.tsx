@@ -12,7 +12,7 @@ import {
   ArrowLeft, Star, CheckCircle, Clock, FileText, Download, MessageSquare,
   TrendingUp, TrendingDown, Target, BarChart3, Award, AlertTriangle,
   Users, Timer, Percent, ThumbsUp, ThumbsDown, Brain, Rocket, Volume2,
-  Search, Gift, Shield, Layout
+  Search, Gift, Shield, Layout, Phone
 } from 'lucide-react'
 
 // Function to format text with proper paragraph breaks
@@ -90,13 +90,22 @@ interface AnalysisData {
   score: number
   title?: string
   analysis: {
-    callType: string
-    quantitativeAnalysis: string
-    strengths: any[] | { raw?: string }
-    weaknesses: any[] | { raw?: string }
-    scoring: any
-    strongMoments: any
-    weakMoments: any
+    strengths: string[]
+    improvements: string[]
+    techniques: string[]
+    objections: string[]
+    scoring?: Record<string, any>
+    // New comprehensive analysis fields
+    momentosFortesFracos?: string
+    analiseQuantitativa?: string
+    pontosFortes?: string
+    pontosFortesGS?: string
+    pontosFracos?: string
+    pontosFracosGS?: string
+    analiseQuantitativaCompleta?: string
+    explicacaoPontuacao?: string
+    justificacaoGS?: string
+    tipoCall?: string
   }
   transcription: string
   custom_prompts: string[]
@@ -160,14 +169,14 @@ export default function AnalysisReportPage() {
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 30) return 'text-green-500'
-    if (score >= 20) return 'text-yellow-500'
+    if (score >= 32) return 'text-green-500'
+    if (score >= 24) return 'text-yellow-500'
     return 'text-red-500'
   }
 
   const getScoreBadgeColor = (score: number) => {
-    if (score >= 30) return 'bg-green-500/20 text-green-400 border-green-500/30'
-    if (score >= 20) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+    if (score >= 32) return 'bg-green-500/20 text-green-400 border-green-500/30'
+    if (score >= 24) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
     return 'bg-red-500/20 text-red-400 border-red-500/30'
   }
 
@@ -255,9 +264,7 @@ export default function AnalysisReportPage() {
     )
   }
 
-  const quantitativeData = parseQuantitativeAnalysis(analysis.analysis?.quantitativeAnalysis)
-  const strongMoments = parseMoments(analysis.analysis?.strongMoments?.raw || '')
-  const weakMoments = parseMoments(analysis.analysis?.weakMoments?.raw || '')
+
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -320,48 +327,50 @@ export default function AnalysisReportPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Text Fields Section */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Header Section - Tipo de Call and Total Score */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Tipo de Call */}
                     <div className="space-y-2">
                       <h4 className="font-semibold text-white flex items-center">
-                        <Target className="h-4 w-4 mr-2 text-blue-400" />
+                        <Phone className="h-4 w-4 mr-2 text-blue-400" />
                         Tipo de Call
                       </h4>
-                      <div className="bg-white/10 p-3 rounded-lg border border-white/20">
-                        <p className="text-white/80">{getCallTypeLabel(analysis.call_type)}</p>
-                      </div>
-                    </div>
-
-                    {/* Score */}
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-white flex items-center">
-                        <Star className="h-4 w-4 mr-2 text-yellow-400" />
-                        Score Total
-                      </h4>
-                      <div className="bg-white/10 p-3 rounded-lg border border-white/20">
-                        <p className={`text-lg font-bold ${getScoreColor(analysis.score)}`}>
-                          {analysis.score}/40
+                      <div className="bg-white/10 p-4 rounded-lg border border-white/20 h-16 flex items-center">
+                        <p className="text-white/80 text-sm">
+                          {getCallTypeLabel(analysis.call_type)}
                         </p>
                       </div>
                     </div>
 
+                    {/* Total Score */}
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-white flex items-center">
+                        <Star className="h-4 w-4 mr-2 text-yellow-400" />
+                        Total Score
+                      </h4>
+                      <div className="bg-white/10 p-4 rounded-lg border border-white/20 h-16 flex items-center justify-between">
+                        <span className="text-2xl font-bold" style={{ color: analysis.score >= 32 ? '#22c55e' : analysis.score >= 24 ? '#eab308' : '#ef4444' }}>
+                          {analysis.score}/40
+                        </span>
+                        <Badge variant={analysis.score >= 32 ? 'default' : analysis.score >= 24 ? 'secondary' : 'destructive'}>
+                          {analysis.score >= 32 ? 'Excelente' : analysis.score >= 24 ? 'Bom' : 'Necessita Melhorar'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main Analysis Grid */}
+                  <div className="grid grid-cols-1 gap-6">
                     {/* Pontos Fortes */}
-                    <div className="space-y-2 lg:col-span-2">
+                    <div className="space-y-2">
                       <h4 className="font-semibold text-white flex items-center">
                         <ThumbsUp className="h-4 w-4 mr-2 text-green-400" />
-                        Pontos Fortes 
+                        Pontos Fortes
                       </h4>
                       <div className="bg-white/10 p-4 rounded-lg border border-white/20 max-h-48 overflow-y-auto">
-                        {(analysis.analysis.strengths && typeof analysis.analysis.strengths === 'object' && 'raw' in analysis.analysis.strengths) ? (
-                          <div className="prose prose-invert max-w-none">
-                            <MarkdownRenderer content={String(analysis.analysis.strengths.raw)} />
-                          </div>
-                        ) : Array.isArray(analysis.analysis.strengths) && analysis.analysis.strengths.length > 0 ? (
-                          <div className="space-y-2">
-                            {analysis.analysis.strengths.map((strength, index) => (
-                              <p key={index} className="text-white/80 text-sm">• {strength.description || strength}</p>
-                            ))}
+                        {analysis.analysis?.pontosFortesGS ? (
+                          <div className="whitespace-pre-line text-sm leading-relaxed text-white">
+                            {analysis.analysis.pontosFortesGS}
                           </div>
                         ) : (
                           <p className="text-white/60 text-sm">Dados não disponíveis</p>
@@ -370,38 +379,35 @@ export default function AnalysisReportPage() {
                     </div>
 
                     {/* Pontos Fracos */}
-                    <div className="space-y-2 lg:col-span-2">
+                    <div className="space-y-2">
                       <h4 className="font-semibold text-white flex items-center">
                         <ThumbsDown className="h-4 w-4 mr-2 text-red-400" />
-                        Pontos Fracos 
+                        Pontos Fracos
                       </h4>
                       <div className="bg-white/10 p-4 rounded-lg border border-white/20 max-h-48 overflow-y-auto">
-                        {(analysis.analysis.weaknesses && typeof analysis.analysis.weaknesses === 'object' && 'raw' in analysis.analysis.weaknesses) ? (
-                          <div className="prose prose-invert max-w-none">
-                            <MarkdownRenderer content={String(analysis.analysis.weaknesses.raw)} />
-                          </div>
-                        ) : Array.isArray(analysis.analysis.weaknesses) && analysis.analysis.weaknesses.length > 0 ? (
-                          <div className="space-y-2">
-                            {analysis.analysis.weaknesses.map((weakness, index) => (
-                              <p key={index} className="text-white/80 text-sm">• {weakness.description || weakness}</p>
-                            ))}
+                        {analysis.analysis?.pontosFracosGS ? (
+                          <div className="whitespace-pre-line text-sm leading-relaxed text-white">
+                            {analysis.analysis.pontosFracosGS}
                           </div>
                         ) : (
                           <p className="text-white/60 text-sm">Dados não disponíveis</p>
                         )}
                       </div>
                     </div>
+                  </div>
 
+                  {/* Full Width Sections */}
+                  <div className="space-y-6">
                     {/* Resumo da Call */}
-                    <div className="space-y-2 lg:col-span-2">
+                    <div className="space-y-2">
                       <h4 className="font-semibold text-white flex items-center">
                         <MessageSquare className="h-4 w-4 mr-2 text-blue-400" />
                         Resumo da Call
                       </h4>
                       <div className="bg-white/10 p-4 rounded-lg border border-white/20 max-h-64 overflow-y-auto">
-                        {(analysis.analysis as any).callSummary ? (
-                          <div className="prose prose-invert max-w-none">
-                            <MarkdownRenderer content={String((analysis.analysis as any).callSummary.raw || (analysis.analysis as any).callSummary)} />
+                        {analysis.analysis?.momentosFortesFracos ? (
+                          <div className="whitespace-pre-line text-sm leading-relaxed text-white">
+                            {analysis.analysis.momentosFortesFracos}
                           </div>
                         ) : (
                           <p className="text-white/60 text-sm">Dados não disponíveis</p>
@@ -410,29 +416,33 @@ export default function AnalysisReportPage() {
                     </div>
 
                     {/* Dicas Gerais */}
-                    <div className="space-y-2 lg:col-span-2">
+                    <div className="space-y-2">
                       <h4 className="font-semibold text-white flex items-center">
                         <Brain className="h-4 w-4 mr-2 text-purple-400" />
                         Dicas Gerais
                       </h4>
                       <div className="bg-white/10 p-4 rounded-lg border border-white/20 max-h-48 overflow-y-auto">
-                        {(analysis.analysis as any).tips ? (
-                          <MarkdownRenderer content={(analysis.analysis as any).tips.raw || (analysis.analysis as any).tips} />
+                        {analysis.analysis?.explicacaoPontuacao ? (
+                          <div className="whitespace-pre-line text-sm leading-relaxed text-white">
+                            {analysis.analysis.explicacaoPontuacao}
+                          </div>
                         ) : (
                           <p className="text-white/60 text-sm">Dados não disponíveis</p>
                         )}
                       </div>
                     </div>
 
-                    {/* Foco para próximas calls */}
-                    <div className="space-y-2 lg:col-span-2">
+                    {/* Foco para as Próximas Calls */}
+                    <div className="space-y-2">
                       <h4 className="font-semibold text-white flex items-center">
-                        <Rocket className="h-4 w-4 mr-2 text-orange-400" />
-                        Foco para próximas calls 
+                        <Target className="h-4 w-4 mr-2 text-orange-400" />
+                        Foco para as Próximas Calls
                       </h4>
                       <div className="bg-white/10 p-4 rounded-lg border border-white/20 max-h-48 overflow-y-auto">
-                        {(analysis.analysis as any).focus ? (
-                          <MarkdownRenderer content={(analysis.analysis as any).focus.raw || (analysis.analysis as any).focus} />
+                        {analysis.analysis?.pontosFracosGS ? (
+                          <div className="whitespace-pre-line text-sm leading-relaxed text-white">
+                            {analysis.analysis.pontosFracosGS}
+                          </div>
                         ) : (
                           <p className="text-white/60 text-sm">Dados não disponíveis</p>
                         )}
@@ -448,27 +458,59 @@ export default function AnalysisReportPage() {
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       {[
-                        { key: 'clareza', label: 'Clareza e Fluência da Fala', icon: MessageSquare },
-                        { key: 'tom', label: 'Tom e Controlo', icon: Volume2 },
-                        { key: 'envolvimento', label: 'Envolvimento Conversacional', icon: Users },
-                        { key: 'descoberta', label: 'Efetividade na Descoberta de Necessidades', icon: Search },
-                        { key: 'entrega', label: 'Entrega de Valor e Ajuste da Solução', icon: Gift },
-                        { key: 'objeções', label: 'Habilidades de Lidar com Objeções', icon: Shield },
-                        { key: 'estrutura', label: 'Estrutura e Controle da Reunião', icon: Layout },
-                        { key: 'fechamento', label: 'Fechamento e Próximos Passos', icon: CheckCircle }
+                        { key: 'Clareza e Fluência da Fala', label: 'Clareza e Fluência da Fala', icon: MessageSquare },
+                        { key: 'Tom e Controlo', label: 'Tom e Controlo', icon: Volume2 },
+                        { key: 'Envolvimento Conversacional', label: 'Envolvimento Conversacional', icon: Users },
+                        { key: 'Efetividade na Descoberta de Necessidades', label: 'Efetividade na Descoberta de Necessidades', icon: Search },
+                        { key: 'Entrega de Valor e Ajuste da Solução', label: 'Entrega de Valor e Ajuste da Solução', icon: Gift },
+                        { key: 'Habilidades de Lidar com Objeções', label: 'Habilidades de Lidar com Objeções', icon: Shield },
+                        { key: 'Estrutura e Controle da Reunião', label: 'Estrutura e Controle da Reunião', icon: Layout },
+                        { key: 'Fechamento e Próximos Passos', label: 'Fechamento e Próximos Passos', icon: CheckCircle }
                       ].map(({ key, label, icon: Icon }) => {
                         // Function to extract score from scoring data
                         const getScore = () => {
-                          // First try to get from parsed scoring object
+                          // First try to get from parsed scoring object with exact match
                           if (analysis.analysis.scoring?.[key]) {
                             return analysis.analysis.scoring[key]
                           }
                           
-                          // If not found, try to parse from raw text
+                          // Try to find partial matches in scoring object
+                          if (analysis.analysis.scoring) {
+                            const scoringKeys = Object.keys(analysis.analysis.scoring)
+                            for (const scoringKey of scoringKeys) {
+                              if (scoringKey !== 'raw' && scoringKey !== 'total' && 
+                                  (scoringKey.includes(key) || key.includes(scoringKey))) {
+                                return analysis.analysis.scoring[scoringKey]
+                              }
+                            }
+                          }
+                          
+                          // Try to parse from analiseQuantitativaCompleta with flexible matching
+                          if (analysis.analysis.analiseQuantitativaCompleta && typeof analysis.analysis.analiseQuantitativaCompleta === 'string') {
+                            const lines = analysis.analysis.analiseQuantitativaCompleta.split('\n')
+                            for (const line of lines) {
+                              // Check if line contains key words from the category
+                              const keyWords = key.toLowerCase().split(' ').filter(word => word.length > 3)
+                              const lineLower = line.toLowerCase()
+                              const hasKeyWords = keyWords.some(word => lineLower.includes(word))
+                              
+                              if (hasKeyWords) {
+                                const match = line.match(/(\d+)\/5/)
+                                if (match) return parseInt(match[1])
+                              }
+                            }
+                          }
+                          
+                          // If not found, try to parse from raw text with flexible matching
                           if (analysis.analysis.scoring?.raw && typeof analysis.analysis.scoring.raw === 'string') {
                             const lines = analysis.analysis.scoring.raw.split('\n')
                             for (const line of lines) {
-                              if (line.includes(label)) {
+                              // Check if line contains key words from the category
+                              const keyWords = key.toLowerCase().split(' ').filter(word => word.length > 3)
+                              const lineLower = line.toLowerCase()
+                              const hasKeyWords = keyWords.some(word => lineLower.includes(word))
+                              
+                              if (hasKeyWords) {
                                 const match = line.match(/(\d+)\/5/)
                                 if (match) return parseInt(match[1])
                               }
@@ -480,17 +522,20 @@ export default function AnalysisReportPage() {
                         
                         const score = getScore()
                         return (
-                          <div key={key} className="bg-white/10 p-4 rounded-lg border border-white/20 text-center">
-                            <div className="flex items-center justify-center mb-3">
+                          <div key={key} className="bg-white/10 p-4 rounded-lg border border-white/20 text-center relative h-32">
+                            <div className="flex items-center justify-center mb-2">
                               <Icon className="h-5 w-5 text-blue-400" />
                             </div>
-                            <h5 className="text-white/90 text-sm font-medium mb-2">{label}</h5>
-                            <div className="text-lg font-bold text-white">{score}/5</div>
+                            <h5 className="text-white/90 text-sm font-medium">{label}</h5>
+                            <div className="text-2xl font-bold text-white absolute bottom-2 left-1/2 transform -translate-x-1/2">{score}</div>
                           </div>
                         )
                       })}
                     </div>
                   </div>
+
+
+
                 </CardContent>
               </Card>
             </div>

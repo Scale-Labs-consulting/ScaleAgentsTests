@@ -1,6 +1,336 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { del } from '@vercel/blob'
+import { 
+  getMomentosFortesFracosPrompt,
+  getAnaliseQuantitativaPrompt,
+  getPontosFortesPrompt,
+  getPontosFortesGSPrompt,
+  getPontosFracosPrompt,
+  getPontosFracosGSPrompt,
+  getAnaliseQuantitativaCompletaPrompt,
+  getExplicacaoPontuacaoPrompt,
+  getJustificacaoGSPrompt,
+  getTipoCallPrompt,
+  SYSTEM_PROMPTS
+} from '@/lib/comprehensive-prompts'
+
+// Function to perform comprehensive analysis
+async function performComprehensiveAnalysis(transcription: string) {
+  console.log('🔍 Starting comprehensive analysis...')
+  
+  const results = {
+    callType: '',
+    totalScore: 0,
+    strengths: '',
+    improvements: '',
+    techniques: '',
+    objections: '',
+    feedback: '',
+    scoring: { raw: '', total: 0 },
+    momentosFortesFracos: '',
+    analiseQuantitativa: '',
+    pontosFortes: '',
+    pontosFortesGS: '',
+    pontosFracos: '',
+    pontosFracosGS: '',
+    analiseQuantitativaCompleta: '',
+    explicacaoPontuacao: '',
+    justificacaoGS: '',
+    tipoCall: ''
+  }
+
+  try {
+    // 1. Determine call type first
+    console.log('📞 Analyzing call type...')
+    const tipoCallResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPTS.TIPO_CALL },
+          { role: 'user', content: getTipoCallPrompt(transcription) }
+        ],
+        max_tokens: 50,
+        temperature: 0.1,
+      }),
+    })
+
+    if (tipoCallResponse.ok) {
+      const tipoCallData = await tipoCallResponse.json()
+      results.tipoCall = tipoCallData.choices[0].message.content.trim()
+      console.log('✅ Call type determined:', results.tipoCall)
+    }
+
+    // 2. Perform comprehensive quantitative analysis (includes scoring)
+    console.log('📊 Performing comprehensive quantitative analysis...')
+    const analiseCompletaResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPTS.ANALISE_QUANTITATIVA_COMPLETA },
+          { role: 'user', content: getAnaliseQuantitativaCompletaPrompt(transcription) }
+        ],
+        max_tokens: 2000,
+        temperature: 0.3,
+      }),
+    })
+
+    if (analiseCompletaResponse.ok) {
+      const analiseCompletaData = await analiseCompletaResponse.json()
+      const analiseCompletaContent = analiseCompletaData.choices[0].message.content
+      results.analiseQuantitativaCompleta = analiseCompletaContent
+      
+      // Parse scoring from the comprehensive analysis
+      const scoringMatch = analiseCompletaContent.match(/Pontuação Total:\s*(\d+)\/40/i)
+      if (scoringMatch) {
+        results.totalScore = parseInt(scoringMatch[1])
+      }
+      
+      // Parse individual scores with improved patterns
+      const scoringLines = analiseCompletaContent.split('\n').filter((line: string) => line.trim())
+      const scoringObj: { raw: string; total: number; [key: string]: any } = { raw: analiseCompletaContent, total: 0 }
+      
+      console.log('🔍 Parsing scoring lines:', scoringLines.length, 'lines')
+      
+      scoringLines.forEach((line: string) => {
+        console.log('📝 Processing line:', line)
+        
+        // More flexible patterns to match various formats
+        const patterns = [
+          /^(.+?):\s*(\d+)\/5$/i,
+          /^(.+?)\s*:\s*(\d+)\/5$/i,
+          /^(.+?):\s*(\d+)$/i,
+          /^(.+?)\s*-\s*(\d+)\/5$/i,
+          /^(.+?)\s*(\d+)\/5$/i,
+          /^(.+?):\s*(\d+)\s*\/\s*5$/i,
+          /^(.+?)\s*:\s*(\d+)\s*\/\s*5$/i,
+          /^(.+?)\s*(\d+)\s*\/\s*5$/i,
+        ]
+        
+        for (const pattern of patterns) {
+          const match = line.match(pattern)
+          if (match) {
+            const key = match[1].trim()
+            const score = parseInt(match[2])
+            console.log('✅ Found score:', key, '=', score)
+            scoringObj[key] = score
+            break
+          }
+        }
+      })
+      
+      console.log('📊 Final scoring object:', scoringObj)
+      
+      // Calculate total from individual scores
+      const individualScores = Object.entries(scoringObj)
+        .filter(([key, value]) => key !== 'raw' && key !== 'total' && typeof value === 'number')
+        .map(([key, value]) => value as number)
+      
+      if (individualScores.length > 0) {
+        const calculatedTotal = individualScores.reduce((sum, score) => sum + score, 0)
+        scoringObj.total = calculatedTotal
+        results.totalScore = calculatedTotal
+      }
+      
+      results.scoring = scoringObj
+      console.log('✅ Comprehensive analysis completed')
+    }
+
+    // 3. Perform other analyses in parallel
+    console.log('🔄 Performing parallel analyses...')
+    const analysisPromises = [
+      // Momentos Fortes e Fracos
+      fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPTS.MOMENTOS_FORTES_FRACOS },
+            { role: 'user', content: getMomentosFortesFracosPrompt(transcription) }
+          ],
+          max_tokens: 1000,
+          temperature: 0.7,
+        }),
+      }),
+      
+      // Pontos Fortes
+      fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPTS.PONTOS_FORTES },
+            { role: 'user', content: getPontosFortesPrompt(transcription) }
+          ],
+          max_tokens: 1500,
+          temperature: 0.7,
+        }),
+      }),
+      
+      // Pontos Fracos
+      fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPTS.PONTOS_FRACOS },
+            { role: 'user', content: getPontosFracosPrompt(transcription) }
+          ],
+          max_tokens: 1500,
+          temperature: 0.7,
+        }),
+      }),
+      
+      // Pontos Fortes GS
+      fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPTS.PONTOS_FORTES_GS },
+            { role: 'user', content: getPontosFortesGSPrompt(transcription) }
+          ],
+          max_tokens: 1000,
+          temperature: 0.7,
+        }),
+      }),
+      
+      // Pontos Fracos GS
+      fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPTS.PONTOS_FRACOS_GS },
+            { role: 'user', content: getPontosFracosGSPrompt(transcription) }
+          ],
+          max_tokens: 1000,
+          temperature: 0.7,
+        }),
+      })
+    ]
+
+    const analysisResponses = await Promise.all(analysisPromises)
+    
+    // Process responses
+    if (analysisResponses[0].ok) {
+      const data = await analysisResponses[0].json()
+      results.momentosFortesFracos = data.choices[0].message.content
+    }
+    
+    if (analysisResponses[1].ok) {
+      const data = await analysisResponses[1].json()
+      results.pontosFortes = data.choices[0].message.content
+    }
+    
+    if (analysisResponses[2].ok) {
+      const data = await analysisResponses[2].json()
+      results.pontosFracos = data.choices[0].message.content
+    }
+    
+    if (analysisResponses[3].ok) {
+      const data = await analysisResponses[3].json()
+      results.pontosFortesGS = data.choices[0].message.content
+    }
+    
+    if (analysisResponses[4].ok) {
+      const data = await analysisResponses[4].json()
+      results.pontosFracosGS = data.choices[0].message.content
+    }
+
+    // 4. Perform additional analyses that depend on scoring results
+    console.log('🔄 Performing additional analyses...')
+    
+    // Explicação Pontuação
+    if (results.scoring.raw) {
+      console.log('📊 Getting scoring explanation...')
+      const explicacaoResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPTS.EXPLICACAO_PONTUACAO },
+            { role: 'user', content: getExplicacaoPontuacaoPrompt(transcription, results.scoring.raw) }
+          ],
+          max_tokens: 1500,
+          temperature: 0.7,
+        }),
+      })
+
+      if (explicacaoResponse.ok) {
+        const data = await explicacaoResponse.json()
+        results.explicacaoPontuacao = data.choices[0].message.content
+      }
+    }
+
+    // Justificação GS
+    if (results.scoring.raw) {
+      console.log('📝 Getting GS justification...')
+      const justificacaoResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPTS.JUSTIFICACAO_GS },
+            { role: 'user', content: getJustificacaoGSPrompt(results.scoring.raw) }
+          ],
+          max_tokens: 1000,
+          temperature: 0.7,
+        }),
+      })
+
+      if (justificacaoResponse.ok) {
+        const data = await justificacaoResponse.json()
+        results.justificacaoGS = data.choices[0].message.content
+      }
+    }
+
+    console.log('✅ All analyses completed')
+    return results
+
+  } catch (error) {
+    console.error('❌ Error in comprehensive analysis:', error)
+    return results
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,11 +350,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if OpenAI API key is available
-    if (!process.env.OPENAI_KEY) {
-      console.error('❌ OpenAI API key not configured')
+    // Check if AssemblyAI API key is available
+    if (!process.env.ASSEMBLY_AI_API_KEY) {
+      console.error('❌ AssemblyAI API key not configured')
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
+        { error: 'AssemblyAI API key not configured' },
         { status: 500 }
       )
     }
@@ -59,165 +389,181 @@ export async function POST(request: NextRequest) {
     const videoBuffer = await videoResponse.arrayBuffer()
     const videoBlob = new Blob([videoBuffer], { type: 'video/mp4' })
 
-    // Convert video to audio using OpenAI Whisper
-    console.log('🎵 Converting video to audio...')
+    // Upload to AssemblyAI for transcription
+    console.log('📤 Uploading to AssemblyAI...')
     
-    // Create FormData for Whisper API
+    // Create FormData for AssemblyAI upload
     const formData = new FormData()
     formData.append('file', videoBlob, fileName)
-    formData.append('model', 'whisper-1')
-    formData.append('language', 'pt')
-    formData.append('response_format', 'verbose_json')
-    formData.append('timestamp_granularities', 'segment')
 
-    // Process with OpenAI Whisper
-    console.log('📤 Sending to OpenAI Whisper...')
-    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_KEY}`
+        'Authorization': process.env.ASSEMBLY_AI_API_KEY!
       },
       body: formData
     })
 
-    if (!whisperResponse.ok) {
-      const errorText = await whisperResponse.text()
-      console.error('❌ Whisper API error:', errorText)
-      throw new Error(`Whisper API failed: ${whisperResponse.statusText}`)
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text()
+      console.error('❌ AssemblyAI upload error:', errorText)
+      throw new Error(`AssemblyAI upload failed: ${uploadResponse.statusText}`)
     }
 
-    const whisperResult = await whisperResponse.json()
-    const transcription = whisperResult.text
+    const uploadResult = await uploadResponse.json()
+    const audioUrl = uploadResult.upload_url
 
-    console.log('✅ Transcription completed:', transcription.length, 'characters')
+    console.log('✅ File uploaded to AssemblyAI:', audioUrl)
 
-    // Analyze with ChatGPT
-    console.log('🤖 Analyzing with ChatGPT...')
+    // Start transcription
+    console.log('🎙️ Starting AssemblyAI transcription...')
+    const transcriptResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
+      method: 'POST',
+      headers: {
+        'Authorization': process.env.ASSEMBLY_AI_API_KEY!,
+        'Content-Type': 'application/json'
+      },
+             body: JSON.stringify({
+         audio_url: audioUrl,
+         language_code: 'pt',
+         speaker_labels: true
+       })
+    })
+
+    if (!transcriptResponse.ok) {
+      const errorText = await transcriptResponse.text()
+      console.error('❌ AssemblyAI transcription error:', errorText)
+      throw new Error(`AssemblyAI transcription failed: ${transcriptResponse.statusText}`)
+    }
+
+    const transcriptResult = await transcriptResponse.json()
+    const transcriptId = transcriptResult.id
+
+    console.log('✅ Transcription started, ID:', transcriptId)
+
+    // Poll for completion
+    let transcription = ''
+    let attempts = 0
+    const maxAttempts = 60 // 5 minutes with 5-second intervals
+
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
+      attempts++
+
+      const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
+        headers: {
+          'Authorization': process.env.ASSEMBLY_AI_API_KEY!
+        }
+      })
+
+      if (!statusResponse.ok) {
+        throw new Error(`Failed to check transcription status: ${statusResponse.statusText}`)
+      }
+
+      const statusResult = await statusResponse.json()
+      console.log(`📊 Transcription status (attempt ${attempts}):`, statusResult.status)
+
+      if (statusResult.status === 'completed') {
+        // Format transcription with speaker diarization
+        if (statusResult.utterances && statusResult.utterances.length > 0) {
+          transcription = statusResult.utterances.map((utterance: any) => {
+            const startTime = Math.floor(utterance.start / 1000)
+            const minutes = Math.floor(startTime / 60)
+            const seconds = startTime % 60
+            const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+            return `Speaker ${utterance.speaker} (${timeStr}) - ${utterance.text}`
+          }).join('\n\n')
+        } else {
+          transcription = statusResult.text
+        }
+        console.log('✅ Transcription completed with speaker diarization:', transcription.length, 'characters')
+        break
+      } else if (statusResult.status === 'error') {
+        throw new Error(`Transcription failed: ${statusResult.error}`)
+      }
+    }
+
+    if (!transcription) {
+      throw new Error('Transcription timed out')
+    }
+
+    // Analyze with ChatGPT using comprehensive analysis
+    console.log('🤖 Starting comprehensive analysis with ChatGPT...')
     
     // Truncate transcription to avoid token limits
     const truncatedTranscription = transcription.length > 8000 
       ? transcription.substring(0, 8000) + '... [truncated]'
       : transcription
 
-    const analysisPrompt = `Analisa esta transcrição de uma chamada de vendas em português e fornece uma análise completa e estruturada.
-
-Transcrição:
-${truncatedTranscription}
-
-Fornece a tua análise em formato de texto simples, estruturada da seguinte forma:
-
-**TIPO DE CHAMADA:**
-[Identifica se é prospetiva, follow-up, demonstração, fechamento, etc.]
-
-**PONTUAÇÃO GERAL:**
-[Pontuação de 1-10 baseada na qualidade da chamada]
-
-**PONTOS FORTES:**
-• [Ponto forte 1 - descrição clara e concisa]
-• [Ponto forte 2 - descrição clara e concisa]
-• [Ponto forte 3 - descrição clara e concisa]
-
-**ÁREAS DE MELHORIA:**
-• [Área de melhoria 1 - descrição clara e concisa]
-• [Área de melhoria 2 - descrição clara e concisa]
-• [Área de melhoria 3 - descrição clara e concisa]
-
-**TÉCNICAS UTILIZADAS:**
-• [Técnica 1 - descrição clara e concisa]
-• [Técnica 2 - descrição clara e concisa]
-
-**OBJEÇÕES E TRATAMENTO:**
-• [Objeção identificada e como foi tratada - descrição clara e concisa]
-
-**FEEDBACK GERAL:**
-[Análise detalhada e sugestões práticas para melhorar]
-
-IMPORTANTE:
-- Responde em português
-- Mantém o formato acima
-- Cada ponto deve ser uma frase clara e concisa
-- NÃO incluas timestamps ou referências temporais
-- Cada bullet point deve ser uma ideia completa mas concisa
-- Evita frases muito longas ou complexas`
-
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: 'És um especialista em análise de vendas com experiência em avaliar chamadas de vendas e fornecer feedback construtivo.'
-          },
-          {
-            role: 'user',
-            content: analysisPrompt
-          }
-        ],
-        max_tokens: 2000,
-        temperature: 0.7,
-      }),
+    // Perform comprehensive analysis with multiple specialized prompts
+    const analysisResults = await performComprehensiveAnalysis(truncatedTranscription)
+    
+    console.log('✅ Comprehensive analysis completed')
+    
+    // Extract basic analysis data for backward compatibility
+    const callTypeMatch = analysisResults.callType ? [null, analysisResults.callType] : null
+    const scoreMatch = analysisResults.totalScore ? [null, analysisResults.totalScore.toString()] : null
+    const strengthsMatch = analysisResults.strengths ? [null, analysisResults.strengths] : null
+    const improvementsMatch = analysisResults.improvements ? [null, analysisResults.improvements] : null
+    const techniquesMatch = analysisResults.techniques ? [null, analysisResults.techniques] : null
+    const objectionsMatch = analysisResults.objections ? [null, analysisResults.objections] : null
+    const feedbackMatch = analysisResults.feedback ? [null, analysisResults.feedback] : null
+    
+              // Use scoring from comprehensive analysis
+      const scoringObj: { raw: string; total: number; [key: string]: any } = analysisResults.scoring || { raw: '', total: 0 }
+    
+    console.log('🔍 Parsing results:', {
+      callType: callTypeMatch ? callTypeMatch[1] : 'Not found',
+      score: scoreMatch ? scoreMatch[1] : 'Not found',
+      strengths: strengthsMatch ? 'Found' : 'Not found',
+      improvements: improvementsMatch ? 'Found' : 'Not found',
+      techniques: techniquesMatch ? 'Found' : 'Not found',
+      objections: objectionsMatch ? 'Found' : 'Not found',
+      feedback: feedbackMatch ? 'Found' : 'Not found'
     })
-
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text()
-      console.error('❌ OpenAI analysis error:', errorText)
-      throw new Error(`OpenAI analysis failed: ${openaiResponse.statusText}`)
-    }
-
-    const openaiData = await openaiResponse.json()
-    const analysisContent = openaiData.choices[0].message.content
-    
-    // Parse the analysis
-    const callTypeMatch = analysisContent.match(/\*\*TIPO DE CHAMADA:\*\*\s*(.+?)(?=\n\*\*|$)/i)
-    const scoreMatch = analysisContent.match(/\*\*PONTUAÇÃO GERAL:\*\*\s*(\d+)/i)
-    const strengthsMatch = analysisContent.match(/\*\*PONTOS FORTES:\*\*([\s\S]*?)(?=\n\*\*|$)/i)
-    const improvementsMatch = analysisContent.match(/\*\*ÁREAS DE MELHORIA:\*\*([\s\S]*?)(?=\n\*\*|$)/i)
-    const techniquesMatch = analysisContent.match(/\*\*TÉCNICAS UTILIZADAS:\*\*([\s\S]*?)(?=\n\*\*|$)/i)
-    const objectionsMatch = analysisContent.match(/\*\*OBJEÇÕES E TRATAMENTO:\*\*([\s\S]*?)(?=\n\*\*|$)/i)
-    const feedbackMatch = analysisContent.match(/\*\*FEEDBACK GERAL:\*\*([\s\S]*?)(?=\n\*\*|$)/i)
-    
-    const extractBulletPoints = (text: string) => {
-      if (!text) return []
-      return text
-        .split('\n')
-        .filter(line => line.trim().startsWith('•'))
-        .map(line => line.trim().substring(1).trim())
-        .filter(item => item.length > 0)
-    }
     
     const analysis = {
-      call_type: callTypeMatch ? callTypeMatch[1].trim() : 'Não identificado',
-      score: scoreMatch ? parseInt(scoreMatch[1]) : 0,
-      feedback: feedbackMatch ? feedbackMatch[1].trim() : 'Análise não disponível',
+      call_type: analysisResults.tipoCall || callTypeMatch?.[1]?.trim() || 'Não identificado',
+      score: scoringObj?.total || (scoreMatch?.[1] ? parseInt(scoreMatch[1]) : 0),
+      feedback: feedbackMatch?.[1]?.trim() || 'Análise não disponível',
       analysis: {
-        strengths: extractBulletPoints(strengthsMatch ? strengthsMatch[1] : ''),
-        improvements: extractBulletPoints(improvementsMatch ? improvementsMatch[1] : ''),
-        techniques: extractBulletPoints(techniquesMatch ? techniquesMatch[1] : ''),
-        objections: extractBulletPoints(objectionsMatch ? objectionsMatch[1] : '')
+        // Use comprehensive analysis results for all fields
+        strengths: analysisResults.pontosFortes ? [analysisResults.pontosFortes] : [],
+        improvements: analysisResults.pontosFracos ? [analysisResults.pontosFracos] : [],
+        techniques: analysisResults.analiseQuantitativa ? [analysisResults.analiseQuantitativa] : [],
+        objections: analysisResults.pontosFracosGS ? [analysisResults.pontosFracosGS] : [],
+        scoring: scoringObj || {},
+        // Add comprehensive analysis results
+        momentosFortesFracos: analysisResults.momentosFortesFracos || '',
+        analiseQuantitativa: analysisResults.analiseQuantitativa || '',
+        pontosFortes: analysisResults.pontosFortes || '',
+        pontosFortesGS: analysisResults.pontosFortesGS || '',
+        pontosFracos: analysisResults.pontosFracos || '',
+        pontosFracosGS: analysisResults.pontosFracosGS || '',
+        analiseQuantitativaCompleta: analysisResults.analiseQuantitativaCompleta || '',
+        explicacaoPontuacao: analysisResults.explicacaoPontuacao || '',
+        justificacaoGS: analysisResults.justificacaoGS || '',
+        tipoCall: analysisResults.tipoCall || ''
       }
     }
 
     // Store analysis in database
     const analysisData = {
+      sales_call_id: salesCallId,
       user_id: userId,
       title: fileName.replace(/\.[^/.]+$/, ''),
       status: 'completed',
       call_type: analysis.call_type,
       feedback: analysis.feedback,
-      score: analysis.score,
+      score: parseFloat(analysis.score.toString()),
       analysis: analysis.analysis,
       analysis_metadata: {
         blob_url: blobUrl,
         original_transcription_length: transcription.length,
         truncated_transcription_length: truncatedTranscription.length,
-        tokens_used: openaiData.usage?.total_tokens || 0
+        tokens_used: 0 // Will be calculated from comprehensive analysis
       },
-      transcription: truncatedTranscription
+      transcription: transcription // Store the full transcription, not truncated
     }
 
     const { data: salesAnalysis, error: dbError } = await supabase
@@ -273,7 +619,7 @@ IMPORTANTE:
     return NextResponse.json({
       success: true,
       analysis: salesAnalysis,
-      transcription: truncatedTranscription,
+      transcription: transcription, // Return the full transcription
       message: 'Analysis completed successfully'
     })
 

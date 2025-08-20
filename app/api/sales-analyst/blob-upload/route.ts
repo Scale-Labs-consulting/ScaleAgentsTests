@@ -66,16 +66,17 @@ export async function POST(request: NextRequest) {
     // Create database record
     const salesCallData = {
       user_id: userId,
+      agent_id: null, // Will be set when agent is created
       title: (originalFileName || file.name).replace(/\.[^/.]+$/, ''),
       file_url: blob.url,
-      file_path: blob.pathname,
       file_size: file.size,
-      duration: 0,
+      duration_seconds: 0,
       status: 'uploaded',
       metadata: {
         isConverted,
         originalFileName: originalFileName || file.name,
         fileType: file.type,
+        blobPath: blob.pathname,
         conversionInfo: isConverted ? {
           originalSize: file.size,
           convertedAt: new Date().toISOString()

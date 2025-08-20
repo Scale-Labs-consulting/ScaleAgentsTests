@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import { convertVideoToAudio, shouldConvertVideo } from '@/lib/video-converter'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -60,6 +60,8 @@ export default function SalesAnalystPage() {
   const [analysisResult, setAnalysisResult] = useState<any>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [transcript, setTranscript] = useState<string>('')
+  const [showTranscript, setShowTranscript] = useState(false)
   const [audioRef] = useState(useRef<HTMLAudioElement>(null))
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -69,82 +71,7 @@ export default function SalesAnalystPage() {
   const [selectedCall, setSelectedCall] = useState<SalesCall | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Initialize Supabase client
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
 
-  // Debug function to check authentication status
-  const debugAuth = async () => {
-    try {
-      console.log('🔍 Debugging authentication...')
-      console.log('👤 User state:', user)
-      console.log('🔧 Initialized:', initialized)
-      console.log('⏳ Loading:', loading)
-      
-      // Check if we're in browser environment
-      console.log('🌐 Browser environment:', typeof window !== 'undefined')
-      
-      // Check localStorage for auth data
-      if (typeof window !== 'undefined') {
-        const authData = localStorage.getItem('scaleagents-auth')
-        console.log('💾 LocalStorage auth data:', authData ? 'Present' : 'Missing')
-        if (authData) {
-          try {
-            const parsed = JSON.parse(authData)
-            console.log('📄 Parsed auth data:', parsed)
-          } catch (e) {
-            console.log('❌ Failed to parse auth data')
-          }
-        }
-      }
-      
-      const { data: { session }, error } = await supabase.auth.getSession()
-      console.log('🔑 Session:', session ? 'Found' : 'Not found')
-      console.log('❌ Session error:', error)
-      
-      if (session) {
-        console.log('🔑 Access token:', session.access_token ? 'Present' : 'Missing')
-        console.log('🔑 Token length:', session.access_token?.length || 0)
-        console.log('🔑 Token expires at:', session.expires_at)
-        console.log('🔑 Refresh token:', session.refresh_token ? 'Present' : 'Missing')
-      }
-      
-      // Try to get current user
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser()
-      console.log('👤 Current user:', currentUser ? 'Found' : 'Not found')
-      console.log('❌ User error:', userError)
-      
-    } catch (error) {
-      console.error('❌ Debug auth error:', error)
-    }
-  }
-
-  // Function to manually refresh session
-  const refreshSession = async () => {
-    try {
-      console.log('🔄 Manually refreshing session...')
-      const { data, error } = await supabase.auth.refreshSession()
-      
-      if (error) {
-        console.error('❌ Session refresh failed:', error)
-        alert('Failed to refresh session. Please log in again.')
-        router.push('/login')
-      } else if (data.session) {
-        console.log('✅ Session refreshed successfully')
-        alert('Session refreshed successfully!')
-      } else {
-        console.log('ℹ️ No session to refresh')
-        alert('No active session to refresh. Please log in.')
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('❌ Session refresh error:', error)
-      alert('Session refresh failed. Please log in again.')
-      router.push('/login')
-    }
-  }
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -153,39 +80,12 @@ export default function SalesAnalystPage() {
     }
   }, [user, initialized, router])
 
-  // Check session validity on component mount (only if user exists)
+  // Simple redirect to login if not authenticated
   useEffect(() => {
-    const checkSession = async () => {
-      // Only check if we have a user and auth is initialized
-      if (user && initialized && !loading) {
-        try {
-          console.log('🔍 Checking session validity...')
-          const { data: { session }, error } = await supabase.auth.getSession()
-          
-          if (error) {
-            console.error('❌ Session validation error:', error)
-            // Only logout if it's a serious error
-            if (error.message.includes('invalid') || error.message.includes('expired')) {
-              await supabase.auth.signOut()
-              router.push('/login')
-            }
-          } else if (!session) {
-            console.log('ℹ️ No active session found, but user exists - this might be normal during auth state changes')
-            // Don't force logout immediately, let the auth state settle
-          } else {
-            console.log('✅ Session validation successful')
-          }
-        } catch (error) {
-          console.error('❌ Session check error:', error)
-          // Don't force logout on network errors
-        }
-      }
+    if (initialized && !user) {
+      router.push('/login')
     }
-
-    // Add a small delay to let auth state settle
-    const timeoutId = setTimeout(checkSession, 1000)
-    return () => clearTimeout(timeoutId)
-  }, [user, initialized, loading, router])
+  }, [user, initialized, router])
 
   // Show loading while auth is initializing
   if (loading || !initialized) {
@@ -210,29 +110,12 @@ export default function SalesAnalystPage() {
     const file = event.target.files?.[0]
     if (!file) return
 
-    // Check if user is authenticated
+    // Simple authentication check
     if (!user || !user.id) {
       alert('Por favor, faça login para continuar.')
+      router.push('/login')
       return
     }
-
-    // Send log to server terminal
-    await fetch('/api/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        message: '📁 File selected:',
-        data: { name: file.name, size: file.size, type: file.type }
-      })
-    })
-    
-    await fetch('/api/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        message: '🔍 Starting client-side file upload process...'
-      })
-    })
 
     // Validate file type
     if (!file.type.startsWith('video/')) {
@@ -240,111 +123,35 @@ export default function SalesAnalystPage() {
       return
     }
 
-
-
     setUploadedFile(file)
     setIsUploading(true)
     setUploadProgress(0)
     setUploadStatus('A preparar o carregamento...')
-    setAnalysisResult(null) // Clear previous analysis
+    setAnalysisResult(null)
 
     try {
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: '🔑 Getting access token...' })
-      })
-      
       console.log('🔑 Getting access token...')
-      console.log('👤 User object:', user)
-      console.log('👤 User ID:', user?.id)
+      console.log('👤 User ID:', user.id)
       
-      // Try to get the current session with retry logic
-      let session = null
-      let sessionError = null
+      // Simple session check - just get the current session
+      const { data: { session }, error } = await supabase.auth.getSession()
       
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          console.log(`🔑 Attempt ${attempt}/3: Getting session...`)
-          const { data, error } = await supabase.auth.getSession()
-          
-          if (error) {
-            sessionError = error
-            console.error(`❌ Session error (attempt ${attempt}):`, error)
-            if (attempt < 3) {
-              await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
-              continue
-            }
-          } else if (data.session) {
-            session = data.session
-            console.log(`✅ Session obtained on attempt ${attempt}`)
-            break
-          } else {
-            console.log(`ℹ️ No session found on attempt ${attempt}`)
-            if (attempt < 3) {
-              await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
-              continue
-            }
-          }
-        } catch (error) {
-          console.error(`❌ Session fetch error (attempt ${attempt}):`, error)
-          if (attempt < 3) {
-            await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
-            continue
-          }
-        }
-      }
-      
-      if (sessionError) {
-        console.error('❌ Session error after all attempts:', sessionError)
-        throw new Error('Failed to get session: ' + sessionError.message)
+      if (error) {
+        console.error('❌ Session error:', error)
+        throw new Error('Authentication error. Please log in again.')
       }
       
       if (!session) {
-        console.error('❌ No active session found after all attempts')
-        // Try to refresh the session
-        try {
-          console.log('🔄 Attempting to refresh session...')
-          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-          
-          if (refreshError) {
-            console.error('❌ Session refresh failed:', refreshError)
-            throw new Error('No active session found. Please log in again.')
-          }
-          
-          if (refreshData.session) {
-            session = refreshData.session
-            console.log('✅ Session refreshed successfully')
-          } else {
-            throw new Error('No active session found. Please log in again.')
-          }
-        } catch (refreshError) {
-          console.error('❌ Session refresh error:', refreshError)
-          throw new Error('No active session found. Please log in again.')
-        }
+        console.error('❌ No active session found')
+        throw new Error('No active session found. Please log in again.')
       }
       
       const accessToken = session.access_token
       console.log('🔑 Access token obtained:', accessToken ? 'Yes' : 'No')
-      console.log('🔑 Access token length:', accessToken?.length || 0)
-      
-      // Check if we have all required data
-      if (!user?.id) {
-        throw new Error('User ID is missing')
-      }
       
       if (!accessToken) {
-        throw new Error('Access token is missing')
+        throw new Error('Access token is missing. Please log in again.')
       }
-      
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '🔑 Access token status:',
-          data: { hasToken: !!accessToken, tokenLength: accessToken.length, userId: user.id }
-        })
-      })
     
       // Use client-side upload approach
       console.log('🚀 Starting client-side upload...')
@@ -357,9 +164,11 @@ export default function SalesAnalystPage() {
       setIsUploading(false)
       setUploadProgress(0)
       
+      // Show error to user
+      alert(error instanceof Error ? error.message : 'Erro no carregamento. Por favor, tente novamente.')
+      
       // If it's an authentication error, redirect to login
       if (error instanceof Error && error.message.includes('session')) {
-        alert('Sessão expirada. Por favor, faça login novamente.')
         router.push('/login')
       }
     }
@@ -475,6 +284,12 @@ export default function SalesAnalystPage() {
 
       // Store analysis result for display
       setAnalysisResult(result.analysis)
+      
+      // Store transcript for display
+      if (result.transcription) {
+        setTranscript(result.transcription)
+        setShowTranscript(true)
+      }
       
       // Reset upload state after 3 seconds
       setTimeout(() => {
@@ -908,33 +723,21 @@ export default function SalesAnalystPage() {
                     >
                       Escolher Ficheiro
                     </Button>
-                    <Button 
-                      onClick={debugAuth}
-                      className="bg-gray-600 hover:bg-gray-700 text-white"
-                    >
-                      Debug Auth
-                    </Button>
-                    <Button 
-                      onClick={refreshSession}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      Refresh Session
-                    </Button>
                     {uploadedFile && (
-                                              <Button 
-                          variant="outline"
-                          onClick={() => {
-                            setUploadedFile(null)
-                            setUploadStatus('')
-                            setUploadProgress(0)
-                            if (fileInputRef.current) {
-                              fileInputRef.current.value = ''
-                            }
-                          }}
-                          className="bg-purple-600 hover:bg-purple-700 text-white"
-                        >
-                          Limpar Ficheiro
-                        </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => {
+                          setUploadedFile(null)
+                          setUploadStatus('')
+                          setUploadProgress(0)
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = ''
+                          }
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        Limpar Ficheiro
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -980,6 +783,37 @@ export default function SalesAnalystPage() {
             </Card>
           </div>
 
+          {/* Transcript Display */}
+          {showTranscript && transcript && (
+            <div className="max-w-4xl mx-auto mt-8">
+              <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <FileText className="w-5 h-5" />
+                    <span>Transcrição da Chamada</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowTranscript(false)}
+                      className="ml-auto text-white/60 hover:text-white"
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </Button>
+                  </CardTitle>
+                  <CardDescription>
+                    Transcrição completa com identificação de oradores
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-white/5 p-4 rounded-lg border border-white/10 max-h-96 overflow-y-auto">
+                    <pre className="text-white/90 text-sm whitespace-pre-wrap font-mono">
+                      {transcript}
+                    </pre>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
         </div>
       </div>

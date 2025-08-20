@@ -113,7 +113,7 @@ export default function DashboardPage() {
       name: 'HR Talent',
       description: 'Aquisição inteligente de talentos e gestão de recursos humanos',
       icon: UserCheck,
-      status: 'inactive',
+      status: 'active',
       lastUsed: 'há 3 dias'
     }
   ]
@@ -415,8 +415,7 @@ export default function DashboardPage() {
                             } else if (agent.id === 'scale-expert') {
                               router.push('/scale-expert')
                             } else if (agent.id === 'hr-talent') {
-                              // TODO: Add HR Talent page route when available
-                              console.log('HR Talent agent clicked')
+                              router.push('/hr-talent')
                             }
                           }}
                         >

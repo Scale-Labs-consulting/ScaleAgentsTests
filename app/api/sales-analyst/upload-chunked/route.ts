@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { put } from '@vercel/blob'
 import { createClient } from '@supabase/supabase-js'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
-import { existsSync } from 'fs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,9 +11,17 @@ export async function POST(request: NextRequest) {
     const fileName = formData.get('fileName') as string
     const userId = formData.get('userId') as string
     const accessToken = formData.get('accessToken') as string
-    const fileSize = parseInt(formData.get('fileSize') as string)
+    const fileId = formData.get('fileId') as string
 
-    if (!chunk || !fileName || !userId) {
+    console.log('📁 Chunked upload request received:', {
+      fileName,
+      chunkIndex,
+      totalChunks,
+      chunkSize: chunk?.size,
+      userId
+    })
+
+    if (!chunk || !fileName || !userId || !accessToken || chunkIndex === undefined || totalChunks === undefined) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
@@ -35,138 +41,138 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    // Create temp directory for chunks
-    const tempDir = join(process.cwd(), 'temp', userId)
-    if (!existsSync(tempDir)) {
-      await mkdir(tempDir, { recursive: true })
-    }
+    // Check if Vercel Blob is configured
+    const useFallback = !process.env.BLOB_READ_WRITE_TOKEN
 
-    // Save chunk to temp directory
-    const chunkPath = join(tempDir, `${fileName}.part${chunkIndex}`)
-    const chunkBuffer = Buffer.from(await chunk.arrayBuffer())
-    await writeFile(chunkPath, chunkBuffer)
-
-    // If this is the last chunk, combine all chunks
-    if (chunkIndex === totalChunks - 1) {
-      console.log(`Combining ${totalChunks} chunks for file: ${fileName}`)
+    let chunkUrl: string
+    
+    if (useFallback) {
+      // Use Supabase Storage for chunk
+      const chunkFileName = `${userId}/${fileId}/chunk-${chunkIndex.toString().padStart(4, '0')}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('sales-calls')
+        .upload(chunkFileName, chunk)
+      
+      if (uploadError) {
+        console.error('❌ Supabase Storage chunk upload failed:', uploadError)
+        return NextResponse.json(
+          { error: `Chunk upload failed: ${uploadError.message}` },
+          { status: 500 }
+        )
+      }
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('sales-calls')
+        .getPublicUrl(chunkFileName)
+      
+      chunkUrl = publicUrl
+    } else {
+      // Use Vercel Blob for chunk
+      const chunkFileName = `${userId}/${fileId}/chunk-${chunkIndex.toString().padStart(4, '0')}`
       
       try {
-        const { createReadStream, createWriteStream } = require('fs')
-        const { pipeline } = require('stream/promises')
-        const { readFile } = require('fs/promises')
-        
-        const finalPath = join(tempDir, fileName)
-        const writeStream = createWriteStream(finalPath)
-
-        // Combine all chunks using append mode
-        for (let i = 0; i < totalChunks; i++) {
-          const chunkPath = join(tempDir, `${fileName}.part${i}`)
-          console.log(`Reading chunk ${i}: ${chunkPath}`)
-          
-          const readStream = createReadStream(chunkPath)
-          await pipeline(readStream, writeStream, { end: false })
-        }
-        
-        writeStream.end()
-        await new Promise((resolve, reject) => {
-          writeStream.on('finish', resolve)
-          writeStream.on('error', reject)
-        })
-
-        console.log(`File combined successfully: ${finalPath}`)
-
-        // Read the combined file
-        const finalFile = await readFile(finalPath)
-        const fileBlob = new Blob([finalFile], { type: 'video/mp4' })
-        console.log(`File blob created, size: ${fileBlob.size} bytes`)
-
-        // Upload to Supabase Storage
-        const storageFileName = `${userId}/${Date.now()}-${fileName}`
-        console.log(`Uploading to Supabase: ${storageFileName}`)
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('sales-calls')
-          .upload(storageFileName, fileBlob)
-
-        if (uploadError) {
-          console.error('Upload error:', uploadError)
-          return NextResponse.json(
-            { error: 'Failed to upload file' },
-            { status: 500 }
-          )
-        }
-
-        console.log('File uploaded to Supabase successfully')
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('sales-calls')
-          .getPublicUrl(storageFileName)
-
-        console.log(`Public URL: ${publicUrl}`)
-
-        // Create database record
-        const salesCallData = {
-          user_id: userId,
-          title: fileName.replace(/\.[^/.]+$/, ''),
-          file_url: publicUrl,
-          file_path: storageFileName,
-          file_size: fileSize,
-          duration: 0,
-          status: 'uploaded'
-        }
-
-        console.log('Creating database record:', salesCallData)
-
-        const { data: salesCall, error: dbError } = await supabase
-          .from('sales_calls')
-          .insert(salesCallData)
-          .select()
-          .single()
-
-        if (dbError) {
-          console.error('Database error:', dbError)
-          await supabase.storage
-            .from('sales-calls')
-            .remove([storageFileName])
-          
-          return NextResponse.json(
-            { error: 'Failed to create database record' },
-            { status: 500 }
-          )
-        }
-
-        console.log('Database record created successfully:', salesCall)
-
-        // Clean up temp files
-        const { rm } = require('fs/promises')
-        await rm(tempDir, { recursive: true, force: true })
-
-        return NextResponse.json({
-          success: true,
-          salesCall: salesCall
+        const blob = await put(chunkFileName, chunk, {
+          access: 'public',
+          addRandomSuffix: false
         })
         
-      } catch (error) {
-        console.error('Error combining chunks:', error)
+        chunkUrl = blob.url
+      } catch (blobError) {
+        console.error('❌ Vercel Blob chunk upload failed:', blobError)
         return NextResponse.json(
-          { error: 'Failed to combine file chunks' },
+          { error: `Chunk upload failed: ${blobError instanceof Error ? blobError.message : 'Unknown error'}` },
           { status: 500 }
         )
       }
     }
 
-    // Return success for chunk upload
+    console.log(`✅ Chunk ${chunkIndex + 1}/${totalChunks} uploaded:`, chunkUrl)
+
+    // If this is the last chunk, trigger file assembly
+    if (chunkIndex === totalChunks - 1) {
+      console.log('🎯 Last chunk received, triggering file assembly...')
+      
+      // Store chunk information in database for assembly
+      const { data: chunkRecord, error: dbError } = await supabase
+        .from('file_chunks')
+        .insert({
+          file_id: fileId,
+          chunk_index: chunkIndex,
+          chunk_url: chunkUrl,
+          is_last: true,
+          total_chunks: totalChunks,
+          user_id: userId
+        })
+        .select()
+        .single()
+
+      if (dbError) {
+        console.error('❌ Failed to store chunk record:', dbError)
+        return NextResponse.json(
+          { error: 'Failed to store chunk information' },
+          { status: 500 }
+        )
+      }
+
+      // Trigger assembly process
+      try {
+        const assemblyResponse = await fetch(`${request.nextUrl.origin}/api/sales-analyst/assemble-chunks`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            fileId,
+            fileName,
+            userId,
+            totalChunks
+          })
+        })
+
+        if (!assemblyResponse.ok) {
+          console.error('❌ Assembly trigger failed:', assemblyResponse.status)
+        } else {
+          console.log('✅ File assembly triggered successfully')
+        }
+      } catch (assemblyError) {
+        console.error('❌ Assembly trigger error:', assemblyError)
+      }
+    } else {
+      // Store chunk information for later assembly
+      const { error: dbError } = await supabase
+        .from('file_chunks')
+        .insert({
+          file_id: fileId,
+          chunk_index: chunkIndex,
+          chunk_url: chunkUrl,
+          is_last: false,
+          total_chunks: totalChunks,
+          user_id: userId
+        })
+
+      if (dbError) {
+        console.error('❌ Failed to store chunk record:', dbError)
+        return NextResponse.json(
+          { error: 'Failed to store chunk information' },
+          { status: 500 }
+        )
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      chunkIndex: chunkIndex,
-      message: 'Chunk uploaded successfully'
+      chunkIndex,
+      chunkUrl,
+      isLast: chunkIndex === totalChunks - 1,
+      message: `Chunk ${chunkIndex + 1}/${totalChunks} uploaded successfully`
     })
 
   } catch (error) {
-    console.error('API error:', error)
+    console.error('❌ Chunked upload error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: `Chunked upload failed: ${error instanceof Error ? error.message : String(error)}` },
       { status: 500 }
     )
   }

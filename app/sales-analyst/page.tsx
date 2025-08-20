@@ -123,6 +123,16 @@ export default function SalesAnalystPage() {
       return
     }
 
+    // Validate file size (100MB limit for direct upload)
+    const maxSize = 100 * 1024 * 1024 // 100MB in bytes
+    if (file.size > maxSize) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1)
+      const maxSizeMB = (maxSize / (1024 * 1024)).toFixed(0)
+      
+      alert(`Ficheiro demasiado grande: ${fileSizeMB}MB. O tamanho máximo é ${maxSizeMB}MB para upload direto.\n\nSugestões:\n• Comprima o vídeo\n• Use um ficheiro mais pequeno\n• Considere usar a funcionalidade de upload em partes para ficheiros maiores`)
+      return
+    }
+
     setUploadedFile(file)
     setIsUploading(true)
     setUploadProgress(0)
@@ -788,6 +798,9 @@ export default function SalesAnalystPage() {
                       Tamanho do ficheiro: {(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB
                     </p>
                   )}
+                  <p className="text-white/40 text-xs">
+                    Tamanho máximo: 100MB por ficheiro
+                  </p>
                   <p className="text-white/50 text-sm mb-4">Formato Suportado: MP4 (sem limite de tamanho)</p>
                   <div className="flex justify-center">
                     <div className="w-16 h-16 bg-white/5 rounded-lg flex items-center justify-center">

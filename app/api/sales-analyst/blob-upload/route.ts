@@ -39,12 +39,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate file size (500MB limit for Vercel Blob)
-    const maxSize = 500 * 1024 * 1024 // 500MB in bytes
+    // Validate file size (100MB limit for serverless functions)
+    const maxSize = 100 * 1024 * 1024 // 100MB in bytes
     if (file.size > maxSize) {
+      console.error(`❌ File too large: ${(file.size / (1024 * 1024)).toFixed(1)}MB exceeds ${(maxSize / (1024 * 1024)).toFixed(0)}MB limit`)
       return NextResponse.json(
-        { error: `File too large: ${(file.size / (1024 * 1024)).toFixed(1)}MB. Maximum size is 500MB.` },
-        { status: 400 }
+        { 
+          error: `File too large: ${(file.size / (1024 * 1024)).toFixed(1)}MB. Maximum size is ${(maxSize / (1024 * 1024)).toFixed(0)}MB for direct upload.`,
+          suggestion: 'Please compress your video or use a smaller file. For larger files, consider using the chunked upload feature.'
+        },
+        { status: 413 }
       )
     }
 

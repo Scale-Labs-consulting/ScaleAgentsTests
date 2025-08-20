@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
-import { convertVideoToAudio, shouldConvertVideo, truncateFile } from '@/lib/video-converter'
+import { convertVideoToAudio, shouldConvertVideo } from '@/lib/video-converter'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -60,8 +60,6 @@ export default function SalesAnalystPage() {
   const [analysisResult, setAnalysisResult] = useState<any>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState(0)
-  const [transcript, setTranscript] = useState<string>('')
-  const [showTranscript, setShowTranscript] = useState(false)
   const [audioRef] = useState(useRef<HTMLAudioElement>(null))
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -123,42 +121,7 @@ export default function SalesAnalystPage() {
       return
     }
 
-    // Check if file needs truncation (100MB limit for direct upload)
-    const maxSize = 100 * 1024 * 1024 // 100MB in bytes
-    let fileToUpload = file
-    let isTruncated = false
-    
-    if (file.size > maxSize) {
-      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1)
-      const maxSizeMB = (maxSize / (1024 * 1024)).toFixed(0)
-      
-      console.log(`📏 File too large: ${fileSizeMB}MB, truncating to ${maxSizeMB}MB...`)
-      
-      try {
-        // Truncate the file to fit within the limit
-        fileToUpload = await truncateFile(file, maxSize)
-        isTruncated = true
-        
-        const truncatedSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(1)
-        console.log(`✅ File truncated: ${fileSizeMB}MB → ${truncatedSizeMB}MB`)
-        
-        toast({
-          title: "Ficheiro truncado automaticamente",
-          description: `O ficheiro foi truncado de ${fileSizeMB}MB para ${truncatedSizeMB}MB para permitir o upload.`,
-          variant: "default",
-        })
-      } catch (truncateError) {
-        console.error('❌ File truncation failed:', truncateError)
-        toast({
-          title: "Erro na truncagem",
-          description: "Não foi possível truncar o ficheiro. Por favor, use um ficheiro mais pequeno.",
-          variant: "destructive",
-        })
-        return
-      }
-    }
-
-    setUploadedFile(fileToUpload)
+    setUploadedFile(file)
     setIsUploading(true)
     setUploadProgress(0)
     setUploadStatus('A preparar o carregamento...')
@@ -188,10 +151,10 @@ export default function SalesAnalystPage() {
         throw new Error('Access token is missing. Please log in again.')
       }
     
-          // Use client-side upload approach
-    console.log('🚀 Starting client-side upload...')
-    setUploadStatus('A fazer upload do ficheiro...')
-    await uploadFileClientSide(fileToUpload, accessToken, isTruncated)
+      // Use client-side upload approach
+      console.log('🚀 Starting client-side upload...')
+      setUploadStatus('A fazer upload do ficheiro...')
+      await uploadFileClientSide(file, accessToken)
     
     } catch (error) {
       console.error('❌ Upload error:', error)
@@ -209,7 +172,7 @@ export default function SalesAnalystPage() {
     }
   }
 
-  const uploadFileClientSide = async (file: File, accessToken: string, isTruncated: boolean = false) => {
+  const uploadFileClientSide = async (file: File, accessToken: string) => {
     try {
       // Check if we should convert video to audio
       let fileToUpload = file
@@ -262,7 +225,6 @@ export default function SalesAnalystPage() {
       formData.append('userId', user.id)
       formData.append('accessToken', accessToken)
       formData.append('isConverted', isConverted.toString())
-      formData.append('isTruncated', isTruncated.toString())
       formData.append('originalFileName', file.name)
 
       const blobUploadResponse = await fetch('/api/sales-analyst/blob-upload', {
@@ -271,24 +233,8 @@ export default function SalesAnalystPage() {
       })
 
       if (!blobUploadResponse.ok) {
-        // Clone the response so we can read it multiple times if needed
-        const responseClone = blobUploadResponse.clone()
-        
-        let errorData
-        try {
-          errorData = await responseClone.json()
-          throw new Error(errorData.error || 'Failed to upload to Vercel Blob')
-        } catch (jsonError) {
-          // If JSON parsing fails, try to get the text content
-          try {
-            const errorText = await blobUploadResponse.text()
-            console.error('❌ Non-JSON response received:', errorText.substring(0, 500))
-            throw new Error('Server returned an invalid response. This might be a configuration issue with Vercel Blob.')
-          } catch (textError) {
-            // If both JSON and text fail, throw a generic error
-            throw new Error(`Upload failed with status ${blobUploadResponse.status}: ${blobUploadResponse.statusText}`)
-          }
-        }
+        const errorData = await blobUploadResponse.json()
+        throw new Error(errorData.error || 'Failed to upload to Vercel Blob')
       }
 
       const uploadResult = await blobUploadResponse.json()
@@ -313,23 +259,8 @@ export default function SalesAnalystPage() {
       })
 
       if (!transcriptionResponse.ok) {
-        // Clone the response so we can read it multiple times if needed
-        const responseClone = transcriptionResponse.clone()
-        
-        try {
-          const errorData = await responseClone.json()
-          throw new Error(errorData.error || 'Transcription failed')
-        } catch (jsonError) {
-          // If JSON parsing fails, try to get the text content
-          try {
-            const errorText = await transcriptionResponse.text()
-            console.error('❌ Non-JSON transcription response:', errorText.substring(0, 500))
-            throw new Error('Transcription service returned an invalid response.')
-          } catch (textError) {
-            // If both JSON and text fail, throw a generic error
-            throw new Error(`Transcription failed with status ${transcriptionResponse.status}: ${transcriptionResponse.statusText}`)
-          }
-        }
+        const errorData = await transcriptionResponse.json()
+        throw new Error(errorData.error || 'Transcription failed')
       }
 
       const result = await transcriptionResponse.json()
@@ -351,12 +282,6 @@ export default function SalesAnalystPage() {
 
       // Store analysis result for display
       setAnalysisResult(result.analysis)
-      
-      // Store transcript for display
-      if (result.transcription) {
-        setTranscript(result.transcription)
-        setShowTranscript(true)
-      }
       
       // Reset upload state after 3 seconds
       setTimeout(() => {
@@ -402,23 +327,8 @@ export default function SalesAnalystPage() {
       })
       
       if (!response.ok) {
-        // Clone the response so we can read it multiple times if needed
-        const responseClone = response.clone()
-        
-        try {
-          const errorData = await responseClone.json()
-          throw new Error(errorData.error || 'Analysis failed')
-        } catch (jsonError) {
-          // If JSON parsing fails, try to get the text content
-          try {
-            const errorText = await response.text()
-            console.error('❌ Non-JSON analysis response:', errorText.substring(0, 500))
-            throw new Error('Analysis service returned an invalid response.')
-          } catch (textError) {
-            // If both JSON and text fail, throw a generic error
-            throw new Error(`Analysis failed with status ${response.status}: ${response.statusText}`)
-          }
-        }
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Analysis failed')
       }
       
       const result = await response.json()
@@ -565,48 +475,16 @@ export default function SalesAnalystPage() {
       })
 
       if (!response.ok) {
-        // Clone the response so we can read it multiple times if needed
-        const responseClone = response.clone()
-        
-        try {
-          const errorData = await responseClone.json()
-          await fetch('/api/log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              message: '❌ API Error:',
-              data: errorData
-            })
+        const errorData = await response.json()
+        await fetch('/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: '❌ API Error:',
+            data: errorData
           })
-          throw new Error(errorData.error || 'Analysis failed')
-        } catch (jsonError) {
-          // If JSON parsing fails, try to get the text content
-          try {
-            const errorText = await response.text()
-            console.error('❌ Non-JSON analysis response:', errorText.substring(0, 500))
-            await fetch('/api/log', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                message: '❌ Non-JSON API Error:',
-                data: { error: errorText.substring(0, 500) }
-              })
-            })
-            throw new Error('Analysis service returned an invalid response.')
-          } catch (textError) {
-            // If both JSON and text fail, throw a generic error
-            const genericError = `Analysis failed with status ${response.status}: ${response.statusText}`
-            await fetch('/api/log', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                message: '❌ Generic API Error:',
-                data: { error: genericError }
-              })
-            })
-            throw new Error(genericError)
-          }
-        }
+        })
+        throw new Error(errorData.error || 'Analysis failed')
       }
 
       const result = await response.json()
@@ -824,9 +702,6 @@ export default function SalesAnalystPage() {
                       Tamanho do ficheiro: {(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB
                     </p>
                   )}
-                  <p className="text-white/40 text-xs">
-                    Ficheiros grandes serão truncados automaticamente para 100MB
-                  </p>
                   <p className="text-white/50 text-sm mb-4">Formato Suportado: MP4 (sem limite de tamanho)</p>
                   <div className="flex justify-center">
                     <div className="w-16 h-16 bg-white/5 rounded-lg flex items-center justify-center">
@@ -900,37 +775,7 @@ export default function SalesAnalystPage() {
             </Card>
           </div>
 
-          {/* Transcript Display */}
-          {showTranscript && transcript && (
-            <div className="max-w-4xl mx-auto mt-8">
-              <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-white">
-                    <FileText className="w-5 h-5" />
-                    <span>Transcrição da Chamada</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowTranscript(false)}
-                      className="ml-auto text-white/60 hover:text-white"
-                    >
-                      <XCircle className="w-4 h-4" />
-                    </Button>
-                  </CardTitle>
-                  <CardDescription>
-                    Transcrição completa com identificação de oradores
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="bg-white/5 p-4 rounded-lg border border-white/10 max-h-96 overflow-y-auto">
-                    <pre className="text-white/90 text-sm whitespace-pre-wrap font-mono">
-                      {transcript}
-                    </pre>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+
 
         </div>
       </div>

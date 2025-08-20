@@ -17,8 +17,6 @@ const nextConfig = {
   // Optimize for Vercel
   compress: true,
   poweredByHeader: false,
-  
-
 }
 
 export default nextConfig

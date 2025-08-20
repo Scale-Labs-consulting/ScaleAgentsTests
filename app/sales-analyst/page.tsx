@@ -206,39 +206,35 @@ export default function SalesAnalystPage() {
         }
       }
 
-      console.log('🚀 Starting Vercel Blob upload...')
+      console.log('🚀 Starting client-side Vercel Blob upload...')
       await fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: '🚀 Starting Vercel Blob upload...',
+          message: '🚀 Starting client-side Vercel Blob upload...',
           data: { fileName: file.name, fileSize: file.size }
         })
       })
 
-      // Step 1: Upload to Vercel Blob
+      // Step 1: Upload to Vercel Blob using client upload
       setUploadStatus('A fazer upload para Vercel Blob...')
       setUploadProgress(20)
 
-      const formData = new FormData()
-      formData.append('file', fileToUpload)
-      formData.append('userId', user.id)
-      formData.append('accessToken', accessToken)
-      formData.append('isConverted', isConverted.toString())
-      formData.append('originalFileName', file.name)
+      // Import the upload function from @vercel/blob/client
+      const { upload } = await import('@vercel/blob/client')
 
-      const blobUploadResponse = await fetch('/api/sales-analyst/blob-upload', {
-        method: 'POST',
-        body: formData
+      const blob = await upload(fileToUpload.name, fileToUpload, {
+        access: 'public',
+        handleUploadUrl: '/api/sales-analyst/blob-upload',
+        clientPayload: JSON.stringify({
+          userId: user.id,
+          accessToken: accessToken,
+          originalFileName: file.name,
+          isConverted: isConverted
+        })
       })
 
-      if (!blobUploadResponse.ok) {
-        const errorData = await blobUploadResponse.json()
-        throw new Error(errorData.error || 'Failed to upload to Vercel Blob')
-      }
-
-      const uploadResult = await blobUploadResponse.json()
-      console.log('✅ File uploaded to Vercel Blob:', uploadResult.blobUrl)
+      console.log('✅ File uploaded to Vercel Blob:', blob.url)
 
       // Step 2: Start transcription and analysis
       setUploadStatus('A processar vídeo e iniciar transcrição...')
@@ -250,11 +246,11 @@ export default function SalesAnalystPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          blobUrl: uploadResult.blobUrl,
+          blobUrl: blob.url,
           fileName: file.name,
           userId: user.id,
           accessToken: accessToken,
-          salesCallId: uploadResult.salesCall.id
+          salesCallId: null // Will be updated after database record is created
         })
       })
 

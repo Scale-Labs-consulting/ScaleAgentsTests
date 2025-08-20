@@ -187,3 +187,4 @@ tests/
 **/test/data/
 **/test-data/
 **/test_data/
+.env*.local

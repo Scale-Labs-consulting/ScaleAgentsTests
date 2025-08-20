@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
-import { convertVideoToAudio, shouldConvertVideo } from '@/lib/video-converter'
+import { convertVideoToAudio, shouldConvertVideo, truncateFile } from '@/lib/video-converter'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -123,17 +123,42 @@ export default function SalesAnalystPage() {
       return
     }
 
-    // Validate file size (100MB limit for direct upload)
+    // Check if file needs truncation (100MB limit for direct upload)
     const maxSize = 100 * 1024 * 1024 // 100MB in bytes
+    let fileToUpload = file
+    let isTruncated = false
+    
     if (file.size > maxSize) {
       const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1)
       const maxSizeMB = (maxSize / (1024 * 1024)).toFixed(0)
       
-      alert(`Ficheiro demasiado grande: ${fileSizeMB}MB. O tamanho máximo é ${maxSizeMB}MB para upload direto.\n\nSugestões:\n• Comprima o vídeo\n• Use um ficheiro mais pequeno\n• Considere usar a funcionalidade de upload em partes para ficheiros maiores`)
-      return
+      console.log(`📏 File too large: ${fileSizeMB}MB, truncating to ${maxSizeMB}MB...`)
+      
+      try {
+        // Truncate the file to fit within the limit
+        fileToUpload = await truncateFile(file, maxSize)
+        isTruncated = true
+        
+        const truncatedSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(1)
+        console.log(`✅ File truncated: ${fileSizeMB}MB → ${truncatedSizeMB}MB`)
+        
+        toast({
+          title: "Ficheiro truncado automaticamente",
+          description: `O ficheiro foi truncado de ${fileSizeMB}MB para ${truncatedSizeMB}MB para permitir o upload.`,
+          variant: "default",
+        })
+      } catch (truncateError) {
+        console.error('❌ File truncation failed:', truncateError)
+        toast({
+          title: "Erro na truncagem",
+          description: "Não foi possível truncar o ficheiro. Por favor, use um ficheiro mais pequeno.",
+          variant: "destructive",
+        })
+        return
+      }
     }
 
-    setUploadedFile(file)
+    setUploadedFile(fileToUpload)
     setIsUploading(true)
     setUploadProgress(0)
     setUploadStatus('A preparar o carregamento...')
@@ -163,10 +188,10 @@ export default function SalesAnalystPage() {
         throw new Error('Access token is missing. Please log in again.')
       }
     
-      // Use client-side upload approach
-      console.log('🚀 Starting client-side upload...')
-      setUploadStatus('A fazer upload do ficheiro...')
-      await uploadFileClientSide(file, accessToken)
+          // Use client-side upload approach
+    console.log('🚀 Starting client-side upload...')
+    setUploadStatus('A fazer upload do ficheiro...')
+    await uploadFileClientSide(fileToUpload, accessToken, isTruncated)
     
     } catch (error) {
       console.error('❌ Upload error:', error)
@@ -184,7 +209,7 @@ export default function SalesAnalystPage() {
     }
   }
 
-  const uploadFileClientSide = async (file: File, accessToken: string) => {
+  const uploadFileClientSide = async (file: File, accessToken: string, isTruncated: boolean = false) => {
     try {
       // Check if we should convert video to audio
       let fileToUpload = file
@@ -237,6 +262,7 @@ export default function SalesAnalystPage() {
       formData.append('userId', user.id)
       formData.append('accessToken', accessToken)
       formData.append('isConverted', isConverted.toString())
+      formData.append('isTruncated', isTruncated.toString())
       formData.append('originalFileName', file.name)
 
       const blobUploadResponse = await fetch('/api/sales-analyst/blob-upload', {
@@ -799,7 +825,7 @@ export default function SalesAnalystPage() {
                     </p>
                   )}
                   <p className="text-white/40 text-xs">
-                    Tamanho máximo: 100MB por ficheiro
+                    Ficheiros grandes serão truncados automaticamente para 100MB
                   </p>
                   <p className="text-white/50 text-sm mb-4">Formato Suportado: MP4 (sem limite de tamanho)</p>
                   <div className="flex justify-center">

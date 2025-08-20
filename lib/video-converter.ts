@@ -71,3 +71,39 @@ export const shouldConvertVideo = (file: File): boolean => {
   // Convert if it's a video file larger than 50MB
   return file.type.startsWith('video/') && file.size > 50 * 1024 * 1024
 }
+
+export const truncateFile = async (file: File, maxSize: number): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    
+    reader.onload = (e) => {
+      try {
+        const arrayBuffer = e.target?.result as ArrayBuffer
+        
+        // If file is already within limit, return as is
+        if (arrayBuffer.byteLength <= maxSize) {
+          resolve(file)
+          return
+        }
+        
+        // Truncate the array buffer to the maximum size
+        const truncatedBuffer = arrayBuffer.slice(0, maxSize)
+        
+        // Create a new file with the truncated content
+        const truncatedFile = new File([truncatedBuffer], file.name, {
+          type: file.type,
+          lastModified: file.lastModified
+        })
+        
+        console.log(`📏 File truncated: ${(arrayBuffer.byteLength / (1024 * 1024)).toFixed(1)}MB → ${(truncatedBuffer.byteLength / (1024 * 1024)).toFixed(1)}MB`)
+        
+        resolve(truncatedFile)
+      } catch (error) {
+        reject(new Error(`File truncation failed: ${error}`))
+      }
+    }
+    
+    reader.onerror = () => reject(new Error('Failed to read file for truncation'))
+    reader.readAsArrayBuffer(file)
+  })
+}

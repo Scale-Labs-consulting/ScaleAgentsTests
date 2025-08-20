@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
     const userId = formData.get('userId') as string
     const accessToken = formData.get('accessToken') as string
     const isConverted = formData.get('isConverted') === 'true'
+    const isTruncated = formData.get('isTruncated') === 'true'
     const originalFileName = formData.get('originalFileName') as string
 
     console.log('📁 Blob upload request received:', {
@@ -144,6 +145,7 @@ export async function POST(request: NextRequest) {
       status: 'uploaded',
       metadata: {
         isConverted,
+        isTruncated,
         originalFileName: originalFileName || file.name,
         fileType: file.type,
         storageType: useFallback ? 'supabase' : 'vercel-blob',
@@ -151,6 +153,10 @@ export async function POST(request: NextRequest) {
         conversionInfo: isConverted ? {
           originalSize: file.size,
           convertedAt: new Date().toISOString()
+        } : null,
+        truncationInfo: isTruncated ? {
+          originalSize: file.size,
+          truncatedAt: new Date().toISOString()
         } : null
       }
     }

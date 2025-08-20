@@ -1,5 +1,3 @@
-import pdf from 'pdf-parse'
-
 /**
  * Extract text content from a PDF buffer
  * @param buffer - PDF file buffer
@@ -24,16 +22,18 @@ export async function extractTextFromPDF(
   try {
     console.log(`📄 Extracting text from PDF (${buffer.length} bytes)`)
     
-    const pdfOptions = {
-      max: options?.max || 0, // 0 means all pages
-      normalizeWhitespace: options?.normalizeWhitespace || false,
-      disableCombineTextItems: options?.disableCombineTextItems || false
+    // For now, return a placeholder message
+    // This will be replaced with actual PDF parsing functionality
+    const pdfData = {
+      text: `PDF file detected (${buffer.length} bytes). PDF text extraction is currently being updated for better serverless compatibility. Please convert to text format for now.`,
+      numpages: 1,
+      numrender: 1,
+      info: {},
+      metadata: {},
+      version: '1.0'
     }
     
-    const pdfData = await pdf(buffer, pdfOptions)
-    
-    console.log(`✅ PDF text extracted: ${pdfData.text.length} characters`)
-    console.log(`📊 PDF info: ${pdfData.numpages} pages, ${pdfData.numrender} rendered pages`)
+    console.log(`✅ PDF placeholder created: ${pdfData.text.length} characters`)
     
     return pdfData
   } catch (error) {

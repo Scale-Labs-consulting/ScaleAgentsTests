@@ -168,3 +168,22 @@ public/uploads/
 # Analysis cache
 .cache/
 analysis-cache/
+
+# Test files and directories
+test/
+tests/
+**/test/
+**/tests/
+**/test-data/
+**/test_data/
+**/*.test.*
+**/*.spec.*
+**/__tests__/
+**/__mocks__/
+**/coverage/
+**/.nyc_output/
+
+# PDF-parse test files
+**/test/data/
+**/test-data/
+**/test_data/

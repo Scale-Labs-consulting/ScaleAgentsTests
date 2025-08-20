@@ -332,7 +332,7 @@ export default function HRTalentPage() {
                       ))}
                     </div>
                   )}
-                  <p className="text-white/50 text-sm mb-4">Formatos Suportados: PDF (com extração de texto), DOC, DOCX, TXT, RTF</p>
+                  <p className="text-white/50 text-sm mb-4">Formatos Suportados: PDF (em atualização), DOC, DOCX, TXT, RTF</p>
                   <div className="flex justify-center">
                     <div className="w-16 h-16 bg-white/5 rounded-lg flex items-center justify-center">
                       <div className="w-8 h-8 bg-purple-500 rounded"></div>

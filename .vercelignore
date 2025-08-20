@@ -1,0 +1,53 @@
+# Test files and directories
+test/
+tests/
+**/test/
+**/tests/
+**/test-data/
+**/test_data/
+**/*.test.*
+**/*.spec.*
+**/__tests__/
+**/__mocks__/
+**/coverage/
+**/.nyc_output/
+
+# PDF-parse test files
+**/test/data/
+**/test-data/
+**/test_data/
+
+# Development files
+.env.local
+.env.development.local
+.env.test.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+uploads/
+public/uploads/
+
+# Build artifacts
+build/
+dist/
+.next/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3

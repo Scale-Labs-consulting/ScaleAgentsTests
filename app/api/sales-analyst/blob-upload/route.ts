@@ -49,7 +49,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
         return {
           allowedContentTypes: ['video/*', 'audio/*'],
-          addRandomSuffix: false,
+          addRandomSuffix: true,
           tokenPayload: JSON.stringify({
             userId: payload.userId,
             accessToken: payload.accessToken,

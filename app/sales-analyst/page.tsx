@@ -236,7 +236,34 @@ export default function SalesAnalystPage() {
 
       console.log('✅ File uploaded to Vercel Blob:', blob.url)
 
-      // Step 2: Start transcription and analysis
+      // Step 2: Get the sales call ID from the database
+      setUploadStatus('A obter informações do ficheiro...')
+      setUploadProgress(50)
+
+      // Wait a moment for the database record to be created
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // Get the sales call record that was just created
+      const salesCallResponse = await fetch('/api/sales-analyst/sales-calls/latest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          accessToken: accessToken,
+          blobUrl: blob.url
+        })
+      })
+
+      if (!salesCallResponse.ok) {
+        throw new Error('Failed to get sales call record')
+      }
+
+      const salesCallData = await salesCallResponse.json()
+      const salesCallId = salesCallData.salesCall.id
+
+      // Step 3: Start transcription and analysis
       setUploadStatus('A processar vídeo e iniciar transcrição...')
       setUploadProgress(60)
 
@@ -250,7 +277,7 @@ export default function SalesAnalystPage() {
           fileName: file.name,
           userId: user.id,
           accessToken: accessToken,
-          salesCallId: null // Will be updated after database record is created
+          salesCallId: salesCallId
         })
       })
 

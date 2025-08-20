@@ -4,6 +4,12 @@ import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Vercel Blob is configured
+    const useFallback = !process.env.BLOB_READ_WRITE_TOKEN
+    if (useFallback) {
+      console.warn('⚠️ BLOB_READ_WRITE_TOKEN not set - using Supabase Storage fallback')
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
     const userId = formData.get('userId') as string
@@ -14,7 +20,8 @@ export async function POST(request: NextRequest) {
     console.log('📁 Blob upload request received:', {
       fileName: file?.name,
       fileSize: file?.size,
-      userId: userId
+      userId: userId,
+      hasBlobToken: !!process.env.BLOB_READ_WRITE_TOKEN
     })
 
     if (!file || !userId || !accessToken) {
@@ -54,21 +61,80 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    // Upload to Vercel Blob
-    console.log('📤 Uploading to Vercel Blob...')
-    const blob = await put(`${userId}/${Date.now()}-${file.name}`, file, {
-      access: 'public',
-      addRandomSuffix: false
-    })
+    let fileUrl: string
+    let filePath: string
+    
+    if (useFallback) {
+      // Use Supabase Storage as fallback
+      console.log('📤 Uploading to Supabase Storage (fallback)...')
+      
+      const fileName = `${userId}/${Date.now()}-${file.name}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('sales-calls')
+        .upload(fileName, file)
+      
+      if (uploadError) {
+        console.error('❌ Supabase Storage upload failed:', uploadError)
+        return NextResponse.json(
+          { error: `Supabase Storage upload failed: ${uploadError.message}` },
+          { status: 500 }
+        )
+      }
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('sales-calls')
+        .getPublicUrl(fileName)
+      
+      fileUrl = publicUrl
+      filePath = fileName
+      
+      console.log('✅ File uploaded to Supabase Storage:', fileUrl)
+    } else {
+      // Use Vercel Blob
+      console.log('📤 Uploading to Vercel Blob...')
+      console.log('🔑 Blob token configured:', !!process.env.BLOB_READ_WRITE_TOKEN)
+      
+      let blob: any
+      try {
+        blob = await put(`${userId}/${Date.now()}-${file.name}`, file, {
+          access: 'public',
+          addRandomSuffix: false
+        })
 
-    console.log('✅ File uploaded to Vercel Blob:', blob.url)
+        fileUrl = blob.url
+        filePath = blob.pathname
+        
+        console.log('✅ File uploaded to Vercel Blob:', fileUrl)
+      } catch (blobError) {
+        console.error('❌ Vercel Blob upload failed:', blobError)
+        
+        // Check if it's an authentication error
+        if (blobError instanceof Error && blobError.message.includes('Unauthorized')) {
+          return NextResponse.json(
+            { error: 'Vercel Blob authentication failed. Please check BLOB_READ_WRITE_TOKEN.' },
+            { status: 500 }
+          )
+        }
+        
+        // Check if it's a configuration error
+        if (blobError instanceof Error && blobError.message.includes('store')) {
+          return NextResponse.json(
+            { error: 'Vercel Blob store not found. Please create a blob store with "vercel blob create".' },
+            { status: 500 }
+          )
+        }
+        
+        throw blobError
+      }
+    }
 
     // Create database record
     const salesCallData = {
       user_id: userId,
       agent_id: null, // Will be set when agent is created
       title: (originalFileName || file.name).replace(/\.[^/.]+$/, ''),
-      file_url: blob.url,
+      file_url: fileUrl,
       file_size: file.size,
       duration_seconds: 0,
       status: 'uploaded',
@@ -76,7 +142,8 @@ export async function POST(request: NextRequest) {
         isConverted,
         originalFileName: originalFileName || file.name,
         fileType: file.type,
-        blobPath: blob.pathname,
+        storageType: useFallback ? 'supabase' : 'vercel-blob',
+        filePath: filePath,
         conversionInfo: isConverted ? {
           originalSize: file.size,
           convertedAt: new Date().toISOString()
@@ -105,7 +172,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       salesCall: salesCall,
-      blobUrl: blob.url,
+      blobUrl: fileUrl,
       message: 'File uploaded successfully'
     })
 

@@ -235,7 +235,15 @@ export default function SalesAnalystPage() {
       })
 
       if (!blobUploadResponse.ok) {
-        const errorData = await blobUploadResponse.json()
+        let errorData
+        try {
+          errorData = await blobUploadResponse.json()
+        } catch (jsonError) {
+          // If JSON parsing fails, it might be an HTML error page
+          const errorText = await blobUploadResponse.text()
+          console.error('❌ Non-JSON response received:', errorText.substring(0, 500))
+          throw new Error('Server returned an invalid response. This might be a configuration issue with Vercel Blob.')
+        }
         throw new Error(errorData.error || 'Failed to upload to Vercel Blob')
       }
 

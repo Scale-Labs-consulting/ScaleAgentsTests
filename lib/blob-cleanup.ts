@@ -14,6 +14,44 @@ export interface BlobFile {
   uploadedAt: Date
 }
 
+/**
+ * Delete a specific blob file by URL
+ * @param blobUrl - The URL of the blob file to delete
+ * @returns Promise<boolean> - True if deletion was successful
+ */
+export const deleteBlobFile = async (blobUrl: string): Promise<boolean> => {
+  try {
+    console.log('🗑️ Deleting blob file:', blobUrl)
+    
+    if (!blobUrl) {
+      console.warn('⚠️ No blob URL provided for deletion')
+      return false
+    }
+
+    // Check if BLOB_READ_WRITE_TOKEN is configured
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.warn('⚠️ BLOB_READ_WRITE_TOKEN not configured, skipping file deletion')
+      return false
+    }
+
+    await del(blobUrl)
+    console.log('✅ Successfully deleted blob file:', blobUrl)
+    return true
+    
+  } catch (error) {
+    // Handle specific Vercel Blob errors
+    if (error instanceof Error) {
+      if (error.message.includes('No token found') || error.message.includes('BLOB_READ_WRITE_TOKEN')) {
+        console.warn('⚠️ Vercel Blob token not configured, skipping file deletion')
+        return false
+      }
+    }
+    
+    console.error('❌ Failed to delete blob file:', blobUrl, error)
+    return false
+  }
+}
+
 export const cleanupOldBlobFiles = async (options: BlobCleanupOptions = {}) => {
   const {
     maxAge = 24, // Default: 24 hours

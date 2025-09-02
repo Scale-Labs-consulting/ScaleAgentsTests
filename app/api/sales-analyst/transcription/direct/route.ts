@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if OpenAI API key is available
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.OPENAI_KEY) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
         { status: 500 }
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     // Import OpenAI dynamically to avoid build-time errors
     const { default: OpenAI } = await import('openai')
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: process.env.OPENAI_KEY,
     })
 
     console.log('🎬 Starting transcription for:', fileName)

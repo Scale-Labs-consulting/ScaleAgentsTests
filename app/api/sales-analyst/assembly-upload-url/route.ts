@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if Assembly AI API key is available
-    if (!process.env.ASSEMBLYAI_KEY) {
+    if (!process.env.ASSEMBLY_AI_API_KEY) {
       console.error('❌ Assembly AI API key not configured')
       return NextResponse.json(
         { error: 'Assembly AI API key not configured' },
@@ -35,14 +35,14 @@ export async function POST(request: NextRequest) {
 
     console.log('🎬 Getting Assembly AI upload URL for client-side upload:', fileName)
     console.log('📏 File size:', fileSize, 'bytes')
-    console.log('🔑 API Key available:', !!process.env.ASSEMBLYAI_KEY)
-    console.log('🔑 API Key length:', process.env.ASSEMBLYAI_KEY?.length || 0)
+    console.log('🔑 API Key available:', !!process.env.ASSEMBLY_AI_API_KEY)
+    console.log('🔑 API Key length:', process.env.ASSEMBLY_AI_API_KEY?.length || 0)
 
     // Get upload URL from Assembly AI
     const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
       method: 'POST',
       headers: {
-        'Authorization': process.env.ASSEMBLYAI_KEY!,
+        'Authorization': process.env.ASSEMBLY_AI_API_KEY!,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

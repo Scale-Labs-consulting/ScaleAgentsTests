@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
@@ -15,16 +15,63 @@ import {
   User, 
   Beaker, 
   Edit3,
-  HelpCircle
+  HelpCircle,
+  Save,
+  Check
 } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function SettingsPage() {
   const router = useRouter()
+  const { user, updateProfile } = useAuth()
   const [workspaceName, setWorkspaceName] = useState('Angelo\'s Lovable')
   const [workspaceDescription, setWorkspaceDescription] = useState('')
+  
+  // Profile form state
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
+  const [profileUpdated, setProfileUpdated] = useState(false)
+
+  // Initialize form with current user metadata
+  useEffect(() => {
+    if (user?.user_metadata) {
+      setFirstName(user.user_metadata.first_name || '')
+      setLastName(user.user_metadata.last_name || '')
+    }
+  }, [user])
 
   const handleClose = () => {
     router.push('/dashboard')
+  }
+
+  const handleUpdateProfile = async () => {
+    if (!user) return
+    
+    setIsUpdatingProfile(true)
+    setProfileUpdated(false)
+    
+    try {
+      // Update user metadata instead of profile
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          full_name: `${firstName.trim()} ${lastName.trim()}`
+        }
+      })
+      
+      if (error) throw error
+      
+      setProfileUpdated(true)
+      
+      // Reset the success state after 3 seconds
+      setTimeout(() => setProfileUpdated(false), 3000)
+    } catch (error) {
+      console.error('Failed to update user metadata:', error)
+    } finally {
+      setIsUpdatingProfile(false)
+    }
   }
 
   return (
@@ -67,20 +114,26 @@ export default function SettingsPage() {
               </div>
             </div>
 
-                         {/* Account Section */}
-             <div>
-               <h3 className="text-sm font-semibold text-white/60 mb-4">Account</h3>
-               <div className="space-y-2">
-                 <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-white/5 cursor-pointer">
-                   <User className="w-5 h-5 text-white/60" />
-                   <span className="text-white/80">Angelo Cardoso</span>
-                 </div>
-                 <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-white/5 cursor-pointer">
-                   <Beaker className="w-5 h-5 text-white/60" />
-                   <span className="text-white/80">Labs</span>
-                 </div>
-               </div>
-             </div>
+            {/* Account Section */}
+            <div>
+              <h3 className="text-sm font-semibold text-white/60 mb-4">Account</h3>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-white/5 cursor-pointer">
+                  <User className="w-5 h-5 text-white/60" />
+                  <span className="text-white/80">
+                    {user?.user_metadata?.full_name || 
+                     (user?.user_metadata?.first_name && user?.user_metadata?.last_name 
+                       ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
+                       : user?.user_metadata?.first_name || user?.email || 'User'
+                     )}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-white/5 cursor-pointer">
+                  <Beaker className="w-5 h-5 text-white/60" />
+                  <span className="text-white/80">Labs</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -90,8 +143,8 @@ export default function SettingsPage() {
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-2xl font-bold text-white mb-2">Workspace Settings</h1>
-                <p className="text-white/70">Workspaces allow you to collaborate on projects in real time.</p>
+                <h1 className="text-2xl font-bold text-white mb-2">Settings</h1>
+                <p className="text-white/70">Manage your account and workspace settings.</p>
               </div>
               <div className="flex items-center space-x-4">
                 <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10 bg-white/5">
@@ -111,6 +164,86 @@ export default function SettingsPage() {
 
             {/* Settings Sections */}
             <div className="space-y-8">
+              {/* Profile Information */}
+              <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-white mb-2">Profile Information</h3>
+                      <p className="text-white/70 text-sm">Update your personal information that will be displayed throughout the application.</p>
+                    </div>
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-md bg-gradient-to-r from-purple-500 to-violet-600 flex items-center justify-center">
+                        <span className="text-white font-semibold text-xl">
+                          {user?.user_metadata?.first_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">First Name</label>
+                        <Input
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          placeholder="Enter your first name"
+                          className="bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">Last Name</label>
+                        <Input
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Enter your last name"
+                          className="bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/80 mb-2">Email</label>
+                      <Input
+                        value={user?.email || ''}
+                        disabled
+                        className="bg-white/5 border-white/20 text-white/50 cursor-not-allowed"
+                      />
+                      <p className="text-xs text-white/50 mt-1">Email cannot be changed</p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between pt-4">
+                      <div className="flex items-center space-x-2">
+                        {profileUpdated && (
+                          <div className="flex items-center space-x-2 text-green-400">
+                            <Check className="w-4 h-4" />
+                            <span className="text-sm">Profile updated successfully!</span>
+                          </div>
+                        )}
+                      </div>
+                      <Button 
+                        onClick={handleUpdateProfile}
+                        disabled={isUpdatingProfile}
+                        className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+                      >
+                        {isUpdatingProfile ? (
+                          <div className="flex items-center space-x-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            <span>Saving...</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <Save className="w-4 h-4" />
+                            <span>Save Changes</span>
+                          </div>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Workspace Avatar */}
               <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
                 <CardContent className="p-6">

@@ -3,10 +3,10 @@ import { SalesAnalystService } from '@/lib/sales-analyst'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const callId = params.id
+    const { id: callId } = await params
     
     if (!callId) {
       return NextResponse.json(

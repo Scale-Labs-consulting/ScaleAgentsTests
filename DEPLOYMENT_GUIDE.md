@@ -25,7 +25,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 OPENAI_KEY=your_openai_api_key
 
 # AssemblyAI Configuration
-ASSEMBLYAI_KEY=your_assemblyai_api_key
+ASSEMBLY_AI_API_KEY=your_assemblyai_api_key
 ```
 
 ## 🚀 Deployment Steps
@@ -100,7 +100,7 @@ Return transcription
 ### Common Issues
 
 1. **AssemblyAI Key Not Found**
-   - ✅ Solution: Set `ASSEMBLYAI_KEY` in Vercel environment variables
+   - ✅ Solution: Set `ASSEMBLY_AI_API_KEY` in Vercel environment variables
 
 2. **Function Timeout**
    - ✅ Solution: Extended timeout to 300 seconds in vercel.json

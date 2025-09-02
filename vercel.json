@@ -9,6 +9,21 @@
     },
     "app/api/sales-analyst/blob-transcribe/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/scale-expert/blob-upload/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/scale-expert/blob-transcribe/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/scale-expert/delete-blob/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/hr-agent/blob-upload/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/hr-agent/blob-upload-zip/route.ts": {
+      "maxDuration": 300
     }
   }
 }

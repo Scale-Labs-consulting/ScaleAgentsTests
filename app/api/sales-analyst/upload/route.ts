@@ -56,9 +56,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check AssemblyAI API key for speaker diarization
-    if (!process.env.ASSEMBLYAI_KEY) {
+    if (!process.env.ASSEMBLY_AI_API_KEY) {
       console.warn('⚠️ AssemblyAI API key not found - will use Whisper fallback for speaker detection')
-      console.log('🔍 Environment variable check: ASSEMBLYAI_KEY =', process.env.ASSEMBLYAI_KEY ? 'Found' : 'Not found')
+              console.log('🔍 Environment variable check: ASSEMBLY_AI_API_KEY =', process.env.ASSEMBLY_AI_API_KEY ? 'Found' : 'Not found')
     } else {
       console.log('✅ AssemblyAI API key found - will use enhanced speaker diarization')
     }
@@ -112,10 +112,10 @@ export async function POST(request: NextRequest) {
       const openAILimit = 25 * 1024 * 1024 // 25MB
 
       // Choose processing method based on available APIs
-      if (process.env.ASSEMBLYAI_KEY) {
+      if (process.env.ASSEMBLY_AI_API_KEY) {
         // Use AssemblyAI for enhanced speaker diarization
         console.log('🎤 Using AssemblyAI for enhanced speaker diarization...')
-        console.log('🔑 API Key found:', process.env.ASSEMBLYAI_KEY.substring(0, 8) + '...')
+                  console.log('🔑 API Key found:', process.env.ASSEMBLY_AI_API_KEY.substring(0, 8) + '...')
         transcription = await processWithAssemblyAI(audioPath)
       } else if (audioStats.size <= openAILimit) {
         // Fallback to Whisper for smaller files
@@ -203,7 +203,7 @@ async function processWithAssemblyAI(audioPath: string): Promise<string> {
   const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
     method: 'POST',
     headers: {
-      'Authorization': process.env.ASSEMBLYAI_KEY!,
+      'Authorization': process.env.ASSEMBLY_AI_API_KEY!,
       'Content-Type': 'application/octet-stream'
     },
     body: audioBuffer
@@ -247,7 +247,7 @@ async function processWithAssemblyAI(audioPath: string): Promise<string> {
   const transcriptResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
     method: 'POST',
     headers: {
-      'Authorization': process.env.ASSEMBLYAI_KEY!,
+      'Authorization': process.env.ASSEMBLY_AI_API_KEY!,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(requestBody)
@@ -274,7 +274,7 @@ async function processWithAssemblyAI(audioPath: string): Promise<string> {
       const retryResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
         method: 'POST',
         headers: {
-          'Authorization': process.env.ASSEMBLYAI_KEY!,
+          'Authorization': process.env.ASSEMBLY_AI_API_KEY!,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(simplifiedBody)
@@ -295,7 +295,7 @@ async function processWithAssemblyAI(audioPath: string): Promise<string> {
           
           const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
             headers: {
-              'Authorization': process.env.ASSEMBLYAI_KEY!
+              'Authorization': process.env.ASSEMBLY_AI_API_KEY!
             }
           })
           
@@ -376,9 +376,9 @@ async function processWithAssemblyAI(audioPath: string): Promise<string> {
     await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
     
     const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
-      headers: {
-        'Authorization': process.env.ASSEMBLYAI_KEY!
-      }
+          headers: {
+      'Authorization': process.env.ASSEMBLY_AI_API_KEY!
+    }
     })
     
     transcript = await statusResponse.json()

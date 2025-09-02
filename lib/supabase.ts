@@ -4,6 +4,17 @@ import { Database } from '@/types/database'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// Debug: Check if environment variables are loaded
+console.log('🔍 Supabase Config Check:')
+console.log('URL:', supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'MISSING')
+console.log('Key:', supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'MISSING')
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ CRITICAL: Missing Supabase environment variables!')
+  console.error('Make sure you have NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file')
+  throw new Error('Missing Supabase environment variables')
+}
+
 // Suppress GoTrue client debug messages globally (works in both client and server)
 const suppressGoTrueMessages = () => {
   const originalLog = console.log
@@ -38,15 +49,6 @@ const suppressGoTrueMessages = () => {
 // Apply suppression immediately
 suppressGoTrueMessages()
 
-// Debug: Check if environment variables are loaded
-console.log('Supabase URL:', supabaseUrl ? 'Loaded' : 'Missing')
-console.log('Supabase Anon Key:', supabaseAnonKey ? 'Loaded' : 'Missing')
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables!')
-  throw new Error('Missing Supabase environment variables')
-}
-
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     // Persist session across browser sessions
@@ -54,7 +56,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     // Auto refresh token before it expires
     autoRefreshToken: true, // Enabled for better session management
     // Detect session in URL (for OAuth flows)
-    detectSessionInUrl: false, // Disabled to prevent auto-login issues
+    detectSessionInUrl: true, // Enabled to handle OAuth callbacks
     // Storage key for session
     storageKey: 'scaleagents-auth',
     // Storage type (localStorage is more persistent than sessionStorage)
@@ -76,6 +78,18 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       eventsPerSecond: 10
     }
   }
+})
+
+// Test the connection immediately
+console.log('🧪 Testing Supabase connection...')
+supabase.auth.getSession().then(({ data, error }) => {
+  if (error) {
+    console.error('❌ Supabase connection test failed:', error)
+  } else {
+    console.log('✅ Supabase connection test successful')
+  }
+}).catch(error => {
+  console.error('❌ Supabase connection test error:', error)
 })
 
 // Helper function to get the current user

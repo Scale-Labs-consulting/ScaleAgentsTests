@@ -62,7 +62,19 @@ async function performComprehensiveAnalysis(transcription: string) {
 
     if (tipoCallResponse.ok) {
       const tipoCallData = await tipoCallResponse.json()
-      results.tipoCall = tipoCallData.choices[0].message.content.trim()
+      const numericCallType = tipoCallData.choices[0].message.content.trim()
+      
+      // Convert numeric call type to proper label
+      const callTypeMap: { [key: string]: string } = {
+        '1': 'Chamada Fria',
+        '2': 'Chamada de Agendamento',
+        '3': 'Reunião de Descoberta',
+        '4': 'Reunião de Fecho',
+        '5': 'Reunião de Esclarecimento de Dúvidas',
+        '6': 'Reunião de One Call Close'
+      }
+      
+      results.tipoCall = callTypeMap[numericCallType] || numericCallType
       console.log('✅ Call type determined:', results.tipoCall)
     }
 
@@ -547,6 +559,62 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Check for duplicate content before storing
+    const encoder = new TextEncoder()
+    const data = encoder.encode(transcription)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    const contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+    
+    console.log('🔐 Generated content hash:', contentHash.substring(0, 16) + '...')
+    
+    // Check if we already have an analysis with this exact content
+    const { data: existingAnalysis, error: duplicateCheckError } = await supabase
+      .from('sales_call_analyses')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('analysis_metadata->>content_hash', contentHash)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    if (duplicateCheckError && duplicateCheckError.code !== 'PGRST116') {
+      console.warn('⚠️ Error checking for duplicates:', duplicateCheckError)
+    }
+    
+    if (existingAnalysis) {
+      console.log('🔄 Duplicate content detected!')
+      console.log('📊 Existing analysis ID:', existingAnalysis.id)
+      console.log('📅 Created at:', existingAnalysis.created_at)
+      console.log('📝 Title:', existingAnalysis.title)
+      
+      // Update the sales call status to completed
+      await supabase
+        .from('sales_calls')
+        .update({ 
+          status: 'completed',
+          duration: 0
+        })
+        .eq('id', salesCallId)
+      
+      // Return the existing analysis instead of creating a new one
+      return NextResponse.json({
+        success: true,
+        analysis: existingAnalysis.analysis,
+        analysisId: existingAnalysis.id,
+        message: 'Duplicate content detected - returning existing analysis',
+        isDuplicate: true,
+        duplicateInfo: {
+          originalId: existingAnalysis.id,
+          originalTitle: existingAnalysis.title,
+          originalDate: existingAnalysis.created_at,
+          contentHash: contentHash.substring(0, 16) + '...'
+        }
+      })
+    }
+    
+    console.log('✅ No duplicate content found, proceeding with new analysis...')
+
     // Store analysis in database
     const analysisData = {
       sales_call_id: salesCallId,
@@ -561,7 +629,8 @@ export async function POST(request: NextRequest) {
         blob_url: blobUrl,
         original_transcription_length: transcription.length,
         truncated_transcription_length: truncatedTranscription.length,
-        tokens_used: 0 // Will be calculated from comprehensive analysis
+        tokens_used: 0, // Will be calculated from comprehensive analysis
+        content_hash: contentHash // Store the content hash for future deduplication
       },
       transcription: transcription // Store the full transcription, not truncated
     }

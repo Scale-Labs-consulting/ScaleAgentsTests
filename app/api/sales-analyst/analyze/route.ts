@@ -17,6 +17,62 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Initialize Supabase client
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // CONTENT HASH DEDUPLICATION
+    console.log('🔍 Checking for duplicate content...')
+    
+    // Generate SHA-256 hash of the transcription content
+    const encoder = new TextEncoder()
+    const data = encoder.encode(transcription)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    const contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+    
+    console.log('🔐 Generated content hash:', contentHash.substring(0, 16) + '...')
+    
+    // Check if we already have an analysis with this exact content
+    const { data: existingAnalysis, error: duplicateCheckError } = await supabase
+      .from('sales_call_analyses')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('analysis_metadata->>content_hash', contentHash)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    if (duplicateCheckError && duplicateCheckError.code !== 'PGRST116') {
+      // PGRST116 means "no rows returned" which is expected when no duplicate exists
+      console.warn('⚠️ Error checking for duplicates:', duplicateCheckError)
+    }
+    
+    if (existingAnalysis) {
+      console.log('🔄 Duplicate content detected!')
+      console.log('📊 Existing analysis ID:', existingAnalysis.id)
+      console.log('📅 Created at:', existingAnalysis.created_at)
+      console.log('📝 Title:', existingAnalysis.title)
+      
+      // Return the existing analysis instead of creating a new one
+      return NextResponse.json({
+        success: true,
+        analysis: existingAnalysis.analysis,
+        analysisId: existingAnalysis.id,
+        message: 'Duplicate content detected - returning existing analysis',
+        isDuplicate: true,
+        duplicateInfo: {
+          originalId: existingAnalysis.id,
+          originalTitle: existingAnalysis.title,
+          originalDate: existingAnalysis.created_at,
+          contentHash: contentHash.substring(0, 16) + '...'
+        }
+      })
+    }
+    
+    console.log('✅ No duplicate content found, proceeding with new analysis...')
+
     console.log('📝 Analyzing transcription with GPT-4...')
     console.log('📊 Transcription length:', transcription.length, 'characters')
 
@@ -28,11 +84,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
-
-    // Initialize Supabase client
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Function to estimate token count (rough approximation: 1 token ≈ 4 characters)
     function estimateTokens(text: string): number {
@@ -124,15 +175,21 @@ Cria uma análise final que combine todos estes resultados de forma coerente e a
      console.log('📋 Step 1: Analyzing call type...')
      const callTypePrompt = `Analisa a seguinte transcrição de conversa e classifica-a numa das seguintes categorias:
 
- Discovery Call: Uma primeira conversa onde o vendedor procura entender as necessidades, desafios e objetivos do potencial cliente. Características típicas incluem: apresentações iniciais, perguntas sobre a empresa/negócio do cliente, identificação de problemas, exploração da situação atual, e questões sobre orçamento, autoridade de decisão, cronograma ou necessidades específicas.
+ Chamada Fria: Primeiro contacto com um potencial cliente que não foi previamente contactado. Características típicas incluem: apresentação inicial da empresa/produto, introdução do vendedor, identificação inicial de necessidades, e tentativa de agendar uma reunião de descoberta.
 
- Follow-up Call: Uma conversa de acompanhamento após contato inicial. Características típicas incluem: referências a conversas anteriores, atualizações sobre progressos, respostas a questões pendentes, apresentação de soluções personalizadas com base na discovery call, e discussões sobre próximos passos concretos.
+ Chamada de Agendamento: Conversa focada em marcar uma reunião ou call específica. Características típicas incluem: discussão de disponibilidade, confirmação de horários, envio de convites, e preparação para a reunião.
 
- Q&A Call: Uma conversa focada principalmente em responder perguntas específicas do cliente sobre o produto/serviço. Características típicas incluem: muitas perguntas técnicas ou de implementação, esclarecimentos sobre funcionalidades específicas, e poucos elementos de descoberta ou follow-up.
+ Reunião de Descoberta: Conversa profunda para entender as necessidades, desafios e objetivos do cliente. Características típicas incluem: perguntas detalhadas sobre a empresa/negócio, identificação de problemas específicos, exploração da situação atual, e questões sobre orçamento, autoridade de decisão, cronograma ou necessidades específicas.
+
+ Reunião de Fecho: Conversa focada em finalizar uma venda ou acordo. Características típicas incluem: discussão de preços finais, negociação de termos, apresentação de propostas finais, e tentativa de obter um compromisso ou assinatura.
+
+ Reunião de Esclarecimento de Dúvidas: Conversa focada em responder perguntas específicas do cliente sobre o produto/serviço. Características típicas incluem: muitas perguntas técnicas ou de implementação, esclarecimentos sobre funcionalidades específicas, e poucos elementos de descoberta ou fecho.
+
+ Reunião de One Call Close: Conversa que combina descoberta e fecho numa única reunião. Características típicas incluem: identificação rápida de necessidades, apresentação de solução personalizada, e tentativa de fecho imediato.
 
  Analisa a transcrição completa para fazer tua determinação, pois o tipo de call pode ser confirmado ao longo de toda a conversa.
 
- Após analisar, responde APENAS com o nome exato da categoria: "Discovery Call", "Follow-up Call", ou "Q&A Call". Não incluas explicações ou texto adicional.
+ Após analisar, responde APENAS com o nome exato da categoria: "Chamada Fria", "Chamada de Agendamento", "Reunião de Descoberta", "Reunião de Fecho", "Reunião de Esclarecimento de Dúvidas", ou "Reunião de One Call Close". Não incluas explicações ou texto adicional.
 
  TRANSCRIÇÃO:
  ${transcription}`
@@ -168,9 +225,12 @@ TEMPO DE RESPOSTA DO COMERCIAL
 
 PROPORÇÕES IDEAIS DE FALA
 Compare as proporções de fala reais com as proporções ideais para cada tipo de call:
-- Discovery Call: Cliente 60% / Comercial 40%
-- Follow-Up: Cliente 50% / Comercial 50%
-- Q&A: Cliente 50% / Comercial 50%
+- Chamada Fria: Cliente 40% / Comercial 60%
+- Chamada de Agendamento: Cliente 30% / Comercial 70%
+- Reunião de Descoberta: Cliente 60% / Comercial 40%
+- Reunião de Fecho: Cliente 40% / Comercial 60%
+- Reunião de Esclarecimento de Dúvidas: Cliente 50% / Comercial 50%
+- Reunião de One Call Close: Cliente 45% / Comercial 55%
 
 FEEDBACK SOBRE O EQUILÍBRIO DA CONVERSA
 - Compare as proporções reais de fala com as proporções ideais.
@@ -208,6 +268,23 @@ Depois analisa APENAS o desempenho do vendedor identificado.
 
 TRANSCRIÇÃO:
 ${transcription}
+
+REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FORTES:
+
+1. NÃO consideres como pontos fortes:
+   - Partilha de ecrã - é uma ferramenta essencial, não um ponto forte
+   - Ações básicas como "dizer olá" ou "apresentar-se"
+   - Técnicas padrão que qualquer vendedor deveria fazer
+   - Ferramentas ou recursos utilizados (como partilhar ecrã)
+
+2. FOCA em pontos fortes reais:
+   - Perguntas estratégicas e bem formuladas
+   - Escuta ativa e empatia genuína
+   - Apresentação personalizada da solução
+   - Gestão eficaz de objeções
+   - Criação de rapport e confiança
+   - Estrutura clara e controlo da reunião
+   - Fechamento eficaz com próximos passos claros
 
 Estrutura o output como uma lista de parágrafos separados, cada um começando com um bullet point (•), com comentários objectivos e claros sobre os momentos mais positivos do vendedor na reunião.
 
@@ -269,6 +346,24 @@ Depois analisa APENAS o desempenho do vendedor identificado.
 TRANSCRIÇÃO:
 ${transcription}
 
+REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FRACOS:
+
+1. NÃO consideres como pontos fracos:
+   - Perguntas estratégicas como "Porquê de nos terem contactado?" - estas são intencionais para fazer a lead abrir-se
+   - Linguagem coloquial/informal - pode ser apropriada para criar rapport e proximidade
+   - Validações como "Consegues ver?" - são importantes para confirmar compreensão
+   - Partilha de ecrã - é uma ferramenta essencial, não um ponto fraco
+   - Técnicas de vendas válidas que podem parecer informais mas são estratégicas
+
+2. FOCA em pontos fracos reais:
+   - Falta de preparação ou conhecimento do produto/serviço
+   - Não aproveitar oportunidades para aprofundar necessidades
+   - Falar demasiado de funcionalidades em vez de benefícios
+   - Não lidar adequadamente com objeções reais
+   - Falta de estrutura ou controlo da reunião
+   - Não criar sentido de urgência quando apropriado
+   - Falta de follow-up ou próximos passos claros
+
 Depois de analisares, estrutura o output como uma lista de parágrafos separados, cada um começando com um bullet point (•), com comentários objectivos e claros sobre os momentos mais frágeis do vendedor na reunião.
 
 IMPORTANTE: Cada ponto deve estar num parágrafo separado, começando com "• " e terminando com uma quebra de linha.
@@ -318,7 +413,7 @@ Idioma: português de Portugal (Lisboa), com uso de pretérito perfeito simples 
 
     // Step 5: Scoring Analysis
     console.log('⭐ Step 5: Analyzing scoring...')
-    const scoringPrompt = `Analisa a seguinte transcrição de uma reunião de vendas e fornece uma pontuação detalhada do vendedor.
+    const scoringPrompt = `Analisa a seguinte transcrição de uma reunião de vendas e fornece uma pontuação detalhada e CONSISTENTE do vendedor.
 
 IMPORTANTE: Primeiro identifica quem é o vendedor na transcrição. Procura por:
 - Quem faz perguntas sobre necessidades, problemas, orçamento
@@ -331,37 +426,105 @@ Depois analisa APENAS o desempenho do vendedor identificado.
 TRANSCRIÇÃO:
 ${transcription}
 
-Avalia o vendedor em cada categoria usando uma escala de 1 a 5, onde:
-1 = Muito fraco
-2 = Fraco  
-3 = Médio
-4 = Bom
-5 = Excelente
+CRITÉRIOS DE AVALIAÇÃO DETALHADOS:
 
-Fornece uma pontuação para cada categoria e uma pontuação total:
+1. Clareza e Fluência da Fala (1-5):
+- 5: Comunicação clara, fluente, sem pausas desnecessárias
+- 4: Comunicação clara com algumas pausas menores
+- 3: Comunicação compreensível mas com algumas hesitações
+- 2: Comunicação pouco clara ou muitas hesitações
+- 1: Comunicação muito confusa ou ininteligível
+
+2. Tom e Controlo (1-5):
+- 5: Tom profissional, confiante, controlo emocional excelente
+- 4: Tom adequado, confiança visível, bom controlo
+- 3: Tom adequado mas falta de confiança ou controlo
+- 2: Tom inadequado ou falta de controlo emocional
+- 1: Tom muito inadequado ou perda de controlo
+
+3. Envolvimento Conversacional (1-5):
+- 5: Excelente equilíbrio entre falar e ouvir, engajamento ativo
+- 4: Bom equilíbrio, engajamento adequado
+- 3: Equilíbrio moderado, algum engajamento
+- 2: Desequilíbrio na conversa, pouco engajamento
+- 1: Conversa muito desequilibrada, sem engajamento
+
+4. Efetividade na Descoberta de Necessidades (1-5):
+- 5: Identificou claramente todas as necessidades e dores do cliente
+- 4: Identificou a maioria das necessidades importantes
+- 3: Identificou algumas necessidades básicas
+- 2: Identificou poucas necessidades ou de forma superficial
+- 1: Não identificou necessidades ou fez perguntas inadequadas
+
+5. Entrega de Valor e Ajuste da Solução (1-5):
+- 5: Apresentou valor claramente alinhado com as necessidades identificadas
+- 4: Apresentou valor adequado com algum alinhamento
+- 3: Apresentou valor mas com alinhamento limitado
+- 2: Apresentou valor mas sem alinhamento claro
+- 1: Não apresentou valor ou solução inadequada
+
+6. Habilidades de Lidar com Objeções (1-5):
+- 5: Respondeu a todas as objeções de forma eficaz e confiante
+- 4: Respondeu adequadamente à maioria das objeções
+- 3: Respondeu a algumas objeções mas com dificuldades
+- 2: Respondeu mal às objeções ou evitou-as
+- 1: Não conseguiu lidar com objeções ou agravou-as
+
+7. Estrutura e Controle da Reunião (1-5):
+- 5: Estrutura clara, controlo total da reunião, fluxo natural
+- 4: Estrutura adequada, bom controlo, fluxo satisfatório
+- 3: Estrutura básica, controlo moderado, fluxo aceitável
+- 2: Estrutura confusa, pouco controlo, fluxo problemático
+- 1: Sem estrutura, sem controlo, fluxo caótico
+
+8. Fechamento e Próximos Passos (1-5):
+- 5: Fechamento claro, próximos passos bem definidos, compromisso obtido
+- 4: Fechamento adequado, próximos passos claros
+- 3: Fechamento básico, próximos passos definidos
+- 2: Fechamento confuso, próximos passos pouco claros
+- 1: Sem fechamento ou próximos passos indefinidos
+
+REGRAS IMPORTANTES PARA AVALIAÇÃO:
+
+1. CONSISTÊNCIA: A mesma transcrição deve sempre receber a mesma pontuação, independentemente do nome do ficheiro.
+
+2. CONTEXTO DE VENDAS: Considera que:
+   - Perguntas como "Porquê de nos terem contactado?" são estratégicas para fazer a lead abrir-se
+   - Linguagem coloquial/informal pode ser apropriada para criar rapport
+   - Validações como "Consegues ver?" são importantes para confirmar compreensão
+   - Partilha de ecrã é uma ferramenta essencial, não um ponto forte
+
+3. AVALIAÇÃO COMPLETA: TODOS os 8 critérios devem ser avaliados, mesmo que alguns não sejam muito evidentes na call.
+
+4. JUSTIFICAÇÃO: Cada pontuação deve ter uma justificação clara baseada na transcrição.
+
+Fornece a pontuação seguindo EXATAMENTE este formato:
 
 Clareza e Fluência da Fala: [pontuação]/5
+Justificação: [explicação baseada na transcrição]
+
 Tom e Controlo: [pontuação]/5
+Justificação: [explicação baseada na transcrição]
+
 Envolvimento Conversacional: [pontuação]/5
+Justificação: [explicação baseada na transcrição]
+
 Efetividade na Descoberta de Necessidades: [pontuação]/5
+Justificação: [explicação baseada na transcrição]
+
 Entrega de Valor e Ajuste da Solução: [pontuação]/5
+Justificação: [explicação baseada na transcrição]
+
 Habilidades de Lidar com Objeções: [pontuação]/5
+Justificação: [explicação baseada na transcrição]
+
 Estrutura e Controle da Reunião: [pontuação]/5
+Justificação: [explicação baseada na transcrição]
+
 Fechamento e Próximos Passos: [pontuação]/5
+Justificação: [explicação baseada na transcrição]
 
 Total: [soma de todas as pontuações]/40
-
-Exemplo de resposta:
-Clareza e Fluência da Fala: 4/5
-Tom e Controlo: 3/5
-Envolvimento Conversacional: 4/5
-Efetividade na Descoberta de Necessidades: 5/5
-Entrega de Valor e Ajuste da Solução: 4/5
-Habilidades de Lidar com Objeções: 3/5
-Estrutura e Controle da Reunião: 4/5
-Fechamento e Próximos Passos: 4/5
-
-Total: 31/40
 
 Usa português de Portugal (Lisboa).
 Evita gerúndios, usa pretérito perfeito simples.
@@ -787,21 +950,27 @@ Não uses emojis ou formatação especial.`
          console.log('✅ User validation passed')
 
                    // Validate and normalize call_type
-          let normalizedCallType = 'Discovery Call' // Default to Discovery Call
+          let normalizedCallType = 'Reunião de Descoberta' // Default to Reunião de Descoberta
           if (combinedAnalysis.callType) {
             const callTypeText = combinedAnalysis.callType.trim()
             // Check for exact matches first
-            if (['Discovery Call', 'Follow-up Call', 'Q&A Call'].includes(callTypeText)) {
+            if (['Chamada Fria', 'Chamada de Agendamento', 'Reunião de Descoberta', 'Reunião de Fecho', 'Reunião de Esclarecimento de Dúvidas', 'Reunião de One Call Close'].includes(callTypeText)) {
               normalizedCallType = callTypeText
             } else {
               // Try to extract call type from the text
               const lowerCallType = callTypeText.toLowerCase()
-              if (lowerCallType.includes('discovery')) {
-                normalizedCallType = 'Discovery Call'
-              } else if (lowerCallType.includes('follow') || lowerCallType.includes('follow-up')) {
-                normalizedCallType = 'Follow-up Call'
-              } else if (lowerCallType.includes('q&a') || lowerCallType.includes('qa')) {
-                normalizedCallType = 'Q&A Call'
+              if (lowerCallType.includes('chamada fria') || lowerCallType.includes('cold call')) {
+                normalizedCallType = 'Chamada Fria'
+              } else if (lowerCallType.includes('agendamento') || lowerCallType.includes('scheduling')) {
+                normalizedCallType = 'Chamada de Agendamento'
+              } else if (lowerCallType.includes('descoberta') || lowerCallType.includes('discovery')) {
+                normalizedCallType = 'Reunião de Descoberta'
+              } else if (lowerCallType.includes('fecho') || lowerCallType.includes('closing')) {
+                normalizedCallType = 'Reunião de Fecho'
+              } else if (lowerCallType.includes('esclarecimento') || lowerCallType.includes('dúvidas') || lowerCallType.includes('q&a')) {
+                normalizedCallType = 'Reunião de Esclarecimento de Dúvidas'
+              } else if (lowerCallType.includes('one call close') || lowerCallType.includes('one call')) {
+                normalizedCallType = 'Reunião de One Call Close'
               }
             }
           }
@@ -828,7 +997,8 @@ Não uses emojis ou formatação especial.`
              was_truncated: false,
              analysis_method: 'chunked_full_context',
              original_sales_call_id: salesCallId || null, // Store original ID if provided
-             original_file_name: originalFileName || null // Store original filename for display
+             original_file_name: originalFileName || null, // Store original filename for display
+             content_hash: contentHash // Store the content hash for future deduplication
            },
            transcription: transcription,
            custom_prompts: [

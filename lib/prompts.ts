@@ -8,7 +8,7 @@ Transcrição:
 Fornece a tua análise em formato de texto simples, estruturada EXATAMENTE da seguinte forma:
 
 **TIPO DE CHAMADA:**
-[Identifica se é prospetiva, follow-up, demonstração, fechamento, etc.]
+[Identifica se é: Chamada Fria, Chamada de Agendamento, Reunião de Descoberta, Reunião de Fecho, Reunião de Esclarecimento de Dúvidas, ou Reunião de One Call Close]
 
 **PONTUAÇÃO GERAL:**
 [Pontuação de 1-40 baseada na qualidade da chamada - APENAS O NÚMERO]

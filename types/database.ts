@@ -255,6 +255,27 @@ export interface Database {
           notes: string | null
           created_at: string
           updated_at: string
+          // Extracted personal information fields
+          personal_info?: Record<string, any>
+          extracted_name?: string
+          extracted_email?: string
+          extracted_phone?: string
+          extracted_location?: string
+          extracted_linkedin?: string
+          extracted_github?: string
+          extracted_website?: string
+          extracted_date_of_birth?: string
+          extracted_nationality?: string
+          extracted_languages?: string[]
+          extracted_skills?: string[]
+          extracted_experience_years?: number
+          extracted_education?: string[]
+          extracted_certifications?: string[]
+          extracted_availability?: string
+          extracted_salary_expectation?: string
+          extracted_work_permit?: string
+          extracted_remote_preference?: string
+          extracted_notice_period?: string
         }
         Insert: {
           id?: string
@@ -273,6 +294,27 @@ export interface Database {
           notes?: string | null
           created_at?: string
           updated_at?: string
+          // Extracted personal information fields
+          personal_info?: Record<string, any>
+          extracted_name?: string
+          extracted_email?: string
+          extracted_phone?: string
+          extracted_location?: string
+          extracted_linkedin?: string
+          extracted_github?: string
+          extracted_website?: string
+          extracted_date_of_birth?: string
+          extracted_nationality?: string
+          extracted_languages?: string[]
+          extracted_skills?: string[]
+          extracted_experience_years?: number
+          extracted_education?: string[]
+          extracted_certifications?: string[]
+          extracted_availability?: string
+          extracted_salary_expectation?: string
+          extracted_work_permit?: string
+          extracted_remote_preference?: string
+          extracted_notice_period?: string
         }
         Update: {
           id?: string
@@ -291,6 +333,27 @@ export interface Database {
           notes?: string | null
           created_at?: string
           updated_at?: string
+          // Extracted personal information fields
+          personal_info?: Record<string, any>
+          extracted_name?: string
+          extracted_email?: string
+          extracted_phone?: string
+          extracted_location?: string
+          extracted_linkedin?: string
+          extracted_github?: string
+          extracted_website?: string
+          extracted_date_of_birth?: string
+          extracted_nationality?: string
+          extracted_languages?: string[]
+          extracted_skills?: string[]
+          extracted_experience_years?: number
+          extracted_education?: string[]
+          extracted_certifications?: string[]
+          extracted_availability?: string
+          extracted_salary_expectation?: string
+          extracted_work_permit?: string
+          extracted_remote_preference?: string
+          extracted_notice_period?: string
         }
       }
       hr_evaluation_criteria: {

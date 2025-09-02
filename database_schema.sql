@@ -125,6 +125,14 @@ CREATE TABLE sales_call_analyses (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Index for faster duplicate detection using content hash
+CREATE INDEX idx_sales_call_analyses_content_hash 
+ON sales_call_analyses ((analysis_metadata->>'content_hash'));
+
+-- Index for faster user-based queries
+CREATE INDEX idx_sales_call_analyses_user_content_hash 
+ON sales_call_analyses (user_id, (analysis_metadata->>'content_hash'));
+
 -- ========================================
 -- HR AGENT TABLES
 -- ========================================
@@ -271,6 +279,9 @@ CREATE POLICY "Users can view own profile" ON profiles
 
 CREATE POLICY "Users can update own profile" ON profiles
     FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert own profile" ON profiles
+    FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Agents policies
 CREATE POLICY "Users can view own agents" ON agents

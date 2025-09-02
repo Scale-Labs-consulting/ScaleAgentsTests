@@ -66,6 +66,7 @@ export const getConversations = async (userId: string) => {
       )
     `)
     .eq('user_id', userId)
+    .neq('status', 'deleted')
     .order('updated_at', { ascending: false })
 
   if (error) throw error
@@ -103,6 +104,72 @@ export const addMessage = async (messageData: MessageInsert) => {
 
   if (error) throw error
   return message
+}
+
+export const updateConversationTitle = async (conversationId: string, title: string) => {
+  const { data: conversation, error } = await supabase
+    .from('conversations')
+    .update({ title, updated_at: new Date().toISOString() })
+    .eq('id', conversationId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return conversation
+}
+
+export const getConversationWithMessages = async (conversationId: string) => {
+  const { data: conversation, error } = await supabase
+    .from('conversations')
+    .select(`
+      *,
+      messages (
+        id,
+        role,
+        content,
+        tokens_used,
+        metadata,
+        created_at
+      )
+    `)
+    .eq('id', conversationId)
+    .single()
+
+  if (error) throw error
+  return conversation
+}
+
+export const deleteConversation = async (conversationId: string) => {
+  // First, delete all messages associated with this conversation
+  const { error: messagesError } = await supabase
+    .from('messages')
+    .delete()
+    .eq('conversation_id', conversationId)
+
+  if (messagesError) {
+    console.error('Error deleting messages:', messagesError)
+    throw messagesError
+  }
+
+  // Then, delete the conversation itself
+  const { error: conversationError } = await supabase
+    .from('conversations')
+    .delete()
+    .eq('id', conversationId)
+
+  if (conversationError) {
+    console.error('Error deleting conversation:', conversationError)
+    throw conversationError
+  }
+}
+
+export const archiveConversation = async (conversationId: string) => {
+  const { error } = await supabase
+    .from('conversations')
+    .update({ status: 'archived', updated_at: new Date().toISOString() })
+    .eq('id', conversationId)
+
+  if (error) throw error
 }
 
 // ========================================

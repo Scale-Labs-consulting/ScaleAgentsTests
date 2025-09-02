@@ -31,7 +31,10 @@ import {
   ThumbsUp,
   ThumbsDown,
   Brain,
-  Rocket
+  Rocket,
+  Phone,
+  HelpCircle,
+  Zap
 } from 'lucide-react'
 
 interface SalesReportProps {
@@ -60,6 +63,12 @@ export function SalesReport({
       case 'Discovery Call': return 'Discovery Call'
       case 'Follow-up Call': return 'Follow-up Call'
       case 'Q&A Call': return 'Q&A Call'
+      case 'Chamada Fria': return 'Chamada Fria'
+      case 'Chamada de Agendamento': return 'Chamada de Agendamento'
+      case 'Reunião de Descoberta': return 'Reunião de Descoberta'
+      case 'Reunião de Fecho': return 'Reunião de Fecho'
+      case 'Reunião de Esclarecimento de Dúvidas': return 'Reunião de Esclarecimento de Dúvidas'
+      case 'Reunião de One Call Close': return 'Reunião de One Call Close'
       default: return type || 'Unknown'
     }
   }
@@ -69,6 +78,15 @@ export function SalesReport({
       case '1': return <Target className="w-4 h-4" />
       case '2': return <MessageSquare className="w-4 h-4" />
       case '3': return <Users className="w-4 h-4" />
+      case 'Discovery Call': return <Target className="w-4 h-4" />
+      case 'Follow-up Call': return <MessageSquare className="w-4 h-4" />
+      case 'Q&A Call': return <Users className="w-4 h-4" />
+      case 'Chamada Fria': return <Phone className="w-4 h-4" />
+      case 'Chamada de Agendamento': return <Calendar className="w-4 h-4" />
+      case 'Reunião de Descoberta': return <Target className="w-4 h-4" />
+      case 'Reunião de Fecho': return <CheckCircle className="w-4 h-4" />
+      case 'Reunião de Esclarecimento de Dúvidas': return <HelpCircle className="w-4 h-4" />
+      case 'Reunião de One Call Close': return <Zap className="w-4 h-4" />
       default: return <MessageSquare className="w-4 h-4" />
     }
   }

@@ -9,6 +9,18 @@ IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDED
 - Tenta fechar a venda
 - Tem um papel ativo de vendas
 
+REGRAS CRÍTICAS PARA AVALIAÇÃO:
+
+1. CONSISTÊNCIA: A mesma transcrição deve sempre receber a mesma avaliação, independentemente do nome do ficheiro.
+
+2. CONTEXTO DE VENDAS: Considera que:
+   - Perguntas como "Porquê de nos terem contactado?" são estratégicas para fazer a lead abrir-se
+   - Linguagem coloquial/informal pode ser apropriada para criar rapport
+   - Validações como "Consegues ver?" são importantes para confirmar compreensão
+   - Partilha de ecrã é uma ferramenta essencial, não um ponto forte
+
+3. AVALIAÇÃO COMPLETA: TODOS os critérios devem ser avaliados, mesmo que alguns não sejam muito evidentes na call.
+
 Quando eu te fornecer uma transcrição completa de uma call de vendas, a tua resposta deve ser objetiva e fornecer um feedback generalizado sobre três momentos-chave: início, meio e fim da reunião. Não precisas de analisar cada segundo ou minuto da conversa, apenas destacar os pontos essenciais do desempenho do comercial nos seguintes aspetos:
 
 Início da Call:
@@ -72,9 +84,12 @@ Tempo de Resposta do Comercial
 
 Proporções Ideais de Fala  
 Compare as proporções de fala reais com as proporções ideais para cada tipo de call:  
-- Discovery Call: Cliente 60% / Comercial 40%  
-- Follow-Up: Cliente 50% / Comercial 50%  
-- Q&A: Cliente 50% / Comercial 50%  
+- Chamada Fria: Cliente 40% / Comercial 60%  
+- Chamada de Agendamento: Cliente 30% / Comercial 70%  
+- Reunião de Descoberta: Cliente 60% / Comercial 40%  
+- Reunião de Fecho: Cliente 40% / Comercial 60%  
+- Reunião de Esclarecimento de Dúvidas: Cliente 50% / Comercial 50%  
+- Reunião de One Call Close: Cliente 45% / Comercial 55%  
 
 Feedback sobre o Equilíbrio da Conversa  
 - Compare as proporções reais de fala com as proporções ideais.  
@@ -100,6 +115,23 @@ IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDED
 - Tem um papel ativo de vendas
 
 A tua análise deve focar APENAS no desempenho do VENDEDOR identificado.
+
+REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FORTES:
+
+1. NÃO consideres como pontos fortes:
+   - Partilha de ecrã - é uma ferramenta essencial, não um ponto forte
+   - Ações básicas como "dizer olá" ou "apresentar-se"
+   - Técnicas padrão que qualquer vendedor deveria fazer
+   - Ferramentas ou recursos utilizados (como partilhar ecrã)
+
+2. FOCA em pontos fortes reais:
+   - Perguntas estratégicas e bem formuladas
+   - Escuta ativa e empatia genuína
+   - Apresentação personalizada da solução
+   - Gestão eficaz de objeções
+   - Criação de rapport e confiança
+   - Estrutura clara e controlo da reunião
+   - Fechamento eficaz com próximos passos claros
 
 O feedback deve ser objetivo, conciso (máx. 140 palavras) e focado na melhoria contínua.  
 Deve responder sempre em português de Lisboa.  
@@ -159,6 +191,23 @@ Transcrição para análise:
 // 4. Pontos Fortes/GS
 export const PONTOS_FORTES_GS_PROMPT = `Analisa a seguinte transcrição de uma reunião de vendas e identifica os pontos fortes do comercial ao longo da call.
 
+REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FORTES:
+
+1. NÃO consideres como pontos fortes:
+   - Partilha de ecrã - é uma ferramenta essencial, não um ponto forte
+   - Ações básicas como "dizer olá" ou "apresentar-se"
+   - Técnicas padrão que qualquer vendedor deveria fazer
+   - Ferramentas ou recursos utilizados (como partilhar ecrã)
+
+2. FOCA em pontos fortes reais:
+   - Perguntas estratégicas e bem formuladas
+   - Escuta ativa e empatia genuína
+   - Apresentação personalizada da solução
+   - Gestão eficaz de objeções
+   - Criação de rapport e confiança
+   - Estrutura clara e controlo da reunião
+   - Fechamento eficaz com próximos passos claros
+
 Estrutura o output como uma lista simples, não enumerada, com comentários objectivos e claros sobre os momentos mais positivos da reunião.
 
 Não te preocupes com detalhes temporais exactos — indica sempre a timestamps dos moemntos para contextualizar uma fala.
@@ -200,6 +249,24 @@ IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDED
 - Tem um papel ativo de vendas
 
 A tua análise deve focar APENAS no desempenho do VENDEDOR identificado.
+
+REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FRACOS:
+
+1. NÃO consideres como pontos fracos:
+   - Perguntas estratégicas como "Porquê de nos terem contactado?" - estas são intencionais para fazer a lead abrir-se
+   - Linguagem coloquial/informal - pode ser apropriada para criar rapport e proximidade
+   - Validações como "Consegues ver?" - são importantes para confirmar compreensão
+   - Partilha de ecrã - é uma ferramenta essencial, não um ponto fraco
+   - Técnicas de vendas válidas que podem parecer informais mas são estratégicas
+
+2. FOCA em pontos fracos reais:
+   - Falta de preparação ou conhecimento do produto/serviço
+   - Não aproveitar oportunidades para aprofundar necessidades
+   - Falar demasiado de funcionalidades em vez de benefícios
+   - Não lidar adequadamente com objeções reais
+   - Falta de estrutura ou controlo da reunião
+   - Não criar sentido de urgência quando apropriado
+   - Falta de follow-up ou próximos passos claros
 
 O feedback deve ser objetivo, conciso (máx. 140 palavras) e focado na melhoria contínua.  
 Deve responder sempre em português de Lisboa.  
@@ -261,6 +328,24 @@ export const PONTOS_FRACOS_GS_PROMPT = `Antes de tudo verifica a análise dos po
 
 Agora analisa a seguinte transcrição de uma reunião de vendas e identifica os pontos fracos do comercial ao longo da call.
 
+REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FRACOS:
+
+1. NÃO consideres como pontos fracos:
+   - Perguntas estratégicas como "Porquê de nos terem contactado?" - estas são intencionais para fazer a lead abrir-se
+   - Linguagem coloquial/informal - pode ser apropriada para criar rapport e proximidade
+   - Validações como "Consegues ver?" - são importantes para confirmar compreensão
+   - Partilha de ecrã - é uma ferramenta essencial, não um ponto fraco
+   - Técnicas de vendas válidas que podem parecer informais mas são estratégicas
+
+2. FOCA em pontos fracos reais:
+   - Falta de preparação ou conhecimento do produto/serviço
+   - Não aproveitar oportunidades para aprofundar necessidades
+   - Falar demasiado de funcionalidades em vez de benefícios
+   - Não lidar adequadamente com objeções reais
+   - Falta de estrutura ou controlo da reunião
+   - Não criar sentido de urgência quando apropriado
+   - Falta de follow-up ou próximos passos claros
+
 Depois de analisares, estrutura o output como uma lista simples, não enumerada, com comentários objectivos e claros sobre os momentos mais frágeis da reunião.
 
 indica sempre a timestamp das falas para contextualizar.
@@ -308,6 +393,20 @@ IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDED
 
 A tua análise deve focar APENAS no desempenho do VENDEDOR identificado.
 
+REGRAS CRÍTICAS PARA AVALIAÇÃO:
+
+1. CONSISTÊNCIA: A mesma transcrição deve sempre receber a mesma avaliação, independentemente do nome do ficheiro.
+
+2. CONTEXTO DE VENDAS: Considera que:
+   - Perguntas como "Porquê de nos terem contactado?" são estratégicas para fazer a lead abrir-se
+   - Linguagem coloquial/informal pode ser apropriada para criar rapport
+   - Validações como "Consegues ver?" são importantes para confirmar compreensão
+   - Partilha de ecrã é uma ferramenta essencial, não um ponto forte
+
+3. AVALIAÇÃO COMPLETA: TODOS os 8 critérios devem ser avaliados, mesmo que alguns não sejam muito evidentes na call.
+
+4. JUSTIFICAÇÃO: Cada pontuação deve ter uma justificação clara baseada na transcrição.
+
 Este assistant tem acesso a PDFs com as metodologias, estruturas de análise e critérios de pontuação definidos. É OBRIGATÓRIO que consultes essa base de conhecimento antes de gerar qualquer resposta. Toda a análise deve estar alinhada com os padrões descritos nesses documentos.
 
 Começa directamente com a análise, sem qualquer introdução ou comentário adicional.
@@ -316,10 +415,13 @@ Tarefas principais:
 
 1. Analisa o tempo de resposta do vendedor a cada pergunta colocada pelo cliente;
 2. Calcula a razão de tempo de fala entre o cliente e o vendedor;
-3. Com base no tipo de reunião, aplica o rácio ideal:
-   - Discovery Call: Cliente 60% / Comercial 40%
-   - Follow-Up: Cliente 50% / Comercial 50%
-   - Q&A: Cliente 50% / Comercial 50%
+3. Combase no tipo de reunião, aplica o rácio ideal:
+   - Chamada Fria: Cliente 40% / Comercial 60%
+   - Chamada de Agendamento: Cliente 30% / Comercial 70%
+   - Reunião de Descoberta: Cliente 60% / Comercial 40%
+   - Reunião de Fecho: Cliente 40% / Comercial 60%
+   - Reunião de Esclarecimento de Dúvidas: Cliente 50% / Comercial 50%
+   - Reunião de One Call Close: Cliente 45% / Comercial 55%
 4. Compara os rácios reais com os rácios ideais;
 5. Dá feedback objectivo e claro sobre como melhorar o equilíbrio da conversa e o envolvimento do cliente.
 
@@ -356,6 +458,18 @@ Tens à tua disposição:
 A tua tarefa é justificar, com base na transcrição, cada uma das pontuações atribuídas no sistema. Para cada critério avaliado, escreve uma única frase simples e clara que explique a razão da nota dada.
 
 É obrigatório baseares as tuas justificações em excertos ou evidência da transcrição.
+
+REGRAS CRÍTICAS PARA JUSTIFICAÇÃO:
+
+1. CONSISTÊNCIA: A mesma transcrição deve sempre receber a mesma justificação, independentemente do nome do ficheiro.
+
+2. CONTEXTO DE VENDAS: Considera que:
+   - Perguntas como "Porquê de nos terem contactado?" são estratégicas para fazer a lead abrir-se
+   - Linguagem coloquial/informal pode ser apropriada para criar rapport
+   - Validações como "Consegues ver?" são importantes para confirmar compreensão
+   - Partilha de ecrã é uma ferramenta essencial, não um ponto forte
+
+3. JUSTIFICAÇÃO COMPLETA: TODOS os 8 critérios devem ter justificação, mesmo que alguns não sejam muito evidentes na call.
 
 Mantém o estilo objectivo, profissional e escrito exclusivamente em português de Portugal (Lisboa). Evita qualquer termo ou estrutura do português do Brasil.
 
@@ -422,15 +536,21 @@ Texto HTML para processar:
 // 10. Type of Call
 export const TIPO_CALL_PROMPT = `Analisa a seguinte transcrição de conversa e classifica-a numa das seguintes categorias:
 
-1 - Discovery Call: Uma primeira conversa onde o vendedor procura entender as necessidades, desafios e objetivos do potencial cliente. Características típicas incluem: apresentações iniciais, perguntas sobre a empresa/negócio do cliente, identificação de problemas, exploração da situação atual, e questões sobre orçamento, autoridade de decisão, cronograma ou necessidades específicas.
+1 - Chamada Fria: Primeiro contacto com um potencial cliente que não foi previamente contactado. Características típicas incluem: apresentação inicial da empresa/produto, introdução do vendedor, identificação inicial de necessidades, e tentativa de agendar uma reunião de descoberta.
 
-2 - Follow Up Call: Uma conversa de acompanhamento após contato inicial. Características típicas incluem: referências a conversas anteriores, atualizações sobre progressos, respostas a questões pendentes, apresentação de soluções personalizadas com base na discovery call, e discussões sobre próximos passos concretos.
+2 - Chamada de Agendamento: Conversa focada em marcar uma reunião ou call específica. Características típicas incluem: discussão de disponibilidade, confirmação de horários, envio de convites, e preparação para a reunião.
 
-3 - Q&A Call: Uma conversa focada principalmente em responder perguntas específicas do cliente sobre o produto/serviço. Características típicas incluem: muitas perguntas técnicas ou de implementação, esclarecimentos sobre funcionalidades específicas, e poucos elementos de descoberta ou follow-up.
+3 - Reunião de Descoberta: Conversa profunda para entender as necessidades, desafios e objetivos do cliente. Características típicas incluem: perguntas detalhadas sobre a empresa/negócio, identificação de problemas específicos, exploração da situação atual, e questões sobre orçamento, autoridade de decisão, cronograma ou necessidades específicas.
+
+4 - Reunião de Fecho: Conversa focada em finalizar uma venda ou acordo. Características típicas incluem: discussão de preços finais, negociação de termos, apresentação de propostas finais, e tentativa de obter um compromisso ou assinatura.
+
+5 - Reunião de Esclarecimento de Dúvidas: Conversa focada em responder perguntas específicas do cliente sobre o produto/serviço. Características típicas incluem: muitas perguntas técnicas ou de implementação, esclarecimentos sobre funcionalidades específicas, e poucos elementos de descoberta ou fecho.
+
+6 - Reunião de One Call Close: Conversa que combina descoberta e fecho numa única reunião. Características típicas incluem: identificação rápida de necessidades, apresentação de solução personalizada, e tentativa de fecho imediato.
 
 Analisa apenas os primeiros 5-10 minutos da transcrição para fazer tua determinação, pois essa parte geralmente contém os elementos mais importantes para a classificação.
 
-Após analisar, responde APENAS com o número 1, 2 ou 3 que melhor classifica a transcrição. Não incluas explicações ou texto adicional.
+Após analisar, responde APENAS com o número 1, 2, 3, 4, 5 ou 6 que melhor classifica a transcrição. Não incluas explicações ou texto adicional.
 
 Transcrição para análise:
 {transcription}`

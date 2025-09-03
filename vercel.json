@@ -3,9 +3,6 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "pnpm install",
-  "env": {
-    "NODE_ENV": "production"
-  },
   "functions": {
     "app/api/sales-analyst/blob-upload/route.ts": {
       "maxDuration": 300
@@ -27,36 +24,6 @@
     },
     "app/api/hr-agent/blob-upload-zip/route.ts": {
       "maxDuration": 300
-    }
-  },
-  "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "develop": true,
-      "qa": true
-    }
-  },
-  "environments": {
-    "development": {
-      "buildCommand": "pnpm run build:dev",
-      "env": {
-        "NODE_ENV": "development",
-        "NEXT_PUBLIC_ENV": "development"
-      }
-    },
-    "qa": {
-      "buildCommand": "pnpm run build:qa",
-      "env": {
-        "NODE_ENV": "staging",
-        "NEXT_PUBLIC_ENV": "qa"
-      }
-    },
-    "production": {
-      "buildCommand": "pnpm run build:prod",
-      "env": {
-        "NODE_ENV": "production",
-        "NEXT_PUBLIC_ENV": "production"
-      }
     }
   }
 }

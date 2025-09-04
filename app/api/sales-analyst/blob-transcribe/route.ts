@@ -237,24 +237,28 @@ async function performComprehensiveAnalysis(transcription: string) {
     if (analysisResponses[5].ok) {
       const data = await analysisResponses[5].json()
       const scoringContent = data.choices[0].message.content
+      console.log('📊 Raw scoring content:', scoringContent.substring(0, 500) + '...')
       
       // Parse total score
       const scoringMatch = scoringContent.match(/Pontuação Total:\s*(\d+)\/40/i)
       if (scoringMatch) {
         results.totalScore = parseInt(scoringMatch[1])
+        console.log('✅ Total score parsed:', results.totalScore)
+      } else {
+        console.log('❌ Total score not found in content')
       }
       
       // Parse individual scoring fields
       console.log('🔍 Parsing individual scoring fields...')
       const scoringFields = [
-        { key: 'clarezaFluenciaFala', pattern: /Clareza e Fluência da Fala[:\s]*(\d+)/i },
-        { key: 'tomControlo', pattern: /Tom e Controlo[:\s]*(\d+)/i },
-        { key: 'envolvimentoConversacional', pattern: /Envolvimento Conversacional[:\s]*(\d+)/i },
-        { key: 'efetividadeDescobertaNecessidades', pattern: /Efetividade na Descoberta de Necessidades[:\s]*(\d+)/i },
-        { key: 'entregaValorAjusteSolucao', pattern: /Entrega de Valor e Ajuste da Solução[:\s]*(\d+)/i },
-        { key: 'habilidadesLidarObjeccoes', pattern: /Habilidades de Lidar com Objeções[:\s]*(\d+)/i },
-        { key: 'estruturaControleReuniao', pattern: /Estrutura e Controle da Reunião[:\s]*(\d+)/i },
-        { key: 'fechamentoProximosPassos', pattern: /Fechamento e Próximos Passos[:\s]*(\d+)/i }
+        { key: 'clarezaFluenciaFala', pattern: /Clareza e Fluência da Fala[:\s]*(\d+)(?:\/5)?/i },
+        { key: 'tomControlo', pattern: /Tom e Controlo[:\s]*(\d+)(?:\/5)?/i },
+        { key: 'envolvimentoConversacional', pattern: /Envolvimento Conversacional[:\s]*(\d+)(?:\/5)?/i },
+        { key: 'efetividadeDescobertaNecessidades', pattern: /(?:Eficácia|Efetividade) na Descoberta de Necessidades[:\s]*(\d+)(?:\/5)?/i },
+        { key: 'entregaValorAjusteSolucao', pattern: /Entrega de Valor e Ajuste da Solução[:\s]*(\d+)(?:\/5)?/i },
+        { key: 'habilidadesLidarObjeccoes', pattern: /Habilidades de (?:Tratamento de|Lidar com) Objeções[:\s]*(\d+)(?:\/5)?/i },
+        { key: 'estruturaControleReuniao', pattern: /Estrutura e Controle da Reunião[:\s]*(\d+)(?:\/5)?/i },
+        { key: 'fechamentoProximosPassos', pattern: /(?:Conclusão|Fechamento) e Próximos Passos[:\s]*(\d+)(?:\/5)?/i }
       ]
       
       scoringFields.forEach(field => {
@@ -265,6 +269,7 @@ async function performComprehensiveAnalysis(transcription: string) {
         } else {
           // Set to 0 if not found
           (results as any)[field.key] = 0
+          console.log('❌', field.key + ': not found, set to 0')
         }
       })
       
@@ -1094,6 +1099,23 @@ export async function POST(request: NextRequest) {
       // Don't fail the entire process if blob deletion fails
       // The file will eventually be cleaned up by Vercel's retention policies
     }
+
+    // Debug: Log the final response
+    console.log('🔍 Final response analysis object:', {
+      pontosFortes: salesAnalysis.analysis.pontosFortes?.substring(0, 100) + '...',
+      pontosFracos: salesAnalysis.analysis.pontosFracos?.substring(0, 100) + '...',
+      totalScore: salesAnalysis.score,
+      individualScores: {
+        clarezaFluenciaFala: salesAnalysis.analysis.clarezaFluenciaFala,
+        tomControlo: salesAnalysis.analysis.tomControlo,
+        envolvimentoConversacional: salesAnalysis.analysis.envolvimentoConversacional,
+        efetividadeDescobertaNecessidades: salesAnalysis.analysis.efetividadeDescobertaNecessidades,
+        entregaValorAjusteSolucao: salesAnalysis.analysis.entregaValorAjusteSolucao,
+        habilidadesLidarObjeccoes: salesAnalysis.analysis.habilidadesLidarObjeccoes,
+        estruturaControleReuniao: salesAnalysis.analysis.estruturaControleReuniao,
+        fechamentoProximosPassos: salesAnalysis.analysis.fechamentoProximosPassos
+      }
+    })
 
     return NextResponse.json({
       success: true,

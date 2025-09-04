@@ -1088,32 +1088,59 @@ export default function DashboardPage() {
       }
 
       const data = await response.json()
+      console.log('📥 Received response data:', { 
+        hasResponse: !!data.response, 
+        responseLength: data.response?.length || 0,
+        responsePreview: data.response?.substring(0, 100) + '...'
+      })
       
-      // Simulate streaming effect
+      // Simulate streaming effect with better handling
       const fullResponse = data.response
-      const words = fullResponse.split(' ')
-      let currentText = ''
       
-      for (let i = 0; i < words.length; i++) {
-        // Check if the request was aborted
-        if (!abortControllerRef.current || abortControllerRef.current.signal.aborted) {
-          console.log('Streaming stopped by user')
-          return
-        }
-        
-        currentText += (i > 0 ? ' ' : '') + words[i]
-        
+      if (!fullResponse || fullResponse.trim() === '') {
+        console.log('⚠️ Empty response received')
         setMessages(prev => prev.map(msg => 
           msg.id === streamingMessageId 
-            ? { ...msg, content: currentText }
+            ? { ...msg, content: 'Desculpe, não consegui gerar uma resposta. Tenta novamente.', isStreaming: false }
             : msg
         ))
+        return
+      }
+      
+      // Use character-based streaming for better formatting preservation
+      try {
+        const characters = fullResponse.split('')
+        let currentText = ''
         
-        // Add a small delay for the streaming effect
-        await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 30))
+        for (let i = 0; i < characters.length; i++) {
+          // Check if the request was aborted
+          if (!abortControllerRef.current || abortControllerRef.current.signal.aborted) {
+            console.log('Streaming stopped by user')
+            return
+          }
+          
+          currentText += characters[i]
+          
+          setMessages(prev => prev.map(msg => 
+            msg.id === streamingMessageId 
+              ? { ...msg, content: currentText }
+              : msg
+          ))
+          
+          // Add a consistent delay for the streaming effect
+          await new Promise(resolve => setTimeout(resolve, 20))
+        }
+      } catch (streamingError) {
+        console.error('❌ Error during streaming:', streamingError)
+        // Fallback: show the complete response immediately
+        setMessages(prev => prev.map(msg => 
+          msg.id === streamingMessageId 
+            ? { ...msg, content: fullResponse, isStreaming: false }
+            : msg
+        ))
       }
 
-      // Finalize the message
+      // Finalize the message with the complete response
       setMessages(prev => prev.map(msg => 
         msg.id === streamingMessageId 
           ? { ...msg, content: fullResponse, isStreaming: false }

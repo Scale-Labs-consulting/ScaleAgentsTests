@@ -216,8 +216,8 @@ export async function POST(request: NextRequest) {
     let enhancedMessage = message
     let fileContext = ''
     
-    // Handle uploaded file if provided
-    if (uploadedFile && uploadedFile.url) {
+    // Handle uploaded file if provided (validate it's a real file with URL)
+    if (uploadedFile && uploadedFile.url && uploadedFile.name) {
       console.log('📁 Processing uploaded file:', uploadedFile)
       
       if (uploadedFile.fileType === 'document' && uploadedFile.extractedText) {
@@ -263,14 +263,14 @@ export async function POST(request: NextRequest) {
         return `\n\n--- Sales Call ${index + 1} (${date}) ---\nTitle: ${call.title}\nTranscription:\n${transcription}\n--- End Sales Call ${index + 1} ---`
       }).join('\n')
 
-      enhancedMessage = `Context: The user has ${salesCalls.length} recent sales calls available for analysis.${uploadedFile ? ' Additionally, they have uploaded a file for analysis.' : ''}
+      enhancedMessage = `Context: The user has ${salesCalls.length} recent sales calls available for analysis.${(uploadedFile && uploadedFile.url && uploadedFile.name) ? ' Additionally, they have uploaded a file for analysis.' : ''}
 
 ${salesCallsContext}${fileContext}
 
 User Question: ${message}
 
-Please analyze the sales calls above${uploadedFile ? ' and the uploaded file' : ''} and provide insights related to the user's question about scaling, growth, or business challenges.`
-    } else if (uploadedFile) {
+Please analyze the sales calls above${(uploadedFile && uploadedFile.url && uploadedFile.name) ? ' and the uploaded file' : ''} and provide insights related to the user's question about scaling, growth, or business challenges.`
+    } else if (uploadedFile && uploadedFile.url && uploadedFile.name) {
       enhancedMessage = `Context: The user has uploaded a file for analysis.${fileContext}
 
 User Question: ${message}
@@ -293,7 +293,7 @@ Please analyze the uploaded file and provide insights related to the user's ques
         timestamp: new Date().toISOString(),
         hasSalesCalls: (salesCalls.length > 0).toString(),
         salesCallsCount: salesCalls.length.toString(),
-        hasFileAttachments: (uploadedFile ? 'true' : 'false')
+        hasFileAttachments: ((uploadedFile && uploadedFile.url && uploadedFile.name) ? 'true' : 'false')
       }
     }
     

@@ -112,6 +112,21 @@ export async function POST(request: Request): Promise<NextResponse> {
 
           console.log('✅ Database record created:', salesCall.id)
 
+          // Store the sales call ID in the database for later retrieval
+          try {
+            await supabase
+              .from('sales_calls')
+              .update({ 
+                blob_url: blob.url,
+                blob_path: blob.pathname 
+              })
+              .eq('id', salesCall.id)
+            console.log('✅ Sales call record updated with blob information')
+          } catch (metadataError) {
+            console.warn('⚠️ Could not update sales call record:', metadataError)
+            // This is not critical, continue with the upload
+          }
+
         } catch (error) {
           console.error('❌ Error in onUploadCompleted:', error)
           throw new Error('Could not update database')

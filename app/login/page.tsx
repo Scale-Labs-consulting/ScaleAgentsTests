@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -19,51 +19,78 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState('')
-  const [debugInfo, setDebugInfo] = useState('')
   const router = useRouter()
   const { signIn, signInWithGoogle } = useAuth()
+
+  // Check for OAuth callback errors
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const errorParam = urlParams.get('error')
+    const errorDetails = urlParams.get('details')
+    
+    if (errorParam) {
+      let errorMessage = 'Erro de autenticação. Por favor, tente novamente.'
+      
+      switch (errorParam) {
+        case 'no_auth_code':
+          errorMessage = 'Código de autenticação não encontrado. Tente novamente.'
+          break
+        case 'auth_failed':
+          errorMessage = errorDetails ? `Falha na autenticação: ${errorDetails}` : 'Falha na autenticação.'
+          break
+        case 'no_session':
+          errorMessage = 'Sessão não criada. Tente novamente.'
+          break
+        case 'auth_exception':
+          errorMessage = 'Erro inesperado na autenticação. Tente novamente.'
+          break
+        case 'missing_env_vars':
+          errorMessage = 'Erro de configuração. Contacte o administrador.'
+          break
+      }
+      
+      setError(errorMessage)
+      
+      // Clear the error from URL
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('error')
+      newUrl.searchParams.delete('details')
+      window.history.replaceState({}, '', newUrl.toString())
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
-    setDebugInfo('Starting login process...')
     
     console.log('🔐 Attempting to sign in with email:', email)
     
     try {
-      setDebugInfo(prev => prev + '\nCalling signIn...')
       const result = await signIn(email, password)
       console.log('✅ Sign in successful:', result)
-      setDebugInfo(prev => prev + '\nSign In: Success')
       
       // Check if we need to redirect to a specific page
       const urlParams = new URLSearchParams(window.location.search)
       const redirectTo = urlParams.get('redirectTo') || '/dashboard'
       
-      setDebugInfo(prev => prev + '\nRedirecting to: ' + redirectTo)
-      
       // Verify session before redirecting
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
-          setDebugInfo(prev => prev + '\nSession verified, redirecting...')
           router.push(redirectTo)
         } else {
-          setDebugInfo(prev => prev + '\nNo session found, waiting...')
           // Force a small delay to allow auth state to update
           setTimeout(() => {
             router.push(redirectTo)
           }, 1000)
         }
       } catch (error) {
-        setDebugInfo(prev => prev + '\nSession check failed, redirecting anyway...')
         setTimeout(() => {
           router.push(redirectTo)
         }, 1000)
       }
     } catch (error: any) {
-      setDebugInfo(prev => prev + '\nError: ' + (error.message || String(error)))
       console.error('❌ Login error:', error)
       
       // Provide more specific error messages
@@ -94,7 +121,21 @@ export default function LoginPage() {
       // The redirect will be handled by Supabase OAuth
     } catch (error: any) {
       console.error('❌ Google sign in error:', error)
-      setError('Falha ao iniciar sessão com Google. Por favor, tente novamente.')
+      
+      // Provide more specific error messages
+      let errorMessage = 'Falha ao iniciar sessão com Google. Por favor, tente novamente.'
+      
+      if (error.message?.includes('Invalid redirect URI')) {
+        errorMessage = 'Erro de configuração OAuth. Contacte o administrador.'
+      } else if (error.message?.includes('OAuth provider not enabled')) {
+        errorMessage = 'Autenticação Google não está ativada. Contacte o administrador.'
+      } else if (error.message?.includes('User not found')) {
+        errorMessage = 'Conta Google não encontrada. Tente registar-se primeiro.'
+      } else if (error.message) {
+        errorMessage = `Erro: ${error.message}`
+      }
+      
+      setError(errorMessage)
     } finally {
       setIsGoogleLoading(false)
     }
@@ -139,12 +180,7 @@ export default function LoginPage() {
             <p className="text-white/70 mt-2">Inicie sessão na sua conta</p>
           </div>
 
-          {/* Debug Info */}
-          {debugInfo && (
-            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-md">
-              <p className="text-blue-400 text-xs font-mono whitespace-pre-wrap">{debugInfo}</p>
-            </div>
-          )}
+
 
           {/* Login Card */}
           <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
@@ -188,11 +224,10 @@ export default function LoginPage() {
 
               {/* Divider */}
               <div className="relative mb-6">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-white/20" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-black px-2 text-white/50">ou continue com email</span>
+                <div className="flex items-center">
+                  <div className="flex-1 border-t border-white/20"></div>
+                  <span className="px-2 text-white text-xs uppercase">OU</span>
+                  <div className="flex-1 border-t border-white/20"></div>
                 </div>
               </div>
 

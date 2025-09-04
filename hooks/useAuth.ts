@@ -155,11 +155,13 @@ export function useAuth() {
   const signInWithGoogle = async () => {
     try {
       console.log('🚀 Starting Google OAuth sign-in...')
+      console.log('📍 Current origin:', window.location.origin)
+      console.log('🔗 Redirect URL:', `${window.location.origin}/dashboard`)
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/dashboard`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -167,9 +169,13 @@ export function useAuth() {
         }
       })
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Supabase OAuth error:', error)
+        throw error
+      }
       
       console.log('✅ Google OAuth initiated successfully')
+      console.log('📊 OAuth data:', data)
       return data
     } catch (error) {
       console.error('❌ Google sign in error:', error)

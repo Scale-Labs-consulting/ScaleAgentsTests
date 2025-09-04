@@ -73,14 +73,15 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   console.log('🚀 API ROUTE CALLED - /api/sales-analyst/analyses/[id]/DELETE')
   
   try {
+    const resolvedParams = await params
     const { searchParams } = new URL(request.url)
     const accessToken = searchParams.get('accessToken')
-    const analysisId = params.id
+    const analysisId = resolvedParams.id
 
     if (!accessToken) {
       return NextResponse.json(

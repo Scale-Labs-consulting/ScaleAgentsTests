@@ -109,6 +109,23 @@ export default function DashboardPage() {
   const [loadingAnalyses, setLoadingAnalyses] = useState(false)
   const [selectedAnalysis, setSelectedAnalysis] = useState<any>(null)
   const [showAnalysisModal, setShowAnalysisModal] = useState(false)
+  
+  // Keyboard escape handler for analysis modal
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showAnalysisModal) {
+        console.log('Escape key pressed, closing modal')
+        setShowAnalysisModal(false)
+        setSelectedAnalysis(null)
+      }
+    }
+
+    if (showAnalysisModal) {
+      document.addEventListener('keydown', handleEscape)
+      return () => document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showAnalysisModal])
+  
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   
@@ -420,84 +437,84 @@ export default function DashboardPage() {
 
       console.log('✅ File uploaded to Vercel Blob:', blob.url)
 
-      // Step 2: Get the sales call ID from the database
-      setSalesUploadStatus('A obter informações do ficheiro...')
+      // Step 2: Create a temporary sales call ID for now
+      // We'll use the blob URL as a reference and create the record later if needed
+      setSalesUploadStatus('A processar vídeo e iniciar transcrição...')
       setSalesUploadProgress(50)
 
-      // Wait a moment for the database record to be created
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // Get the sales call record that was just created
-      const salesCallResponse = await fetch('/api/sales-analyst/sales-calls/latest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId: user!.id,
-          accessToken: accessToken,
-          blobUrl: blob.url
-        })
-      })
-
-      if (!salesCallResponse.ok) {
-        throw new Error('Failed to get sales call record')
-      }
-
-      const salesCallData = await salesCallResponse.json()
-      const salesCallId = salesCallData.salesCall.id
+      // Generate a temporary ID based on the blob URL
+      const tempSalesCallId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
       // Step 3: Start transcription and analysis
       setSalesUploadStatus('A processar vídeo e iniciar transcrição...')
       setSalesUploadProgress(60)
 
-      const transcriptionResponse = await fetch('/api/sales-analyst/blob-transcribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          blobUrl: blob.url,
-          fileName: file.name,
-          userId: user!.id,
-          accessToken: accessToken,
-          salesCallId: salesCallId
+      try {
+        const transcriptionResponse = await fetch('/api/sales-analyst/blob-transcribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            blobUrl: blob.url,
+            fileName: file.name,
+            userId: user!.id,
+            accessToken: accessToken,
+            salesCallId: tempSalesCallId
+          })
         })
-      })
 
-      if (!transcriptionResponse.ok) {
-        const errorData = await transcriptionResponse.json()
-        throw new Error(errorData.error || 'Transcription failed')
+        if (!transcriptionResponse.ok) {
+          const errorData = await transcriptionResponse.json()
+          throw new Error(errorData.error || 'Transcription failed')
+        }
+
+                const result = await transcriptionResponse.json()
+
+        await fetch('/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: '✅ Vercel Blob upload and transcription completed!',
+            data: { 
+              transcriptionLength: result.transcription?.length || 0,
+              analysis: result.analysis 
+            }
+          })
+        })
+
+        // Show appropriate status message
+        if (result.duplicateInfo) {
+          setSalesUploadStatus('Análise concluída! (Conteúdo duplicado detectado, mas nova análise criada)')
+        } else {
+          setSalesUploadStatus('Análise concluída com sucesso!')
+        }
+        setSalesUploadProgress(100)
+
+        // Store analysis result for display
+        setSalesAnalysisResult(result.analysis)
+        
+        // Show toast with duplicate info if applicable
+        if (result.duplicateInfo) {
+          toast({
+            title: "Análise Concluída",
+            description: "Conteúdo duplicado detectado, mas nova análise foi criada com sucesso",
+            variant: "default"
+          })
+        }
+        
+        // Reset upload state after 3 seconds
+        setTimeout(() => {
+          setSalesUploadedFile(null)
+          setSalesIsUploading(false)
+          setSalesUploadProgress(0)
+          setSalesUploadStatus('')
+        }, 3000)
+        
+      } catch (error) {
+        console.error('❌ Transcription error:', error)
+        throw error
       }
-
-      const result = await transcriptionResponse.json()
-
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '✅ Vercel Blob upload and transcription completed!',
-          data: { 
-            transcriptionLength: result.transcription?.length || 0,
-            analysis: result.analysis 
-          }
-        })
-      })
-
-      setSalesUploadStatus('Análise concluída com sucesso!')
-      setSalesUploadProgress(100)
-
-      // Store analysis result for display
-      setSalesAnalysisResult(result.analysis)
-      
-      // Reset upload state after 3 seconds
-      setTimeout(() => {
-        setSalesUploadedFile(null)
-        setSalesIsUploading(false)
-        setSalesUploadProgress(0)
-        setSalesUploadStatus('')
-      }, 3000)
-      
     } catch (error) {
       console.error('❌ Vercel Blob upload error:', error)
       await fetch('/api/log', {
@@ -1342,9 +1359,14 @@ export default function DashboardPage() {
           }
         }
         
+        // Show success message with duplicate info if applicable
+        const message = result.duplicateInfo 
+          ? `Ficheiro carregado e transcrito com sucesso (conteúdo duplicado detectado, mas nova análise criada)`
+          : "Ficheiro carregado e transcrito com sucesso"
+        
         toast({
           title: "Sucesso",
-          description: "Ficheiro carregado e transcrito com sucesso"
+          description: message
         })
       } else {
         toast({
@@ -2067,17 +2089,7 @@ export default function DashboardPage() {
 
                 {/* New Chat Button - Top Right */}
                 <div className="flex items-center">
-                  {selectedAgent === 'sales-analyst' ? (
-                    <button 
-                      onClick={() => setActiveTab('analyses')}
-                      className="flex items-center space-x-3 px-5 py-3 bg-gradient-to-r from-purple-600 to-violet-600 rounded-lg hover:from-purple-700 hover:to-violet-700 transition-colors"
-                    >
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      <span className="text-white font-medium">Ver Análises</span>
-                    </button>
-                  ) : (
+                  {selectedAgent === 'scale-expert' && (
                     <button 
                       onClick={createNewConversation}
                       className="flex items-center space-x-3 px-5 py-3 bg-gradient-to-r from-purple-600 to-violet-600 rounded-lg hover:from-purple-700 hover:to-violet-700 transition-colors"
@@ -2515,41 +2527,6 @@ export default function DashboardPage() {
                           </div>
 
 
-                          {selectedAnalyses.size > 0 && (
-                            <div className="flex items-center justify-end p-4 bg-white/5 rounded-lg border border-white/10">
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Eliminar {selectedAnalyses.size}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent className="bg-gray-900 border-white/20">
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle className="text-white">Eliminar Análises Selecionadas</AlertDialogTitle>
-                                    <AlertDialogDescription className="text-white/70">
-                                      Tem a certeza que pretende eliminar {selectedAnalyses.size} análise(s) selecionada(s)? Esta ação não pode ser desfeita.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                                      Cancelar
-                                    </AlertDialogCancel>
-                                                                          <AlertDialogAction 
-                                        onClick={deleteSelectedAnalyses}
-                                        className="bg-red-600 hover:bg-red-700"
-                                      >
-                                        Eliminar {selectedAnalyses.size}
-                                      </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          )}
 
                           {/* Analyses List */}
                           {loadingAnalyses ? (
@@ -2659,15 +2636,26 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Analysis Detail Modal */}
-      {showAnalysisModal && selectedAnalysis && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              {/* Analysis Detail Modal */}
+        {showAnalysisModal && selectedAnalysis && (
+          <div 
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+            onClick={() => {
+              console.log('Backdrop clicked, closing modal')
+              setShowAnalysisModal(false)
+              setSelectedAnalysis(null)
+            }}
+          >
+            <div 
+              className="bg-gray-900 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white">{selectedAnalysis.title}</h2>
               <Button 
                 variant="ghost" 
                 onClick={() => {
+                  console.log('Close button clicked, closing modal')
                   setShowAnalysisModal(false)
                   setSelectedAnalysis(null)
                 }}
@@ -2713,62 +2701,258 @@ export default function DashboardPage() {
                     </div>
                   )}
                   
-                  {selectedAnalysis.analysis.strengths && selectedAnalysis.analysis.strengths.length > 0 && (
+                  {/* Pontos Fortes */}
+                  {selectedAnalysis.analysis.pontosFortes && (
                     <div className="bg-white/5 p-4 rounded-lg">
                       <h3 className="text-lg font-semibold text-white mb-2">Pontos Fortes</h3>
-                      <div className="space-y-2">
-                        {Array.isArray(selectedAnalysis.analysis.strengths) ? 
-                          selectedAnalysis.analysis.strengths.map((strength: any, index: number) => (
-                            <div key={index} className="flex items-start space-x-2">
-                              <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                              <p className="text-white/80 text-sm">{strength.description || strength}</p>
+                      <div className="text-white/90 text-sm leading-relaxed">
+                        {selectedAnalysis.analysis.pontosFortes.split('\n').map((line: string, index: number) => {
+                          const trimmedLine = line.trim()
+                          if (!trimmedLine) return null
+                          
+                          // Check if it's a category title (bold text, usually at the start of a section)
+                          if (trimmedLine.match(/^[A-ZÁÊÇÕ][^:]*$/)) {
+                            return (
+                              <div key={index} className="flex items-start space-x-3 mb-2">
+                                <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                                <div className="flex-1">
+                                  <p className="font-semibold">{trimmedLine}</p>
+                                </div>
+                              </div>
+                            )
+                          }
+                          
+                          // Check if it's a timestamp
+                          if (trimmedLine.match(/^Timestamp:\s*\([^)]+\)$/)) {
+                            return (
+                              <div key={index} className="ml-5 mb-1">
+                                <p className="text-white/70 text-xs">{trimmedLine}</p>
+                              </div>
+                            )
+                          }
+                          
+                          // Check if it's a quote (starts and ends with quotes)
+                          if (trimmedLine.startsWith('"') && trimmedLine.endsWith('"')) {
+                            return (
+                              <div key={index} className="ml-5 mb-3">
+                                <p className="italic text-white/80">"{trimmedLine.slice(1, -1)}"</p>
+                              </div>
+                            )
+                          }
+                          
+                          // Regular description text
+                          return (
+                            <div key={index} className="ml-5 mb-1">
+                              <p>{trimmedLine}</p>
                             </div>
-                          )) :
-                          <p className="text-white/80 text-sm">{selectedAnalysis.analysis.strengths}</p>
-                        }
+                          )
+                        })}
                       </div>
                     </div>
                   )}
                   
-                  {selectedAnalysis.analysis.weaknesses && selectedAnalysis.analysis.weaknesses.length > 0 && (
+                  {/* Pontos de Melhoria */}
+                  {selectedAnalysis.analysis.pontosFracos && (
                     <div className="bg-white/5 p-4 rounded-lg">
                       <h3 className="text-lg font-semibold text-white mb-2">Pontos de Melhoria</h3>
-                      <div className="space-y-2">
-                        {Array.isArray(selectedAnalysis.analysis.weaknesses) ? 
-                          selectedAnalysis.analysis.weaknesses.map((weakness: any, index: number) => (
-                            <div key={index} className="flex items-start space-x-2">
-                              <div className="w-2 h-2 bg-red-400 rounded-full mt-2 flex-shrink-0"></div>
-                              <p className="text-white/80 text-sm">{weakness.description || weakness}</p>
+                      <div className="text-white/90 text-sm leading-relaxed">
+                        {selectedAnalysis.analysis.pontosFracos.split('\n').map((line: string, index: number) => {
+                          const trimmedLine = line.trim()
+                          if (!trimmedLine) return null
+                          
+                          // Check if it's a category title (bold text, usually at the start of a section)
+                          if (trimmedLine.match(/^[A-ZÁÊÇÕ][^:]*$/)) {
+                            return (
+                              <div key={index} className="flex items-start space-x-3 mb-2">
+                                <div className="w-2 h-2 bg-red-400 rounded-full mt-2 flex-shrink-0"></div>
+                                <div className="flex-1">
+                                  <p className="font-semibold">{trimmedLine}</p>
+                                </div>
+                              </div>
+                            )
+                          }
+                          
+                          // Check if it's a timestamp
+                          if (trimmedLine.match(/^Timestamp:\s*\([^)]+\)$/)) {
+                            return (
+                              <div key={index} className="ml-5 mb-1">
+                                <p className="text-white/70 text-xs">{trimmedLine}</p>
+                              </div>
+                            )
+                          }
+                          
+                          // Check if it's a quote (starts and ends with quotes)
+                          if (trimmedLine.startsWith('"') && trimmedLine.endsWith('"')) {
+                            return (
+                              <div key={index} className="ml-5 mb-3">
+                                <p className="italic text-white/80">"{trimmedLine.slice(1, -1)}"</p>
+                              </div>
+                            )
+                          }
+                          
+                          // Regular description text
+                          return (
+                            <div key={index} className="ml-5 mb-1">
+                              <p>{trimmedLine}</p>
                             </div>
-                          )) :
-                          <p className="text-white/80 text-sm">{selectedAnalysis.analysis.weaknesses}</p>
-                        }
+                          )
+                        })}
                       </div>
                     </div>
                   )}
                   
-                  {selectedAnalysis.analysis.scoring && (
+                  {/* Resumo da Call */}
+                  {selectedAnalysis.analysis.resumoDaCall && (
                     <div className="bg-white/5 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold text-white mb-2">Avaliação Detalhada</h3>
-                      <div className="space-y-2">
-                        {selectedAnalysis.analysis.scoring.raw ? (
-                          <pre className="text-white/80 text-sm whitespace-pre-wrap bg-black/20 p-3 rounded">
-                            {selectedAnalysis.analysis.scoring.raw}
-                          </pre>
-                        ) : (
-                          <p className="text-white/80 text-sm">Avaliação disponível no sistema</p>
+                      <h3 className="text-lg font-semibold text-white mb-2">Resumo da Call</h3>
+                      <p className="text-white/90 text-sm leading-relaxed whitespace-pre-line">{selectedAnalysis.analysis.resumoDaCall}</p>
+                    </div>
+                  )}
+                  
+                  {/* Dicas Gerais */}
+                  {selectedAnalysis.analysis.dicasGerais && (
+                    <div className="bg-white/5 p-4 rounded-lg">
+                      <h3 className="text-lg font-semibold text-white mb-2">Dicas Gerais</h3>
+                      <p className="text-white/90 text-sm leading-relaxed whitespace-pre-line">{selectedAnalysis.analysis.dicasGerais}</p>
+                    </div>
+                  )}
+                  
+                  {/* Foco para Próximas Calls */}
+                  {selectedAnalysis.analysis.focoParaProximasCalls && (
+                    <div className="bg-white/5 p-4 rounded-lg">
+                      <h3 className="text-lg font-semibold text-white mb-2">Foco para Próximas Calls</h3>
+                      <p className="text-white/90 text-sm leading-relaxed whitespace-pre-line">{selectedAnalysis.analysis.focoParaProximasCalls}</p>
+                    </div>
+                  )}
+                  
+                  {/* 8 Scoring Fields */}
+                  {(selectedAnalysis.analysis.clarezaFluenciaFala !== undefined || 
+                    selectedAnalysis.analysis.tomControlo !== undefined || 
+                    selectedAnalysis.analysis.envolvimentoConversacional !== undefined || 
+                    selectedAnalysis.analysis.efetividadeDescobertaNecessidades !== undefined || 
+                    selectedAnalysis.analysis.entregaValorAjusteSolucao !== undefined || 
+                    selectedAnalysis.analysis.habilidadesLidarObjeccoes !== undefined || 
+                    selectedAnalysis.analysis.estruturaControleReuniao !== undefined || 
+                    selectedAnalysis.analysis.fechamentoProximosPassos !== undefined) && (
+                    <div className="bg-white/5 p-6 rounded-lg">
+                      <h3 className="text-xl font-semibold text-white mb-6">Avaliação Detalhada</h3>
+                      <div className="space-y-6">
+                        {selectedAnalysis.analysis.clarezaFluenciaFala !== undefined && (
+                          <div className="border-l-4 border-white/30 pl-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="text-white font-medium">Clareza e Fluência da Fala</h4>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.clarezaFluenciaFala}</span>
+                                <span className="text-white/60 text-sm">/10</span>
+                              </div>
+                            </div>
+                            {selectedAnalysis.analysis.justificativaClarezaFluenciaFala && (
+                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaClarezaFluenciaFala}</p>
+                            )}
+                          </div>
+                        )}
+                        {selectedAnalysis.analysis.tomControlo !== undefined && (
+                          <div className="border-l-4 border-white/30 pl-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="text-white font-medium">Tom e Controlo</h4>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.tomControlo}</span>
+                                <span className="text-white/60 text-sm">/10</span>
+                              </div>
+                            </div>
+                            {selectedAnalysis.analysis.justificativaTomControlo && (
+                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaTomControlo}</p>
+                            )}
+                          </div>
+                        )}
+                        {selectedAnalysis.analysis.envolvimentoConversacional !== undefined && (
+                          <div className="border-l-4 border-white/30 pl-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="text-white font-medium">Envolvimento Conversacional</h4>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.envolvimentoConversacional}</span>
+                                <span className="text-white/60 text-sm">/10</span>
+                              </div>
+                            </div>
+                            {selectedAnalysis.analysis.justificativaEnvolvimentoConversacional && (
+                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaEnvolvimentoConversacional}</p>
+                            )}
+                          </div>
+                        )}
+                        {selectedAnalysis.analysis.efetividadeDescobertaNecessidades !== undefined && (
+                          <div className="border-l-4 border-white/30 pl-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="text-white font-medium">Efetividade na Descoberta de Necessidades</h4>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.efetividadeDescobertaNecessidades}</span>
+                                <span className="text-white/60 text-sm">/10</span>
+                              </div>
+                            </div>
+                            {selectedAnalysis.analysis.justificativaEfetividadeDescobertaNecessidades && (
+                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaEfetividadeDescobertaNecessidades}</p>
+                            )}
+                          </div>
+                        )}
+                        {selectedAnalysis.analysis.entregaValorAjusteSolucao !== undefined && (
+                          <div className="border-l-4 border-white/30 pl-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="text-white font-medium">Entrega de Valor e Ajuste da Solução</h4>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.entregaValorAjusteSolucao}</span>
+                                <span className="text-white/60 text-sm">/10</span>
+                              </div>
+                            </div>
+                            {selectedAnalysis.analysis.justificativaEntregaValorAjusteSolucao && (
+                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaEntregaValorAjusteSolucao}</p>
+                            )}
+                          </div>
+                        )}
+                        {selectedAnalysis.analysis.habilidadesLidarObjeccoes !== undefined && (
+                          <div className="border-l-4 border-white/30 pl-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="text-white font-medium">Habilidades de Lidar com Objeções</h4>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.habilidadesLidarObjeccoes}</span>
+                                <span className="text-white/60 text-sm">/10</span>
+                              </div>
+                            </div>
+                            {selectedAnalysis.analysis.justificativaHabilidadesLidarObjeccoes && (
+                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaHabilidadesLidarObjeccoes}</p>
+                            )}
+                          </div>
+                        )}
+                        {selectedAnalysis.analysis.estruturaControleReuniao !== undefined && (
+                          <div className="border-l-4 border-white/30 pl-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="text-white font-medium">Estrutura e Controle da Reunião</h4>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.estruturaControleReuniao}</span>
+                                <span className="text-white/60 text-sm">/10</span>
+                              </div>
+                            </div>
+                            {selectedAnalysis.analysis.justificativaEstruturaControleReuniao && (
+                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaEstruturaControleReuniao}</p>
+                            )}
+                          </div>
+                        )}
+                        {selectedAnalysis.analysis.fechamentoProximosPassos !== undefined && (
+                          <div className="border-l-4 border-white/30 pl-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="text-white font-medium">Fechamento e Próximos Passos</h4>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.fechamentoProximosPassos}</span>
+                                <span className="text-white/60 text-sm">/10</span>
+                              </div>
+                            </div>
+                            {selectedAnalysis.analysis.justificativaFechamentoProximosPassos && (
+                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaFechamentoProximosPassos}</p>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* Feedback */}
-              {selectedAnalysis.feedback && (
-                <div className="bg-white/5 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold text-white mb-2">Feedback</h3>
-                  <p className="text-white/80">{selectedAnalysis.feedback}</p>
+                  
                 </div>
               )}
             </div>

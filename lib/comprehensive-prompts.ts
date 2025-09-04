@@ -9,6 +9,8 @@ IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDED
 - Tenta fechar a venda
 - Tem um papel ativo de vendas
 
+CRÍTICO: Na tua resposta, NUNCA uses "Speaker A" ou "Speaker B". Sempre refere-te ao vendedor como "o vendedor" e ao cliente como "o cliente". NUNCA combines "vendedor" com "Speaker A/B" - usa APENAS "o vendedor".
+
 REGRAS CRÍTICAS PARA AVALIAÇÃO:
 
 1. CONSISTÊNCIA: A mesma transcrição deve sempre receber a mesma avaliação, independentemente do nome do ficheiro.
@@ -116,6 +118,8 @@ IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDED
 
 A tua análise deve focar APENAS no desempenho do VENDEDOR identificado.
 
+CRÍTICO: Na tua resposta, NUNCA uses "Speaker A" ou "Speaker B". Sempre refere-te ao vendedor como "o vendedor" e ao cliente como "o cliente". NUNCA combines "vendedor" com "Speaker A/B" - usa APENAS "o vendedor".
+
 REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FORTES:
 
 1. NÃO consideres como pontos fortes:
@@ -152,7 +156,6 @@ Todas as tuas respostas devem ser exclusivamente em português de Portugal (espe
 É ABSOLUTAMENTE ESSENCIAL que todas as respostas sigam estas regras, sem exceção. Em caso de dúvida, opta sempre pela forma utilizada em Portugal, especificamente em Lisboa.
 
 Estrutura da Resposta:
-Pontos Fortes da Reunião
 
 Boa Abordagem Inicial
 Momento em que a introdução foi clara, envolvente e estabeleceu rapport com o cliente.
@@ -184,12 +187,21 @@ Instruções Críticas:
 - Escreve sempre em português de Lisboa.
 - Inclui citação direta do transcript para cada ponto forte, com o timestamp exato.
 - Usa apenas texto simples, sem formatação especial.
+- NÃO incluas títulos como "Pontos Fortes da Reunião" - começa diretamente com os pontos individuais.
 
 Transcrição para análise:
 {transcription}`
 
 // 4. Pontos Fortes/GS
 export const PONTOS_FORTES_GS_PROMPT = `Analisa a seguinte transcrição de uma reunião de vendas e identifica os pontos fortes do comercial ao longo da call.
+
+IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDEDOR/COMERCIAL na transcrição. O vendedor é normalmente a pessoa que:
+- Apresenta produtos/serviços
+- Faz perguntas sobre necessidades do cliente
+- Tenta fechar a venda
+- Tem um papel ativo de vendas
+
+CRÍTICO: Na tua resposta, NUNCA uses "Speaker A" ou "Speaker B". Sempre refere-te ao vendedor como "o vendedor" e ao cliente como "o cliente". NUNCA combines "vendedor" com "Speaker A/B" - usa APENAS "o vendedor".
 
 REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FORTES:
 
@@ -250,6 +262,8 @@ IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDED
 
 A tua análise deve focar APENAS no desempenho do VENDEDOR identificado.
 
+CRÍTICO: Na tua resposta, NUNCA uses "Speaker A" ou "Speaker B". Sempre refere-te ao vendedor como "o vendedor" e ao cliente como "o cliente". NUNCA combines "vendedor" com "Speaker A/B" - usa APENAS "o vendedor".
+
 REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FRACOS:
 
 1. NÃO consideres como pontos fracos:
@@ -287,7 +301,6 @@ Todas as tuas respostas devem ser exclusivamente em português de Portugal (espe
 É ABSOLUTAMENTE ESSENCIAL que todas as respostas sigam estas regras, sem exceção. Em caso de dúvida, opta sempre pela forma utilizada em Portugal, especificamente em Lisboa.
 
 Estrutura da Resposta:
-Pontos Fracos da Reunião
 
 Falta de Rapport Inicial
 Momento em que a introdução não foi clara, envolvente ou não conseguiu estabelecer conexão com o cliente.
@@ -319,6 +332,7 @@ Instruções Críticas:
 - Escreve sempre em português de Lisboa.
 - Inclui citação direta do transcript para cada ponto fraco, com o timestamp exato.
 - Usa apenas texto simples, sem formatação especial.
+- NÃO incluas títulos como "Pontos Fracos da Reunião" - começa diretamente com os pontos individuais.
 
 Transcrição para análise:
 {transcription}`
@@ -327,6 +341,14 @@ Transcrição para análise:
 export const PONTOS_FRACOS_GS_PROMPT = `Antes de tudo verifica a análise dos pontos fortes que te vou dar, para que não ha descrepancias de informação.
 
 Agora analisa a seguinte transcrição de uma reunião de vendas e identifica os pontos fracos do comercial ao longo da call.
+
+IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDEDOR/COMERCIAL na transcrição. O vendedor é normalmente a pessoa que:
+- Apresenta produtos/serviços
+- Faz perguntas sobre necessidades do cliente
+- Tenta fechar a venda
+- Tem um papel ativo de vendas
+
+CRÍTICO: Na tua resposta, NUNCA uses "Speaker A" ou "Speaker B". Sempre refere-te ao vendedor como "o vendedor" e ao cliente como "o cliente". NUNCA combines "vendedor" com "Speaker A/B" - usa APENAS "o vendedor".
 
 REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FRACOS:
 
@@ -393,6 +415,8 @@ IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDED
 
 A tua análise deve focar APENAS no desempenho do VENDEDOR identificado.
 
+CRÍTICO: Na tua resposta, NUNCA uses "Speaker A" ou "Speaker B". Sempre refere-te ao vendedor como "o vendedor" e ao cliente como "o cliente". NUNCA combines "vendedor" com "Speaker A/B" - usa APENAS "o vendedor".
+
 REGRAS CRÍTICAS PARA AVALIAÇÃO:
 
 1. CONSISTÊNCIA: A mesma transcrição deve sempre receber a mesma avaliação, independentemente do nome do ficheiro.
@@ -448,7 +472,85 @@ INSTRUÇÕES CRÍTICAS:
 Transcrição para análise:
 {transcription}`
 
-// 8. Explicação do Sistema de Pontuação
+// 8. Justificativa da Avaliação por Parâmetro
+export const JUSTIFICATIVA_AVALIACAO_PROMPT = `És um analista de vendas experiente especializado em justificações de pontuação.
+
+IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDEDOR/COMERCIAL na transcrição. O vendedor é normalmente a pessoa que:
+- Apresenta produtos/serviços
+- Faz perguntas sobre necessidades do cliente
+- Tenta fechar a venda
+- Tem um papel ativo de vendas
+
+CRÍTICO: Na tua resposta, NUNCA uses "Speaker A" ou "Speaker B". Sempre refere-te ao vendedor como "o vendedor" e ao cliente como "o cliente". NUNCA combines "vendedor" com "Speaker A/B" - usa APENAS "o vendedor".
+
+A tua tarefa é justificar, com base na transcrição, cada uma das pontuações atribuídas no sistema. Para cada critério avaliado, escreve uma única frase simples e clara que explique a razão da nota dada.
+
+É obrigatório baseares as tuas justificações em evidência específica da transcrição.
+
+REGRAS CRÍTICAS PARA JUSTIFICAÇÃO:
+
+1. CONSISTÊNCIA: A mesma transcrição deve sempre receber a mesma justificação, independentemente do nome do ficheiro.
+
+2. CONTEXTO DE VENDAS: Considera que:
+   - Perguntas como "Porquê de nos terem contactado?" são estratégicas para fazer a lead abrir-se
+   - Linguagem coloquial/informal pode ser apropriada para criar rapport
+   - Validações como "Consegues ver?" são importantes para confirmar compreensão
+   - Partilha de ecrã é uma ferramenta essencial, não um ponto forte
+
+3. JUSTIFICAÇÃO COMPLETA: TODOS os 8 critérios devem ter justificação, mesmo que alguns não sejam muito evidentes na call.
+
+Mantém o estilo objectivo, profissional e escrito exclusivamente em português de Portugal (Lisboa). Evita qualquer termo ou estrutura do português do Brasil.
+
+Não adiciones nenhuma introdução, conclusão ou comentário adicional. Apenas apresenta as justificações dos 8 critérios, pela ordem seguinte:
+
+- Clareza e Fluência da Fala  
+- Tom e Controlo  
+- Envolvimento Conversacional  
+- Efetividade na Descoberta de Necessidades  
+- Entrega de Valor e Ajuste da Solução  
+- Habilidades de Lidar com Objeções  
+- Estrutura e Controle da Reunião  
+- Fechamento e Próximos Passos
+  
+INSTRUÇÕES CRÍTICAS QUE DEVES SEGUIR 100%:  
+- NÃO uses HTML, markdown, caracteres especiais ou emojis.  
+- A explicação de cada ponto deve ser objetiva e ter uma única frase, focada no motivo da pontuação atribuída.  
+- Escreve sempre em português de Lisboa.  
+- Usa apenas texto simples, sem formatação especial.
+
+Estrutura da Resposta:
+
+Clareza e Fluência da Fala
+A comunicação foi clara, mas houve algumas pausas que afetaram a fluidez.
+
+Tom e Controle
+A voz manteve um tom profissional e confiante, mas faltou variação para gerar mais impacto.
+
+Envolvimento Conversacional
+O vendedor fez boas perguntas abertas, mas houve momentos em que interrompeu o cliente.
+
+Efetividade na Descoberta de Necessidades
+Conseguiu identificar as dores do cliente, mas sem aprofundar em detalhes específicos.
+
+Entrega de Valor e Ajuste da Solução
+A solução foi bem apresentada, mas faltaram exemplos concretos para ilustrar o valor.
+
+Habilidades de Lidar com Objeções
+Respondeu às objeções, mas sem explorar mais a fundo as preocupações do cliente.
+
+Estrutura e Controle da Reunião
+A reunião teve um bom fluxo, mas o encerramento foi um pouco abrupto.
+
+Fechamento e Próximos Passos
+Foram definidos os próximos passos, mas sem uma chamada clara para ação.
+
+Transcrição para análise:
+{transcription}
+
+Sistema de pontuação para justificar:
+{scoring}`
+
+// 9. Explicação do Sistema de Pontuação
 export const EXPLICACAO_PONTUACAO_PROMPT = `És um analista de vendas experiente.
 
 Tens à tua disposição:
@@ -617,4 +719,8 @@ export function getJustificacaoGSPrompt(htmlContent: string): string {
 
 export function getTipoCallPrompt(transcription: string): string {
   return formatPrompt(TIPO_CALL_PROMPT, { transcription })
+}
+
+export function getJustificativaAvaliacaoPrompt(transcription: string, scoring: string): string {
+  return formatPrompt(JUSTIFICATIVA_AVALIACAO_PROMPT, { transcription, scoring })
 }

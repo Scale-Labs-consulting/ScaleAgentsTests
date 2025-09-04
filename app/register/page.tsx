@@ -186,11 +186,10 @@ export default function RegisterPage() {
 
               {/* Divider */}
               <div className="relative mb-6">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-white/20" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-black px-2 text-white/50">ou registe-se com email</span>
+                <div className="flex items-center">
+                  <div className="flex-1 border-t border-white/20"></div>
+                  <span className="px-2 text-white text-xs uppercase">Ou registe-se com email</span>
+                  <div className="flex-1 border-t border-white/20"></div>
                 </div>
               </div>
 
@@ -325,13 +324,13 @@ export default function RegisterPage() {
                       required
                     />
                     <Label htmlFor="terms" className="text-sm text-white/70 leading-relaxed text-left">
-                      Concordo com os{' '}
+                      Ao continuar, concordas com os{' '}
                       <Link href="/terms" className="text-purple-400 hover:text-purple-300">
-                        Termos de Serviço
+                        Terms of Service
                       </Link>{' '}
                       e{' '}
                       <Link href="/privacy" className="text-purple-400 hover:text-purple-300">
-                        Política de Privacidade
+                        Privacy Policy
                       </Link>
                     </Label>
                   </div>

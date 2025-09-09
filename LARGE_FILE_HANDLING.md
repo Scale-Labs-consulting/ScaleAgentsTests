@@ -1,40 +1,23 @@
 # Large File Handling Guide
 
-## 📊 **Vercel Blob File Size Limits**
+## 📊 **File Size Policy**
 
-### Current Limits:
-- **Single File**: 500MB maximum
+### Current Policy:
+- **All Plans**: No file size limits
 - **Total Storage**: Unlimited (based on pricing)
 - **Multipart Uploads**: Automatic for files > 100MB
 
-## 🔧 **Solutions for Files > 500MB**
+## 🔧 **File Upload Features**
 
-### **Option 1: File Size Validation (Implemented)**
-✅ **Status**: Already implemented in your application
+### **File Upload Policy**
+✅ **Status**: No file size restrictions for any subscription plan
 
-**Client-side validation** (in `app/sales-analyst/page.tsx`):
-```javascript
-// Check file size limit (500MB for Vercel Blob)
-const maxSize = 500 * 1024 * 1024 // 500MB in bytes
-if (file.size > maxSize) {
-  alert(`Ficheiro demasiado grande: ${(file.size / (1024 * 1024)).toFixed(1)}MB. O tamanho máximo é 500MB.`)
-  return
-}
-```
+**All subscription plans now support:**
+- Files of any size
+- Automatic multipart uploads for large files
+- Optimized processing for better performance
 
-**Server-side validation** (in `app/api/sales-analyst/blob-upload/route.ts`):
-```javascript
-// Validate file size (500MB limit for Vercel Blob)
-const maxSize = 500 * 1024 * 1024 // 500MB in bytes
-if (file.size > maxSize) {
-  return NextResponse.json(
-    { error: `File too large: ${(file.size / (1024 * 1024)).toFixed(1)}MB. Maximum size is 500MB.` },
-    { status: 400 }
-  )
-}
-```
-
-### **Option 2: File Compression (Recommended)**
+### **File Compression (Optional)**
 Compress videos before upload to reduce file size:
 
 ```javascript
@@ -45,31 +28,13 @@ const compressVideo = async (file) => {
 }
 ```
 
-### **Option 3: Chunked Upload (Advanced)**
-Split large files into chunks and reassemble:
+### **Chunked Upload (Automatic)**
+Large files are automatically split into chunks and reassembled:
 
 ```javascript
-// Split file into 500MB chunks
-const chunkSize = 500 * 1024 * 1024
-const chunks = Math.ceil(file.size / chunkSize)
-
-for (let i = 0; i < chunks; i++) {
-  const start = i * chunkSize
-  const end = Math.min(start + chunkSize, file.size)
-  const chunk = file.slice(start, end)
-  
-  // Upload each chunk
-  await uploadChunk(chunk, i, chunks)
-}
+// Automatic multipart uploads for files > 100MB
+// No manual intervention required
 ```
-
-### **Option 4: Alternative Storage (Enterprise)**
-For files > 500MB, consider:
-
-1. **AWS S3 Direct Upload**
-2. **Google Cloud Storage**
-3. **Azure Blob Storage**
-4. **Supabase Storage** (with custom limits)
 
 ## 📈 **File Size Optimization**
 

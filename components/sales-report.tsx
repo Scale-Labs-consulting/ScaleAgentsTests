@@ -185,55 +185,124 @@ export function SalesReport({
     navigator.clipboard.writeText(window.location.href)
   }
 
-  // Extract scores from the analysis
-  const scoringData = analysisResult.scoring
-  console.log('🔍 Scoring data structure:', scoringData)
+  // Extract scores from the analysis - check multiple possible locations
+  console.log('🔍 Full analysis result structure:', analysisResult)
   
-  // Handle different scoring data formats
+  // Try to find scoring data in different possible locations
+  let scoringData = null
   let scores: any = {}
   
-  if (typeof scoringData === 'object' && scoringData !== null) {
-    // If scoring data is an object with individual properties
-    if (scoringData.clareza !== undefined) {
-      scores = {
-        clareza: scoringData.clareza || 0,
-        tom: scoringData.tom || 0,
-        envolvimento: scoringData.envolvimento || 0,
-        descoberta: scoringData.descoberta || 0,
-        entrega: scoringData.entrega || 0,
-        objeções: scoringData.objeções || 0,
-        estrutura: scoringData.estrutura || 0,
-        fechamento: scoringData.fechamento || 0
+  // Debug: Log the entire analysisResult structure
+  console.log('🔍 Full analysisResult structure:', JSON.stringify(analysisResult, null, 2))
+  console.log('🔍 analysisResult.analysis:', analysisResult?.analysis)
+  console.log('🔍 analysisResult.analysis?.analysis:', analysisResult?.analysis?.analysis)
+  console.log('🔍 analysisResult.analysis?.analysis?.analysis:', analysisResult?.analysis?.analysis?.analysis)
+  
+  // Check if scoring data is in the correct structure (analysis.analysis.analysis)
+  if (analysisResult?.analysis?.analysis?.analysis) {
+    const analysisFields = analysisResult.analysis.analysis.analysis
+    console.log('🔍 Found analysis fields (analysis.analysis.analysis):', analysisFields)
+    
+    // Extract individual scores from the analysis fields
+    scores = {
+      clareza: analysisFields.clarezaFluenciaFala || 0,
+      tom: analysisFields.tomControlo || 0,
+      envolvimento: analysisFields.envolvimentoConversacional || 0,
+      descoberta: analysisFields.efetividadeDescobertaNecessidades || 0,
+      entrega: analysisFields.entregaValorAjusteSolucao || 0,
+      objeções: analysisFields.habilidadesLidarObjeccoes || 0,
+      estrutura: analysisFields.estruturaControleReuniao || 0,
+      fechamento: analysisFields.fechamentoProximosPassos || 0
+    }
+    
+    console.log('🔍 Extracted scores from analysis.analysis.analysis:', scores)
+  }
+  // Check if scoring data is in the nested structure (analysis.analysis)
+  else if (analysisResult?.analysis?.analysis) {
+    const analysisFields = analysisResult.analysis.analysis
+    console.log('🔍 Found nested analysis fields:', analysisFields)
+    
+    // Extract individual scores from the analysis fields
+    scores = {
+      clareza: analysisFields.clarezaFluenciaFala || 0,
+      tom: analysisFields.tomControlo || 0,
+      envolvimento: analysisFields.envolvimentoConversacional || 0,
+      descoberta: analysisFields.efetividadeDescobertaNecessidades || 0,
+      entrega: analysisFields.entregaValorAjusteSolucao || 0,
+      objeções: analysisFields.habilidadesLidarObjeccoes || 0,
+      estrutura: analysisFields.estruturaControleReuniao || 0,
+      fechamento: analysisFields.fechamentoProximosPassos || 0
+    }
+    
+    console.log('🔍 Extracted scores from nested analysis fields:', scores)
+  }
+  // Check if scoring data is in the direct analysis structure
+  else if (analysisResult?.analysis) {
+    const analysisFields = analysisResult.analysis
+    console.log('🔍 Found direct analysis fields:', analysisFields)
+    
+    // Extract individual scores from the direct analysis fields
+    scores = {
+      clareza: analysisFields.clarezaFluenciaFala || 0,
+      tom: analysisFields.tomControlo || 0,
+      envolvimento: analysisFields.envolvimentoConversacional || 0,
+      descoberta: analysisFields.efetividadeDescobertaNecessidades || 0,
+      entrega: analysisFields.entregaValorAjusteSolucao || 0,
+      objeções: analysisFields.habilidadesLidarObjeccoes || 0,
+      estrutura: analysisFields.estruturaControleReuniao || 0,
+      fechamento: analysisFields.fechamentoProximosPassos || 0
+    }
+    
+    console.log('🔍 Extracted scores from direct analysis fields:', scores)
+  }
+  // Fallback to old structure
+  else if (analysisResult?.scoring) {
+    scoringData = analysisResult.scoring
+    console.log('🔍 Found scoring data in old structure:', scoringData)
+    
+    if (typeof scoringData === 'object' && scoringData !== null) {
+      // If scoring data is an object with individual properties
+      if (scoringData.clareza !== undefined) {
+        scores = {
+          clareza: scoringData.clareza || 0,
+          tom: scoringData.tom || 0,
+          envolvimento: scoringData.envolvimento || 0,
+          descoberta: scoringData.descoberta || 0,
+          entrega: scoringData.entrega || 0,
+          objeções: scoringData.objeções || 0,
+          estrutura: scoringData.estrutura || 0,
+          fechamento: scoringData.fechamento || 0
+        }
+      } else if (scoringData.raw) {
+        // If scoring data has a raw text property
+        const scoringText = scoringData.raw
+        console.log('🔍 Scoring text from raw:', scoringText)
+        
+        scores = {
+          clareza: extractScore(scoringText, 'Clareza e Fluência da Fala'),
+          tom: extractScore(scoringText, 'Tom e Controlo'),
+          envolvimento: extractScore(scoringText, 'Envolvimento Conversacional'),
+          descoberta: extractScore(scoringText, 'Eficácia na Descoberta de Necessidades'),
+          entrega: extractScore(scoringText, 'Entrega de Valor e Ajuste da Solução'),
+          objeções: extractScore(scoringText, 'Habilidades de Tratamento de Objeções'),
+          estrutura: extractScore(scoringText, 'Estrutura e Controlo da Reunião'),
+          fechamento: extractScore(scoringText, 'Conclusão e Próximos Passos')
+        }
       }
-    } else if (scoringData.raw) {
-      // If scoring data has a raw text property
-      const scoringText = scoringData.raw
-      console.log('🔍 Scoring text from raw:', scoringText)
+    } else if (typeof scoringData === 'string') {
+      // If scoring data is a string
+      console.log('🔍 Scoring text from string:', scoringData)
       
       scores = {
-        clareza: extractScore(scoringText, 'Clareza e Fluência da Fala'),
-        tom: extractScore(scoringText, 'Tom e Controlo'),
-        envolvimento: extractScore(scoringText, 'Envolvimento Conversacional'),
-        descoberta: extractScore(scoringText, 'Eficácia na Descoberta de Necessidades'),
-        entrega: extractScore(scoringText, 'Entrega de Valor e Ajuste da Solução'),
-        objeções: extractScore(scoringText, 'Habilidades de Tratamento de Objeções'),
-        estrutura: extractScore(scoringText, 'Estrutura e Controlo da Reunião'),
-        fechamento: extractScore(scoringText, 'Conclusão e Próximos Passos')
+        clareza: extractScore(scoringData, 'Clareza e Fluência da Fala'),
+        tom: extractScore(scoringData, 'Tom e Controlo'),
+        envolvimento: extractScore(scoringData, 'Envolvimento Conversacional'),
+        descoberta: extractScore(scoringData, 'Eficácia na Descoberta de Necessidades'),
+        entrega: extractScore(scoringData, 'Entrega de Valor e Ajuste da Solução'),
+        objeções: extractScore(scoringData, 'Habilidades de Tratamento de Objeções'),
+        estrutura: extractScore(scoringData, 'Estrutura e Controlo da Reunião'),
+        fechamento: extractScore(scoringData, 'Conclusão e Próximos Passos')
       }
-    }
-  } else if (typeof scoringData === 'string') {
-    // If scoring data is a string
-    console.log('🔍 Scoring text from string:', scoringData)
-    
-    scores = {
-      clareza: extractScore(scoringData, 'Clareza e Fluência da Fala'),
-      tom: extractScore(scoringData, 'Tom e Controlo'),
-      envolvimento: extractScore(scoringData, 'Envolvimento Conversacional'),
-      descoberta: extractScore(scoringData, 'Eficácia na Descoberta de Necessidades'),
-      entrega: extractScore(scoringData, 'Entrega de Valor e Ajuste da Solução'),
-      objeções: extractScore(scoringData, 'Habilidades de Tratamento de Objeções'),
-      estrutura: extractScore(scoringData, 'Estrutura e Controlo da Reunião'),
-      fechamento: extractScore(scoringData, 'Conclusão e Próximos Passos')
     }
   }
   
@@ -249,9 +318,23 @@ export function SalesReport({
     }
   })
   
-  // Extract total score
-  const scoringText = typeof scoringData === 'string' ? scoringData : scoringData?.raw || ''
-  const totalScore = extractTotalScore(scoringText)
+  // Extract total score - try multiple sources
+  let totalScore = 0
+  if (analysisResult?.score) {
+    totalScore = analysisResult.score
+  } else if (analysisResult?.analysis?.score) {
+    totalScore = analysisResult.analysis.score
+  } else if (analysisResult?.analysis?.analysis?.score) {
+    totalScore = analysisResult.analysis.analysis.score
+  } else if (analysisResult?.analysis?.analysis?.analysis?.score) {
+    totalScore = analysisResult.analysis.analysis.analysis.score
+  } else {
+    // Fallback to extracting from scoring text
+    const scoringText = typeof scoringData === 'string' ? scoringData : scoringData?.raw || ''
+    totalScore = extractTotalScore(scoringText)
+  }
+  
+  console.log('🔍 Total score extracted:', totalScore)
   
   console.log('🔍 Final extracted scores:', scores)
 
@@ -341,9 +424,24 @@ export function SalesReport({
               </CardHeader>
               <CardContent>
                 <div className="flex items-center space-x-3">
-                  {getCallTypeIcon(analysisResult.callType)}
+                  {(() => {
+                    const callType = analysisResult?.callType || analysisResult?.analysis?.callType || analysisResult?.analysis?.analysis?.tipoCall || analysisResult?.analysis?.call_type || analysisResult?.analysis?.analysis?.call_type
+                    console.log('🔍 Call type debug:', {
+                      callType,
+                      'analysisResult?.callType': analysisResult?.callType,
+                      'analysisResult?.analysis?.callType': analysisResult?.analysis?.callType,
+                      'analysisResult?.analysis?.analysis?.tipoCall': analysisResult?.analysis?.analysis?.tipoCall,
+                      'analysisResult?.analysis?.call_type': analysisResult?.analysis?.call_type,
+                      'analysisResult?.analysis?.analysis?.call_type': analysisResult?.analysis?.analysis?.call_type
+                    })
+                    return getCallTypeIcon(callType)
+                  })()}
                   <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
-                    {getCallTypeLabel(analysisResult.callType)}
+                    {(() => {
+                      const callType = analysisResult?.callType || analysisResult?.analysis?.callType || analysisResult?.analysis?.analysis?.tipoCall || analysisResult?.analysis?.call_type || analysisResult?.analysis?.analysis?.call_type
+                      console.log('🔍 Call type for label:', callType)
+                      return getCallTypeLabel(callType)
+                    })()}
                   </Badge>
                 </div>
               </CardContent>
@@ -361,9 +459,9 @@ export function SalesReport({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {analysisResult.analysis?.strengths ? (
+                {(analysisResult.analysis?.strengths || analysisResult.analysis?.analysis?.pontosFortes || analysisResult.analysis?.analysis?.analysis?.pontosFortes) ? (
                   <div className="space-y-4">
-                    {Array.isArray(analysisResult.analysis.strengths) ? (
+                    {Array.isArray(analysisResult.analysis?.strengths) ? (
                       <div className="space-y-3">
                         {analysisResult.analysis.strengths.map((strength: any, index: number) => (
                           <div key={index} className="bg-white/5 p-3 rounded-lg border border-white/10">
@@ -390,7 +488,7 @@ export function SalesReport({
                       </div>
                     ) : (
                       <div className="prose prose-invert max-w-none">
-                        <MarkdownRenderer content={String(analysisResult.analysis.strengths)} />
+                        <MarkdownRenderer content={String(analysisResult.analysis?.strengths || analysisResult.analysis?.analysis?.pontosFortes || analysisResult.analysis?.analysis?.analysis?.pontosFortes || '')} />
                       </div>
                     )}
                   </div>
@@ -412,9 +510,9 @@ export function SalesReport({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {analysisResult.analysis?.improvements ? (
+                {(analysisResult.analysis?.improvements || analysisResult.analysis?.analysis?.pontosFracos || analysisResult.analysis?.analysis?.analysis?.pontosFracos) ? (
                   <div className="space-y-4">
-                    {Array.isArray(analysisResult.analysis.improvements) ? (
+                    {Array.isArray(analysisResult.analysis?.improvements) ? (
                       <div className="space-y-3">
                         {analysisResult.analysis.improvements.map((improvement: any, index: number) => (
                           <div key={index} className="bg-white/5 p-3 rounded-lg border border-white/10">
@@ -441,7 +539,7 @@ export function SalesReport({
                       </div>
                     ) : (
                       <div className="prose prose-invert max-w-none">
-                        <MarkdownRenderer content={String(analysisResult.analysis.improvements)} />
+                        <MarkdownRenderer content={String(analysisResult.analysis?.improvements || analysisResult.analysis?.analysis?.pontosFracos || analysisResult.analysis?.analysis?.analysis?.pontosFracos || '')} />
                       </div>
                     )}
                   </div>
@@ -726,6 +824,44 @@ export function SalesReport({
                     <span className={getTotalScoreColor(totalScore)}>{totalScore}/40</span>
                   </Badge>
                 </div>
+                
+                {/* Scoring Justifications */}
+                {analysisResult.scoringJustifications && (
+                  <>
+                    <Separator className="my-4" />
+                    <div className="space-y-3">
+                      <h4 className="text-white font-semibold text-sm mb-3">Explicações das Pontuações:</h4>
+                      <div className="space-y-3 text-white/80 text-sm">
+                        {analysisResult.scoringJustifications.split('\n').map((line: string, index: number) => {
+                          if (line.trim()) {
+                            const content = line.trim()
+                            // Split criterion name and explanation
+                            const colonIndex = content.indexOf(':')
+                            if (colonIndex > -1) {
+                              const criterion = content.substring(0, colonIndex).trim()
+                              const explanation = content.substring(colonIndex + 1).trim()
+                              return (
+                                <div key={index} className="space-y-1">
+                                  <div className="text-blue-400 font-medium text-sm">{criterion}:</div>
+                                  <div className="text-white/90 text-sm leading-relaxed ml-2">{explanation}</div>
+                                </div>
+                              )
+                            } else {
+                              // Fallback if no colon found
+                              return (
+                                <div key={index} className="flex items-start space-x-2">
+                                  <span className="text-blue-400 mt-1 text-xs">•</span>
+                                  <span className="text-white/90 text-sm leading-relaxed">{content}</span>
+                                </div>
+                              )
+                            }
+                          }
+                          return null
+                        }).filter(Boolean)}
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -734,20 +870,20 @@ export function SalesReport({
         {activeTab === 'detailed' && (
           <div className="space-y-6">
             {/* Call Type Analysis */}
-            {analysisResult.callType && (
+            {(analysisResult?.callType || analysisResult?.analysis?.callType || analysisResult?.analysis?.analysis?.tipoCall || analysisResult?.analysis?.call_type || analysisResult?.analysis?.analysis?.call_type) && (
               <Card className="bg-white/10 border-white/20 backdrop-blur-md">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
-                    {getCallTypeIcon(analysisResult.callType)}
+                    {getCallTypeIcon(analysisResult?.callType || analysisResult?.analysis?.callType || analysisResult?.analysis?.analysis?.tipoCall || analysisResult?.analysis?.call_type || analysisResult?.analysis?.analysis?.call_type)}
                     <span>Call Classification</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="p-4 bg-white/5 rounded-lg border border-purple-500/30">
                     <p className="text-white/90">
-                      This call was classified as a <strong>{getCallTypeLabel(analysisResult.callType)}</strong>. 
-                      This type of call typically focuses on {analysisResult.callType === '1' ? 'discovering customer needs and understanding their context' : 
-                      analysisResult.callType === '2' ? 'following up on previous interactions and presenting solutions' : 
+                      This call was classified as a <strong>{getCallTypeLabel(analysisResult?.callType || analysisResult?.analysis?.callType || analysisResult?.analysis?.analysis?.tipoCall || analysisResult?.analysis?.call_type || analysisResult?.analysis?.analysis?.call_type)}</strong>. 
+                      This type of call typically focuses on {(analysisResult?.callType || analysisResult?.analysis?.callType || analysisResult?.analysis?.analysis?.tipoCall || analysisResult?.analysis?.call_type || analysisResult?.analysis?.analysis?.call_type) === '1' ? 'discovering customer needs and understanding their context' : 
+                      (analysisResult?.callType || analysisResult?.analysis?.callType || analysisResult?.analysis?.analysis?.tipoCall || analysisResult?.analysis?.call_type || analysisResult?.analysis?.analysis?.call_type) === '2' ? 'following up on previous interactions and presenting solutions' : 
                       'addressing specific questions and concerns about the product or service'}.
                     </p>
                   </div>
@@ -758,7 +894,7 @@ export function SalesReport({
 
 
             {/* Detailed Scoring */}
-            {analysisResult.scoring && (
+            {(analysisResult.scoring || analysisResult.analysis?.analysis?.explicacaoPontuacao) && (
               <Card className="bg-white/10 border-white/20 backdrop-blur-md">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -769,7 +905,7 @@ export function SalesReport({
                 <CardContent>
                   <div className="p-4 bg-white/5 rounded-lg border border-yellow-500/30">
                     <p className="text-white/90 text-sm whitespace-pre-wrap">
-                      {renderAnalysisField(analysisResult.scoring)}
+                      {renderAnalysisField(analysisResult.scoring || analysisResult.analysis?.analysis?.explicacaoPontuacao || '')}
                     </p>
                   </div>
                 </CardContent>

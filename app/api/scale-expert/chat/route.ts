@@ -128,7 +128,7 @@ Use Portuguese when appropriate, as the user interface is in Portuguese.`
     const assistant = await openai.beta.assistants.create({
       name: assistantName,
       instructions: assistantInstructions,
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       tools: tools,
       file_ids: [] // Enable file attachments
     })

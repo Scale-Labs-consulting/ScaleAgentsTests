@@ -79,53 +79,12 @@ export async function POST(request: Request): Promise<NextResponse> {
             }
           )
 
-          // Create database record
-          const salesCallData = {
-            user_id: userId,
-            agent_id: null, // Will be set when agent is created
-            title: (originalFileName || blob.pathname).replace(/\.[^/.]+$/, ''),
-            file_url: blob.url,
-            file_size: 0, // Size will be updated after upload
-            duration_seconds: 0,
-            status: 'uploaded',
-            metadata: {
-              isConverted: false,
-              originalFileName: originalFileName || blob.pathname,
-              fileType: blob.contentType,
-              blobPath: blob.pathname,
-              conversionInfo: null
-            }
-          }
 
-          console.log('📝 Creating database record:', salesCallData)
-
-          const { data: salesCall, error: dbError } = await supabase
-            .from('sales_calls')
-            .insert(salesCallData)
-            .select()
-            .single()
-
-          if (dbError) {
-            console.error('❌ Database error:', dbError)
-            throw new Error('Failed to create database record')
-          }
-
-          console.log('✅ Database record created:', salesCall.id)
-
-          // Store the sales call ID in the database for later retrieval
-          try {
-            await supabase
-              .from('sales_calls')
-              .update({ 
-                blob_url: blob.url,
-                blob_path: blob.pathname 
-              })
-              .eq('id', salesCall.id)
-            console.log('✅ Sales call record updated with blob information')
-          } catch (metadataError) {
-            console.warn('⚠️ Could not update sales call record:', metadataError)
-            // This is not critical, continue with the upload
-          }
+          // File uploaded successfully - no database record needed here
+          // The analysis record will be created in the blob-transcribe route
+          console.log('✅ File uploaded successfully to blob storage')
+          console.log('📁 File URL:', blob.url)
+          console.log('📁 Original filename:', originalFileName || blob.pathname)
 
         } catch (error) {
           console.error('❌ Error in onUploadCompleted:', error)

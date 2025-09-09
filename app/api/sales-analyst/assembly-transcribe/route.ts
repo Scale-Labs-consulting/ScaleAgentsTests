@@ -159,7 +159,7 @@ IMPORTANTE:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -234,7 +234,7 @@ IMPORTANTE:
       }
     )
 
-    // Generate content hash for deduplication
+    // Generate content hash for metadata (but don't use for duplicate detection)
     const encoder = new TextEncoder()
     const data = encoder.encode(truncatedTranscription)
     const hashBuffer = await crypto.subtle.digest('SHA-256', data)
@@ -242,42 +242,7 @@ IMPORTANTE:
     const contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
     
     console.log('🔐 Generated content hash:', contentHash.substring(0, 16) + '...')
-    
-    // Check if we already have an analysis with this exact content
-    const { data: existingAnalysis, error: duplicateCheckError } = await supabase
-      .from('sales_call_analyses')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('analysis_metadata->>content_hash', contentHash)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    
-    if (duplicateCheckError && duplicateCheckError.code !== 'PGRST116') {
-      console.warn('⚠️ Error checking for duplicates:', duplicateCheckError)
-    }
-    
-    if (existingAnalysis) {
-      console.log('🔄 Duplicate content detected!')
-      console.log('📊 Existing analysis ID:', existingAnalysis.id)
-      console.log('📅 Created at:', existingAnalysis.created_at)
-      console.log('📝 Title:', existingAnalysis.title)
-      
-      // Return the existing analysis instead of creating a new one
-      return NextResponse.json({
-        success: true,
-        analysis: existingAnalysis.analysis,
-        analysisId: existingAnalysis.id,
-        message: 'Duplicate content detected - returning existing analysis',
-        isDuplicate: true,
-        duplicateInfo: {
-          originalId: existingAnalysis.id,
-          originalTitle: existingAnalysis.title,
-          originalDate: existingAnalysis.created_at,
-          contentHash: contentHash.substring(0, 16) + '...'
-        }
-      })
-    }
+    console.log('🔄 Creating new analysis (duplicate detection disabled)...')
     
     console.log('✅ No duplicate content found, proceeding with new analysis...')
 

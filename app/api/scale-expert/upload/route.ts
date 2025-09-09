@@ -75,21 +75,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate file size (100MB limit for documents, 500MB for audio/video)
-    const isAudioVideo = file.type.startsWith('audio/') || file.type.startsWith('video/')
-    const maxSize = isAudioVideo ? 500 * 1024 * 1024 : 100 * 1024 * 1024 // 500MB for audio/video, 100MB for documents
-    
-    if (file.size > maxSize) {
-      console.log('❌ File size too large:', { 
-        fileSize: file.size, 
-        maxSize: maxSize, 
-        isAudioVideo: isAudioVideo 
-      })
-      return NextResponse.json(
-        { error: `File size too large. Maximum size is ${isAudioVideo ? '500MB' : '100MB'} for ${isAudioVideo ? 'audio/video' : 'document'} files.` },
-        { status: 400 }
-      )
-    }
+    // File size validation removed - all plans can upload any file size
 
     console.log('📁 Processing file:', { 
       name: file.name, 

@@ -130,6 +130,8 @@ export async function DELETE(
     }
 
     // Delete the analysis
+    console.log(`🗑️ Attempting to delete analysis ${analysisId} for user ${user.id}`)
+    
     const { error: deleteError } = await supabase
       .from('sales_call_analyses')
       .delete()
@@ -145,6 +147,23 @@ export async function DELETE(
     }
 
     console.log(`✅ Analysis ${analysisId} deleted successfully for user ${user.id}`)
+    
+    // Analysis deleted successfully
+    
+    // Verify deletion by trying to fetch the analysis
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('sales_call_analyses')
+      .select('id')
+      .eq('id', analysisId)
+      .single()
+    
+    if (verifyError && verifyError.code === 'PGRST116') {
+      console.log(`✅ Deletion verified: Analysis ${analysisId} no longer exists`)
+    } else if (verifyData) {
+      console.error(`❌ Deletion failed: Analysis ${analysisId} still exists`)
+    } else {
+      console.log(`⚠️ Could not verify deletion: ${verifyError?.message}`)
+    }
 
     return NextResponse.json({
       success: true,

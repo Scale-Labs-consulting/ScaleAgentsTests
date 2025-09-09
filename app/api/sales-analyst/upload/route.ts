@@ -147,10 +147,7 @@ export async function POST(request: NextRequest) {
       console.log('\n' + '='.repeat(80))
       console.log('🎯 FULL TRANSCRIPTION RESULT')
       console.log('='.repeat(80))
-      console.log('📝 TRANSCRIPTION:')
-      console.log('-'.repeat(80))
-      console.log(transcription)
-      console.log('-'.repeat(80))
+      // Transcription preview removed for cleaner logs
       console.log('📊 TRANSCRIPTION SUMMARY:')
       console.log(`• Total characters: ${transcription.length}`)
       console.log(`• Total words: ${transcription.split(' ').length}`)
@@ -595,11 +592,7 @@ async function processAudioFile(audioPath: string): Promise<string> {
         }
         
         console.log('📊 Speaker mapping:', Object.fromEntries(speakerMap))
-        console.log('📝 Final transcription format preview (first 3 lines):')
-        const lines = transcription.trim().split('\n')
-        lines.slice(0, 3).forEach((line, index) => {
-          console.log(`  ${index + 1}. ${line}`)
-        })
+        // Final transcription format preview removed for cleaner logs
         if (lines.length > 3) {
           console.log(`  ... and ${lines.length - 3} more lines`)
         }

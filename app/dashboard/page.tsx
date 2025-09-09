@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('overview')
   const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState('scale-expert')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -71,7 +72,22 @@ export default function DashboardPage() {
   const [salesUploadProgress, setSalesUploadProgress] = useState(0)
   const [salesUploadStatus, setSalesUploadStatus] = useState('')
   const [salesAnalysisResult, setSalesAnalysisResult] = useState<any>(null)
+  const [isFileSelectionInProgress, setIsFileSelectionInProgress] = useState(false)
   const [salesIsAnalyzing, setSalesIsAnalyzing] = useState(false)
+  
+  // AbortController for cancelling upload operations
+  const salesAbortControllerRef = useRef<AbortController | null>(null)
+  
+  // Cleanup effect to abort operations when component unmounts
+  useEffect(() => {
+    return () => {
+      if (salesAbortControllerRef.current) {
+        console.log('🧹 Cleaning up sales upload operations on unmount')
+        salesAbortControllerRef.current.abort()
+        salesAbortControllerRef.current = null
+      }
+    }
+  }, [])
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -103,6 +119,15 @@ export default function DashboardPage() {
   const [salesCalls, setSalesCalls] = useState<any[]>([])
   const [selectedCall, setSelectedCall] = useState<any>(null)
   const salesFileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Enhanced upload states
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [filePreview, setFilePreview] = useState<string | null>(null)
+  
+  // Subscription states
+  const [subscription, setSubscription] = useState<any>(null)
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false)
   
   // Analysis list states
   const [analyses, setAnalyses] = useState<any[]>([])
@@ -191,29 +216,140 @@ export default function DashboardPage() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
-  const handleSalesFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+  // Enhanced file validation
+  const validateFile = (file: File): string | null => {
+    // Check file type
+    if (!file.type.startsWith('video/')) {
+      return 'Por favor, carregue um ficheiro de vídeo (MP4, MOV, AVI, etc.)'
+    }
+    
+    // File size validation removed - all plans can upload any file size
+    
+    return null
+  }
 
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) {
+      handleFileSelection(files[0])
+      // Reset the file input after drag and drop
+      if (salesFileInputRef.current) {
+        salesFileInputRef.current.value = ''
+      }
+    }
+  }
+
+  // Subscription management functions
+  const loadSubscription = async () => {
+    if (!user) return
+    
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_status, subscription_plan, subscription_current_period_end, stripe_customer_id')
+        .eq('id', user.id)
+        .single()
+      
+      if (profile) {
+        setSubscription(profile)
+      }
+    } catch (error) {
+      console.error('Error loading subscription:', error)
+    }
+  }
+
+  const openCustomerPortal = async () => {
+    if (!user) return
+    
+    setSubscriptionLoading(true)
+    try {
+      const response = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      })
+      
+      const { url } = await response.json()
+      if (url) {
+        window.location.href = url
+      }
+    } catch (error) {
+      console.error('Error opening customer portal:', error)
+      toast({
+        title: "Erro",
+        description: "Erro ao abrir o portal do cliente. Tente novamente.",
+        variant: "destructive"
+      })
+    } finally {
+      setSubscriptionLoading(false)
+    }
+  }
+
+  // Handle file selection (from input or drag & drop)
+  const handleFileSelection = async (file: File) => {
+    console.log('🎯 handleFileSelection called with file:', file.name, file.size, file.type)
+    
+    // Prevent multiple simultaneous file selections
+    if (isFileSelectionInProgress) {
+      console.log('⚠️ File selection already in progress, ignoring duplicate call')
+      return
+    }
+    
+    setIsFileSelectionInProgress(true)
+    console.log('🔒 File selection locked')
+    
+    // Clear previous errors
+    setUploadError(null)
+    
     // Simple authentication check
     if (!user || !user.id) {
+      console.log('❌ No user found, redirecting to login')
       toast({
         title: "Erro",
         description: 'Por favor, faça login para continuar.',
         variant: "destructive"
       })
       router.push('/login')
+      setIsFileSelectionInProgress(false)
+      console.log('🔓 File selection unlocked (auth error)')
       return
     }
 
-    // Validate file type
-    if (!file.type.startsWith('video/')) {
+    // Validate file
+    const validationError = validateFile(file)
+    if (validationError) {
+      console.log('❌ File validation failed:', validationError)
+      setUploadError(validationError)
       toast({
         title: "Erro",
-        description: 'Por favor, carregue um ficheiro de vídeo',
+        description: validationError,
         variant: "destructive"
       })
+      setIsFileSelectionInProgress(false)
+      console.log('🔓 File selection unlocked (validation error)')
       return
+    }
+
+    console.log('✅ File validation passed, setting up upload...')
+
+    // Create file preview
+    if (file.type.startsWith('video/')) {
+      const url = URL.createObjectURL(file)
+      setFilePreview(url)
     }
 
     setSalesUploadedFile(file)
@@ -221,6 +357,10 @@ export default function DashboardPage() {
     setSalesUploadProgress(0)
     setSalesUploadStatus('A preparar o carregamento...')
     setSalesAnalysisResult(null)
+    
+    console.log('📁 File state set, starting upload process...')
+    console.log('📁 Current salesUploadedFile state:', file.name)
+    console.log('📁 Current salesIsUploading state:', true)
 
     await fetch('/api/log', {
       method: 'POST',
@@ -274,6 +414,17 @@ export default function DashboardPage() {
       await uploadSalesFileClientSide(file, accessToken)
     
     } catch (error) {
+      // Check if this was a cancellation
+      if (error instanceof Error && error.message === 'Operation cancelled') {
+        console.log('🚫 Upload cancelled by user')
+        setSalesUploadStatus('Upload cancelado')
+        setSalesIsUploading(false)
+        setSalesUploadProgress(0)
+        
+        // Don't show error toast for cancellation
+        return
+      }
+      
       console.error('❌ Upload error:', error)
       await fetch('/api/log', {
         method: 'POST',
@@ -288,12 +439,24 @@ export default function DashboardPage() {
       setSalesIsUploading(false)
       setSalesUploadProgress(0)
       
+      // Reset file input on error
+      if (salesFileInputRef.current) {
+        salesFileInputRef.current.value = ''
+      }
+      
       // Show error to user
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : 'Erro no carregamento. Por favor, tente novamente.',
         variant: "destructive"
       })
+    } finally {
+      // Always release the file selection lock and reset file input
+      setIsFileSelectionInProgress(false)
+      if (salesFileInputRef.current) {
+        salesFileInputRef.current.value = ''
+      }
+      console.log('🔓 File selection unlocked and input reset')
     }
   }
 
@@ -350,6 +513,17 @@ export default function DashboardPage() {
       await uploadSalesFileClientSide(salesUploadedFile, accessToken)
     
     } catch (error) {
+      // Check if this was a cancellation
+      if (error instanceof Error && error.message === 'Operation cancelled') {
+        console.log('🚫 Upload cancelled by user')
+        setSalesUploadStatus('Upload cancelado')
+        setSalesIsUploading(false)
+        setSalesUploadProgress(0)
+        
+        // Don't show error toast for cancellation
+        return
+      }
+      
       console.error('❌ Upload error:', error)
       await fetch('/api/log', {
         method: 'POST',
@@ -373,7 +547,49 @@ export default function DashboardPage() {
     }
   }
 
+  // Function to cancel sales analyst upload and reset to initial state
+  const cancelSalesUpload = () => {
+    console.log('🚫 Cancelling sales analyst upload...')
+    
+    // Abort ongoing operations
+    if (salesAbortControllerRef.current) {
+      console.log('🛑 Aborting ongoing operations...')
+      salesAbortControllerRef.current.abort()
+      salesAbortControllerRef.current = null
+    }
+    
+    // Reset all sales analyst states
+    setSalesUploadedFile(null)
+    setSalesIsUploading(false)
+    setSalesUploadProgress(0)
+    setSalesUploadStatus('')
+    setSalesAnalysisResult(null)
+    setUploadError(null)
+    setFilePreview(null)
+    
+    // Clear file input
+    if (salesFileInputRef.current) {
+      salesFileInputRef.current.value = ''
+    }
+    
+    // Log the cancellation
+    fetch('/api/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        message: '🚫 Sales Analyst upload cancelled by user',
+        data: { userId: user?.id }
+      })
+    }).catch(console.error)
+    
+    console.log('✅ Sales analyst reset to initial state')
+  }
+
   const uploadSalesFileClientSide = async (file: File, accessToken: string) => {
+    // Create new AbortController for this upload operation
+    const abortController = new AbortController()
+    salesAbortControllerRef.current = abortController
+    
     try {
       // Check if we should convert video to audio
       let fileToUpload = file
@@ -383,6 +599,11 @@ export default function DashboardPage() {
         try {
           setSalesUploadStatus('A converter vídeo para áudio...')
           setSalesUploadProgress(5)
+          
+          // Check if operation was cancelled
+          if (abortController.signal.aborted) {
+            throw new Error('Operation cancelled')
+          }
           
           console.log('🎵 Converting video to audio for better processing...')
           fileToUpload = await convertVideoToAudio(file)
@@ -396,6 +617,9 @@ export default function DashboardPage() {
           
           setSalesUploadProgress(15)
         } catch (error) {
+          if (abortController.signal.aborted) {
+            throw new Error('Operation cancelled')
+          }
           console.error('❌ Video conversion failed:', error)
           toast({
             title: "Erro na conversão",
@@ -420,6 +644,11 @@ export default function DashboardPage() {
       // Step 1: Upload to Vercel Blob using client upload
       setSalesUploadStatus('A fazer upload para Vercel Blob...')
       setSalesUploadProgress(20)
+
+      // Check if operation was cancelled
+      if (abortController.signal.aborted) {
+        throw new Error('Operation cancelled')
+      }
 
       // Import the upload function from @vercel/blob/client
       const { upload } = await import('@vercel/blob/client')
@@ -449,6 +678,11 @@ export default function DashboardPage() {
       setSalesUploadStatus('A processar vídeo e iniciar transcrição...')
       setSalesUploadProgress(60)
 
+      // Check if operation was cancelled
+      if (abortController.signal.aborted) {
+        throw new Error('Operation cancelled')
+      }
+
       try {
         const transcriptionResponse = await fetch('/api/sales-analyst/blob-transcribe', {
           method: 'POST',
@@ -461,7 +695,8 @@ export default function DashboardPage() {
             userId: user!.id,
             accessToken: accessToken,
             salesCallId: tempSalesCallId
-          })
+          }),
+          signal: abortController.signal // Add abort signal to the fetch request
         })
 
         if (!transcriptionResponse.ok) {
@@ -485,7 +720,7 @@ export default function DashboardPage() {
 
         // Show appropriate status message
         if (result.duplicateInfo) {
-          setSalesUploadStatus('Análise concluída! (Conteúdo duplicado detectado, mas nova análise criada)')
+          setSalesUploadStatus('Análise existente encontrada! (Conteúdo duplicado detectado)')
         } else {
           setSalesUploadStatus('Análise concluída com sucesso!')
         }
@@ -497,8 +732,8 @@ export default function DashboardPage() {
         // Show toast with duplicate info if applicable
         if (result.duplicateInfo) {
           toast({
-            title: "Análise Concluída",
-            description: "Conteúdo duplicado detectado, mas nova análise foi criada com sucesso",
+            title: "Análise Existente Encontrada",
+            description: "Este conteúdo já foi analisado anteriormente. Exibindo análise existente.",
             variant: "default"
           })
         }
@@ -512,10 +747,18 @@ export default function DashboardPage() {
         }, 3000)
         
       } catch (error) {
+        if (abortController.signal.aborted) {
+          console.log('🚫 Transcription cancelled by user')
+          throw new Error('Operation cancelled')
+        }
         console.error('❌ Transcription error:', error)
         throw error
       }
     } catch (error) {
+      if (abortController.signal.aborted) {
+        console.log('🚫 Upload cancelled by user')
+        throw new Error('Operation cancelled')
+      }
       console.error('❌ Vercel Blob upload error:', error)
       await fetch('/api/log', {
         method: 'POST',
@@ -526,32 +769,45 @@ export default function DashboardPage() {
         })
       })
       throw error
+    } finally {
+      // Clear the abort controller reference
+      if (salesAbortControllerRef.current === abortController) {
+        salesAbortControllerRef.current = null
+      }
     }
   }
 
   // Fetch analyses for the sales analyst
   const fetchAnalyses = async () => {
-    if (!user) return
+    if (!user) {
+      console.log('❌ No user found, skipping fetchAnalyses')
+      return
+    }
+    
+    console.log('🔍 Fetching analyses for user:', user.id)
     
     try {
       setLoadingAnalyses(true)
       const response = await fetch(`/api/sales-analyst/analyses?userId=${user.id}`)
       const result = await response.json()
       
+      console.log('📊 Fetch analyses response:', result)
+      console.log('📊 Number of analyses found:', result.analyses?.length || 0)
+      
       if (result.success) {
         // Transform Supabase data to match our interface
         const transformedAnalyses = result.analyses.map((analysis: any) => {
-          // Generate a better title
-          let displayTitle = 'Análise'
+          console.log('📝 Processing analysis:', analysis.id, 'Title:', analysis.title)
           
-          if (analysis.title && analysis.title.trim()) {
-            displayTitle = `Análise ${analysis.title}`
-          } else {
-            // Try to extract filename from analysis metadata or use ID as fallback
+          // Use the title as-is, since it's already properly formatted
+          let displayTitle = analysis.title || 'Análise'
+          
+          // If no title, try to extract filename from analysis metadata or use ID as fallback
+          if (!displayTitle || displayTitle.trim() === 'Análise') {
             const metadata = analysis.analysis_metadata || {}
-            const originalFileName = metadata.original_file_name || analysis.title
+            const originalFileName = metadata.original_file_name
             if (originalFileName && originalFileName.trim()) {
-              displayTitle = `Análise ${originalFileName}`
+              displayTitle = originalFileName.replace(/\.[^/.]+$/, '') // Remove file extension
             } else {
               displayTitle = `Análise ${analysis.id.slice(0, 8)}`
             }
@@ -569,6 +825,7 @@ export default function DashboardPage() {
           }
         })
         
+        console.log('✅ Transformed analyses:', transformedAnalyses.length)
         setAnalyses(transformedAnalyses)
       } else {
         console.error('Failed to fetch analyses:', result.error)
@@ -596,6 +853,40 @@ export default function DashboardPage() {
       router.push('/login')
     }
   }, [user, initialized, router])
+
+  // Load subscription data when user is available
+  useEffect(() => {
+    if (user) {
+      loadSubscription()
+    }
+  }, [user])
+
+  // Handle success/cancel messages from Stripe checkout
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const success = urlParams.get('success')
+      const canceled = urlParams.get('canceled')
+      
+      if (success === 'true') {
+        toast({
+          title: "Pagamento realizado com sucesso!",
+          description: "A sua subscrição foi ativada. Bem-vindo!",
+          variant: "default"
+        })
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname)
+      } else if (canceled === 'true') {
+        toast({
+          title: "Pagamento cancelado",
+          description: "O pagamento foi cancelado. Pode tentar novamente quando quiser.",
+          variant: "destructive"
+        })
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname)
+      }
+    }
+  }, [])
 
   // Handle agent selection from URL query parameter
   useEffect(() => {
@@ -1388,7 +1679,7 @@ export default function DashboardPage() {
         
         // Show success message with duplicate info if applicable
         const message = result.duplicateInfo 
-          ? `Ficheiro carregado e transcrito com sucesso (conteúdo duplicado detectado, mas nova análise criada)`
+          ? `Ficheiro carregado e transcrito com sucesso (análise existente encontrada)`
           : "Ficheiro carregado e transcrito com sucesso"
         
         toast({
@@ -1701,7 +1992,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Scrollable Content */}
-            {!sidebarCollapsed && (
+            {!sidebarCollapsed && selectedAgent !== 'sales-analyst' && (
               <div className="flex-1 overflow-y-auto mt-6">
                 {/* Past Chats Section */}
                 <div className="px-4 pb-2">
@@ -1748,8 +2039,8 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Spacer to push profile to bottom when collapsed */}
-            {sidebarCollapsed && <div className="flex-1"></div>}
+            {/* Spacer to push profile to bottom when collapsed or when Sales Analyst is active */}
+            {(sidebarCollapsed || selectedAgent === 'sales-analyst') && <div className="flex-1"></div>}
 
             {/* User Profile - Fixed at Bottom */}
             <div className="p-3 border-t border-white/10 flex-shrink-0">
@@ -1944,15 +2235,61 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Upgrade Section */}
-                  <div className="flex items-center justify-between mb-4 p-3 bg-white/5 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <Crown className="w-4 h-4 text-yellow-400" />
-                      <span className="text-white text-sm">Tornar Pro</span>
+                  {/* Subscription Section */}
+                  <div className="mb-4 p-3 bg-white/5 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <Crown className="w-4 h-4 text-yellow-400" />
+                        <span className="text-white text-sm font-medium">
+                          {subscription?.subscription_plan ? 
+                            `Plano ${subscription.subscription_plan.charAt(0).toUpperCase() + subscription.subscription_plan.slice(1)}` : 
+                            'Plano Gratuito'
+                          }
+                        </span>
+                      </div>
+                      <div className={`px-2 py-1 rounded-full text-xs ${
+                        subscription?.subscription_status === 'active' ? 'bg-green-500/20 text-green-400' :
+                        subscription?.subscription_status === 'past_due' ? 'bg-yellow-500/20 text-yellow-400' :
+                        subscription?.subscription_status === 'canceled' ? 'bg-red-500/20 text-red-400' :
+                        'bg-gray-500/20 text-gray-400'
+                      }`}>
+                        {subscription?.subscription_status === 'active' ? 'Ativo' :
+                         subscription?.subscription_status === 'past_due' ? 'Em Atraso' :
+                         subscription?.subscription_status === 'canceled' ? 'Cancelado' :
+                         'Gratuito'}
+                      </div>
                     </div>
-                    <Button size="sm" className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-xs">
-                      Atualizar
-                    </Button>
+                    
+                    {subscription?.subscription_current_period_end && (
+                      <p className="text-white/60 text-xs mb-2">
+                        Renova em: {new Date(subscription.subscription_current_period_end).toLocaleDateString('pt-PT')}
+                      </p>
+                    )}
+                    
+                    <div className="flex space-x-2">
+                      {subscription?.subscription_plan ? (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="flex-1 border-white/20 text-white hover:bg-white/10 bg-white/5 text-xs"
+                          onClick={openCustomerPortal}
+                          disabled={subscriptionLoading}
+                        >
+                          {subscriptionLoading ? 'A carregar...' : 'Gerir Subscrição'}
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          className="flex-1 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-xs"
+                          onClick={() => {
+                            setShowProfileModal(false)
+                            router.push('/pricing')
+                          }}
+                        >
+                          Ver Planos
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Credits */}
@@ -2405,73 +2742,189 @@ export default function DashboardPage() {
                           <CardContent className="space-y-6">
                             {/* File Upload */}
                             <div 
-                              className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center hover:border-purple-500/50 transition-colors cursor-pointer"
-                              onClick={() => salesFileInputRef.current?.click()}
+                              className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
+                                isFileSelectionInProgress 
+                                  ? 'cursor-not-allowed border-gray-500 bg-gray-500/10' 
+                                  : isDragOver 
+                                    ? 'cursor-pointer border-purple-500 bg-purple-500/10 scale-105' 
+                                    : 'cursor-pointer border-white/20 hover:border-purple-500/50 hover:bg-white/5'
+                              }`}
+                              onClick={() => {
+                                console.log('🎯 File input clicked, current file:', salesFileInputRef.current?.files?.[0]?.name)
+                                console.log('🔒 File selection in progress:', isFileSelectionInProgress)
+                                if (!isFileSelectionInProgress) {
+                                  salesFileInputRef.current?.click()
+                                } else {
+                                  console.log('⚠️ File selection already in progress, ignoring click')
+                                }
+                              }}
+                              onDragOver={handleDragOver}
+                              onDragLeave={handleDragLeave}
+                              onDrop={handleDrop}
                             >
                               <input
                                 ref={salesFileInputRef}
                                 type="file"
                                 accept="video/*"
-                                onChange={handleSalesFileUpload}
+                                onChange={(e) => {
+                                  console.log('📁 File input onChange triggered')
+                                  console.log('🔒 File selection in progress:', isFileSelectionInProgress)
+                                  
+                                  if (isFileSelectionInProgress) {
+                                    console.log('⚠️ File selection already in progress, ignoring onChange')
+                                    return
+                                  }
+                                  
+                                  const file = e.target.files?.[0]
+                                  console.log('📁 Selected file:', file?.name, file?.size, file?.type)
+                                  if (file) {
+                                    console.log('📁 Calling handleFileSelection...')
+                                    handleFileSelection(file)
+                                    // Don't reset the input value immediately - let the upload process handle it
+                                    console.log('📁 File selection initiated')
+                                  } else {
+                                    console.log('📁 No file selected')
+                                  }
+                                }}
                                 className="hidden"
                               />
-                              <div className="flex items-center justify-center mb-4">
-                                <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center">
-                                  <Upload className="w-8 h-8 text-purple-400" />
-                                </div>
-                              </div>
-                              <p className="text-lg font-medium text-white mb-2">
-                                {salesUploadedFile ? salesUploadedFile.name : 'Clique aqui para carregar o seu ficheiro ou arraste'}
-                              </p>
-                              {salesUploadedFile && (
-                                <p className="text-white/60 mb-2">
-                                  Tamanho do ficheiro: {(salesUploadedFile.size / (1024 * 1024)).toFixed(1)} MB
-                                </p>
+                              {!salesUploadedFile ? (
+                                <>
+                                  <div className="flex items-center justify-center mb-4">
+                                    <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+                                      isDragOver 
+                                        ? 'bg-purple-500/30 scale-110' 
+                                        : 'bg-purple-500/20'
+                                    }`}>
+                                      <Upload className={`w-8 h-8 transition-colors duration-300 ${
+                                        isDragOver ? 'text-purple-300' : 'text-purple-400'
+                                      }`} />
+                                    </div>
+                                  </div>
+                                  <p className="text-lg font-medium text-white mb-2">
+                                    {isFileSelectionInProgress 
+                                      ? 'A processar seleção de ficheiro...' 
+                                      : isDragOver 
+                                        ? 'Largue o ficheiro aqui' 
+                                        : 'Clique aqui para carregar o seu ficheiro ou arraste'
+                                    }
+                                  </p>
+                                  <p className="text-white/50 text-sm mb-4">
+                                    Formatos suportados: MP4, MOV, AVI, WMV
+                                  </p>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="flex items-center justify-center mb-4">
+                                    <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
+                                      <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    </div>
+                                  </div>
+                                  <p className="text-lg font-medium text-white mb-2">
+                                    {salesUploadedFile.name}
+                                  </p>
+                                  <p className="text-white/60 mb-2">
+                                    Tamanho: {(salesUploadedFile.size / (1024 * 1024)).toFixed(1)} MB
+                                  </p>
+                                  <p className="text-white/60 mb-2">
+                                    Tipo: {salesUploadedFile.type}
+                                  </p>
+                                </>
                               )}
-                              <p className="text-white/50 text-sm mb-4">Formato Suportado: MP4 (sem limite de tamanho)</p>
-                              <div className="flex justify-center">
-                                <div className="w-16 h-16 bg-white/5 rounded-lg flex items-center justify-center">
-                                  <div className="w-8 h-8 bg-purple-500 rounded"></div>
-                                </div>
-                              </div>
                               <div className="flex justify-center space-x-2 mt-4">
-                                <Button 
-                                  className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
-                                >
-                                  Escolher Ficheiro
-                                </Button>
-                                {salesUploadedFile && (
+                                {salesIsUploading ? (
+                                  // Show only Cancel button during upload
                                   <Button 
                                     variant="outline"
-                                    onClick={() => {
-                                      setSalesUploadedFile(null)
-                                      setSalesUploadStatus('')
-                                      setSalesUploadProgress(0)
-                                      if (salesFileInputRef.current) {
-                                        salesFileInputRef.current.value = ''
-                                      }
+                                    onClick={(e) => {
+                                      e.stopPropagation() // Prevent event bubbling to parent drag-and-drop area
+                                      cancelSalesUpload()
                                     }}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                                    className="border-red-500/50 text-red-400 hover:bg-red-500/10"
                                   >
-                                    Limpar Ficheiro
+                                    Cancelar
                                   </Button>
+                                ) : (
+                                  // Show normal buttons when not uploading
+                                  <>
+                                    <Button 
+                                      className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+                                      onClick={(e) => {
+                                        e.stopPropagation() // Prevent event bubbling to parent drag-and-drop area
+                                        console.log('🔘 Button clicked, current file:', salesFileInputRef.current?.files?.[0]?.name)
+                                        console.log('🔒 File selection in progress:', isFileSelectionInProgress)
+                                        if (!isFileSelectionInProgress) {
+                                          salesFileInputRef.current?.click()
+                                        } else {
+                                          console.log('⚠️ File selection already in progress, ignoring button click')
+                                        }
+                                      }}
+                                    >
+                                      {salesUploadedFile ? 'Alterar Ficheiro' : 'Escolher Ficheiro'}
+                                    </Button>
+                                    {salesUploadedFile && (
+                                      <Button 
+                                        variant="outline"
+                                        onClick={(e) => {
+                                          e.stopPropagation() // Prevent event bubbling to parent drag-and-drop area
+                                          setSalesUploadedFile(null)
+                                          setSalesUploadStatus('')
+                                          setSalesUploadProgress(0)
+                                          setUploadError(null)
+                                          setFilePreview(null)
+                                          if (salesFileInputRef.current) {
+                                            salesFileInputRef.current.value = ''
+                                          }
+                                        }}
+                                        className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                                      >
+                                        Limpar Ficheiro
+                                      </Button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </div>
 
+                            {/* Error Display */}
+                            {uploadError && (
+                              <div className="p-4 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30">
+                                <div className="flex items-center space-x-2">
+                                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span className="font-medium">Erro de Validação</span>
+                                </div>
+                                <p className="mt-1 text-sm">{uploadError}</p>
+                              </div>
+                            )}
+
                             {/* Upload Progress */}
                             {salesIsUploading && (
-                              <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-white/70">{salesUploadStatus}</span>
-                                  <span className="text-white/70">{salesUploadProgress}%</span>
+                              <div className="space-y-3">
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-white/70 font-medium">{salesUploadStatus}</span>
+                                  <span className="text-white/70 bg-white/10 px-2 py-1 rounded-full text-xs">
+                                    {salesUploadProgress}%
+                                  </span>
                                 </div>
-                                <div className="w-full bg-white/10 rounded-full h-2">
+                                <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden">
                                   <div 
-                                    className="bg-gradient-to-r from-purple-500 to-violet-500 h-2 rounded-full transition-all duration-300"
+                                    className="bg-gradient-to-r from-purple-500 to-violet-500 h-3 rounded-full transition-all duration-500 ease-out relative"
                                     style={{ width: `${salesUploadProgress}%` }}
-                                  />
+                                  >
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                                  </div>
                                 </div>
+                                {salesUploadProgress > 0 && salesUploadProgress < 100 && (
+                                  <div className="flex items-center justify-center space-x-2 text-xs text-white/50">
+                                    <div className="w-1 h-1 bg-purple-400 rounded-full animate-bounce"></div>
+                                    <div className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                    <div className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                  </div>
+                                )}
                               </div>
                             )}
                             
@@ -2704,8 +3157,8 @@ export default function DashboardPage() {
                   <p className="text-white font-medium capitalize">{selectedAnalysis.status}</p>
                 </div>
                 <div className="bg-white/5 p-4 rounded-lg">
-                  <span className="text-white/60 block">Tipo de Call:</span>
-                  <p className="text-white font-medium">{selectedAnalysis.callType}</p>
+                  <span className="text-white/60 block">Tipo de Chamada:</span>
+                  <p className="text-white font-medium">{selectedAnalysis.analysis?.callType || selectedAnalysis.analysis?.call_type || selectedAnalysis.call_type || 'N/A'}</p>
                 </div>
                 {selectedAnalysis.score > 0 && (
                   <div className="bg-white/5 p-4 rounded-lg">
@@ -2721,264 +3174,356 @@ export default function DashboardPage() {
               {/* Analysis Details */}
               {selectedAnalysis.analysis && (
                 <div className="space-y-4">
-                  {selectedAnalysis.analysis.callType && (
-                    <div className="bg-white/5 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold text-white mb-2">Tipo de Chamada</h3>
-                      <p className="text-white/80">{selectedAnalysis.analysis.callType}</p>
-                    </div>
-                  )}
                   
                   {/* Pontos Fortes */}
-                  {selectedAnalysis.analysis.pontosFortes && (
+                  {(selectedAnalysis.analysis?.analysis_fields?.pontosFortes || selectedAnalysis.analysis?.analysis?.pontosFortes || selectedAnalysis.analysis?.pontosFortes) && (
                     <div className="bg-white/5 p-4 rounded-lg">
                       <h3 className="text-lg font-semibold text-white mb-2">Pontos Fortes</h3>
                       <div className="text-white/90 text-sm leading-relaxed">
-                        {selectedAnalysis.analysis.pontosFortes.split('\n').map((line: string, index: number) => {
-                          const trimmedLine = line.trim()
-                          if (!trimmedLine) return null
-                          
-                          // Check if it's a category title (bold text, usually at the start of a section)
-                          if (trimmedLine.match(/^[A-ZÁÊÇÕ][^:]*$/)) {
-                            return (
-                              <div key={index} className="flex items-start space-x-3 mb-2">
-                                <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-                                <div className="flex-1">
-                                  <p className="font-semibold">{trimmedLine}</p>
-                                </div>
-                              </div>
-                            )
-                          }
-                          
-                          // Check if it's a timestamp
-                          if (trimmedLine.match(/^Timestamp:\s*\([^)]+\)$/)) {
-                            return (
-                              <div key={index} className="ml-5 mb-1">
-                                <p className="text-white/70 text-xs">{trimmedLine}</p>
-                              </div>
-                            )
-                          }
-                          
-                          // Check if it's a quote (starts and ends with quotes)
-                          if (trimmedLine.startsWith('"') && trimmedLine.endsWith('"')) {
-                            return (
-                              <div key={index} className="ml-5 mb-3">
-                                <p className="italic text-white/80">"{trimmedLine.slice(1, -1)}"</p>
-                              </div>
-                            )
-                          }
-                          
-                          // Regular description text
-                          return (
-                            <div key={index} className="ml-5 mb-1">
-                              <p>{trimmedLine}</p>
-                            </div>
-                          )
-                        })}
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h1: ({children}) => <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>,
+                            h2: ({children}) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
+                            h3: ({children}) => <h3 className="text-sm font-semibold mb-2 text-white">{children}</h3>,
+                            p: ({children}) => <p className="mb-3 text-white/90 leading-relaxed">{children}</p>,
+                            ul: ({children}) => <ul className="list-disc list-outside mb-3 space-y-2 text-white/90 pl-4">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal list-outside mb-3 space-y-2 text-white/90 pl-4">{children}</ol>,
+                            li: ({children}) => <li className="mb-2 text-white/90 leading-relaxed">{children}</li>,
+                            strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                            em: ({children}) => <em className="italic text-white/80">{children}</em>,
+                            code: ({children}) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>,
+                            blockquote: ({children}) => <blockquote className="border-l-4 border-green-500 pl-3 italic text-white/80 mb-3">{children}</blockquote>,
+                          }}
+                        >
+                          {selectedAnalysis.analysis?.analysis_fields?.pontosFortes || selectedAnalysis.analysis?.analysis?.pontosFortes || selectedAnalysis.analysis?.pontosFortes}
+                        </ReactMarkdown>
                       </div>
                     </div>
                   )}
                   
                   {/* Pontos de Melhoria */}
-                  {selectedAnalysis.analysis.pontosFracos && (
+                  {(selectedAnalysis.analysis?.analysis_fields?.pontosFracos || selectedAnalysis.analysis?.analysis?.pontosFracos || selectedAnalysis.analysis?.pontosFracos) && (
                     <div className="bg-white/5 p-4 rounded-lg">
                       <h3 className="text-lg font-semibold text-white mb-2">Pontos de Melhoria</h3>
                       <div className="text-white/90 text-sm leading-relaxed">
-                        {selectedAnalysis.analysis.pontosFracos.split('\n').map((line: string, index: number) => {
-                          const trimmedLine = line.trim()
-                          if (!trimmedLine) return null
-                          
-                          // Check if it's a category title (bold text, usually at the start of a section)
-                          if (trimmedLine.match(/^[A-ZÁÊÇÕ][^:]*$/)) {
-                            return (
-                              <div key={index} className="flex items-start space-x-3 mb-2">
-                                <div className="w-2 h-2 bg-red-400 rounded-full mt-2 flex-shrink-0"></div>
-                                <div className="flex-1">
-                                  <p className="font-semibold">{trimmedLine}</p>
-                                </div>
-                              </div>
-                            )
-                          }
-                          
-                          // Check if it's a timestamp
-                          if (trimmedLine.match(/^Timestamp:\s*\([^)]+\)$/)) {
-                            return (
-                              <div key={index} className="ml-5 mb-1">
-                                <p className="text-white/70 text-xs">{trimmedLine}</p>
-                              </div>
-                            )
-                          }
-                          
-                          // Check if it's a quote (starts and ends with quotes)
-                          if (trimmedLine.startsWith('"') && trimmedLine.endsWith('"')) {
-                            return (
-                              <div key={index} className="ml-5 mb-3">
-                                <p className="italic text-white/80">"{trimmedLine.slice(1, -1)}"</p>
-                              </div>
-                            )
-                          }
-                          
-                          // Regular description text
-                          return (
-                            <div key={index} className="ml-5 mb-1">
-                              <p>{trimmedLine}</p>
-                            </div>
-                          )
-                        })}
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h1: ({children}) => <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>,
+                            h2: ({children}) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
+                            h3: ({children}) => <h3 className="text-sm font-semibold mb-2 text-white">{children}</h3>,
+                            p: ({children}) => <p className="mb-3 text-white/90 leading-relaxed">{children}</p>,
+                            ul: ({children}) => <ul className="list-disc list-outside mb-3 space-y-2 text-white/90 pl-4">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal list-outside mb-3 space-y-2 text-white/90 pl-4">{children}</ol>,
+                            li: ({children}) => <li className="mb-2 text-white/90 leading-relaxed">{children}</li>,
+                            strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                            em: ({children}) => <em className="italic text-white/80">{children}</em>,
+                            code: ({children}) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>,
+                            blockquote: ({children}) => <blockquote className="border-l-4 border-red-500 pl-3 italic text-white/80 mb-3">{children}</blockquote>,
+                          }}
+                        >
+                          {selectedAnalysis.analysis?.analysis_fields?.pontosFracos || selectedAnalysis.analysis?.analysis?.pontosFracos || selectedAnalysis.analysis?.pontosFracos}
+                        </ReactMarkdown>
                       </div>
                     </div>
                   )}
                   
-                  {/* Resumo da Call */}
-                  {selectedAnalysis.analysis.resumoDaCall && (
+                  {/* Resumo da Chamada */}
+                  {(selectedAnalysis.analysis?.analysis_fields?.resumoDaCall || selectedAnalysis.analysis?.analysis?.resumoDaCall || selectedAnalysis.analysis?.resumoDaCall) && (
                     <div className="bg-white/5 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold text-white mb-2">Resumo da Call</h3>
-                      <p className="text-white/90 text-sm leading-relaxed whitespace-pre-line">{selectedAnalysis.analysis.resumoDaCall}</p>
+                      <h3 className="text-lg font-semibold text-white mb-2">Resumo da Chamada</h3>
+                      <div className="text-white/90 text-sm leading-relaxed">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h1: ({children}) => <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>,
+                            h2: ({children}) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
+                            h3: ({children}) => <h3 className="text-sm font-semibold mb-2 text-white">{children}</h3>,
+                            p: ({children}) => <p className="mb-3 text-white/90 leading-relaxed">{children}</p>,
+                            ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-1 text-white/90">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal list-outside mb-3 space-y-1 text-white/90 pl-4">{children}</ol>,
+                            li: ({children}) => <li className="mb-1 text-white/90">{children}</li>,
+                            strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                            em: ({children}) => <em className="italic text-white/80">{children}</em>,
+                            code: ({children}) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>,
+                            blockquote: ({children}) => <blockquote className="border-l-4 border-purple-500 pl-3 italic text-white/80 mb-3">{children}</blockquote>,
+                          }}
+                        >
+                          {selectedAnalysis.analysis?.analysis_fields?.resumoDaCall || selectedAnalysis.analysis?.analysis?.resumoDaCall || selectedAnalysis.analysis?.resumoDaCall}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   )}
                   
                   {/* Dicas Gerais */}
-                  {selectedAnalysis.analysis.dicasGerais && (
+                  {(selectedAnalysis.analysis?.analysis_fields?.dicasGerais || selectedAnalysis.analysis?.analysis?.dicasGerais || selectedAnalysis.analysis?.dicasGerais) && (
                     <div className="bg-white/5 p-4 rounded-lg">
                       <h3 className="text-lg font-semibold text-white mb-2">Dicas Gerais</h3>
-                      <p className="text-white/90 text-sm leading-relaxed whitespace-pre-line">{selectedAnalysis.analysis.dicasGerais}</p>
+                      <div className="text-white/90 text-sm leading-relaxed">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h1: ({children}) => <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>,
+                            h2: ({children}) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
+                            h3: ({children}) => <h3 className="text-sm font-semibold mb-2 text-white">{children}</h3>,
+                            p: ({children}) => <p className="mb-3 text-white/90 leading-relaxed">{children}</p>,
+                            ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-1 text-white/90">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal list-outside mb-3 space-y-1 text-white/90 pl-4">{children}</ol>,
+                            li: ({children}) => <li className="mb-1 text-white/90">{children}</li>,
+                            strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                            em: ({children}) => <em className="italic text-white/80">{children}</em>,
+                            code: ({children}) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>,
+                            blockquote: ({children}) => <blockquote className="border-l-4 border-purple-500 pl-3 italic text-white/80 mb-3">{children}</blockquote>,
+                          }}
+                        >
+                          {selectedAnalysis.analysis?.analysis_fields?.dicasGerais || selectedAnalysis.analysis?.analysis?.dicasGerais || selectedAnalysis.analysis?.dicasGerais}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   )}
                   
                   {/* Foco para Próximas Calls */}
-                  {selectedAnalysis.analysis.focoParaProximasCalls && (
+                  {(selectedAnalysis.analysis?.analysis_fields?.focoParaProximasCalls || selectedAnalysis.analysis?.analysis?.focoParaProximasCalls || selectedAnalysis.analysis?.focoParaProximasCalls) && (
                     <div className="bg-white/5 p-4 rounded-lg">
                       <h3 className="text-lg font-semibold text-white mb-2">Foco para Próximas Calls</h3>
-                      <p className="text-white/90 text-sm leading-relaxed whitespace-pre-line">{selectedAnalysis.analysis.focoParaProximasCalls}</p>
-                    </div>
-                  )}
-                  
-                  {/* 8 Scoring Fields */}
-                  {(selectedAnalysis.analysis.clarezaFluenciaFala !== undefined || 
-                    selectedAnalysis.analysis.tomControlo !== undefined || 
-                    selectedAnalysis.analysis.envolvimentoConversacional !== undefined || 
-                    selectedAnalysis.analysis.efetividadeDescobertaNecessidades !== undefined || 
-                    selectedAnalysis.analysis.entregaValorAjusteSolucao !== undefined || 
-                    selectedAnalysis.analysis.habilidadesLidarObjeccoes !== undefined || 
-                    selectedAnalysis.analysis.estruturaControleReuniao !== undefined || 
-                    selectedAnalysis.analysis.fechamentoProximosPassos !== undefined) && (
-                    <div className="bg-white/5 p-6 rounded-lg">
-                      <h3 className="text-xl font-semibold text-white mb-6">Avaliação Detalhada</h3>
-                      <div className="space-y-6">
-                        {selectedAnalysis.analysis.clarezaFluenciaFala !== undefined && (
-                          <div className="border-l-4 border-white/30 pl-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="text-white font-medium">Clareza e Fluência da Fala</h4>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.clarezaFluenciaFala}</span>
-                                <span className="text-white/60 text-sm">/10</span>
-                              </div>
-                            </div>
-                            {selectedAnalysis.analysis.justificativaClarezaFluenciaFala && (
-                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaClarezaFluenciaFala}</p>
-                            )}
-                          </div>
-                        )}
-                        {selectedAnalysis.analysis.tomControlo !== undefined && (
-                          <div className="border-l-4 border-white/30 pl-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="text-white font-medium">Tom e Controlo</h4>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.tomControlo}</span>
-                                <span className="text-white/60 text-sm">/10</span>
-                              </div>
-                            </div>
-                            {selectedAnalysis.analysis.justificativaTomControlo && (
-                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaTomControlo}</p>
-                            )}
-                          </div>
-                        )}
-                        {selectedAnalysis.analysis.envolvimentoConversacional !== undefined && (
-                          <div className="border-l-4 border-white/30 pl-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="text-white font-medium">Envolvimento Conversacional</h4>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.envolvimentoConversacional}</span>
-                                <span className="text-white/60 text-sm">/10</span>
-                              </div>
-                            </div>
-                            {selectedAnalysis.analysis.justificativaEnvolvimentoConversacional && (
-                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaEnvolvimentoConversacional}</p>
-                            )}
-                          </div>
-                        )}
-                        {selectedAnalysis.analysis.efetividadeDescobertaNecessidades !== undefined && (
-                          <div className="border-l-4 border-white/30 pl-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="text-white font-medium">Efetividade na Descoberta de Necessidades</h4>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.efetividadeDescobertaNecessidades}</span>
-                                <span className="text-white/60 text-sm">/10</span>
-                              </div>
-                            </div>
-                            {selectedAnalysis.analysis.justificativaEfetividadeDescobertaNecessidades && (
-                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaEfetividadeDescobertaNecessidades}</p>
-                            )}
-                          </div>
-                        )}
-                        {selectedAnalysis.analysis.entregaValorAjusteSolucao !== undefined && (
-                          <div className="border-l-4 border-white/30 pl-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="text-white font-medium">Entrega de Valor e Ajuste da Solução</h4>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.entregaValorAjusteSolucao}</span>
-                                <span className="text-white/60 text-sm">/10</span>
-                              </div>
-                            </div>
-                            {selectedAnalysis.analysis.justificativaEntregaValorAjusteSolucao && (
-                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaEntregaValorAjusteSolucao}</p>
-                            )}
-                          </div>
-                        )}
-                        {selectedAnalysis.analysis.habilidadesLidarObjeccoes !== undefined && (
-                          <div className="border-l-4 border-white/30 pl-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="text-white font-medium">Habilidades de Lidar com Objeções</h4>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.habilidadesLidarObjeccoes}</span>
-                                <span className="text-white/60 text-sm">/10</span>
-                              </div>
-                            </div>
-                            {selectedAnalysis.analysis.justificativaHabilidadesLidarObjeccoes && (
-                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaHabilidadesLidarObjeccoes}</p>
-                            )}
-                          </div>
-                        )}
-                        {selectedAnalysis.analysis.estruturaControleReuniao !== undefined && (
-                          <div className="border-l-4 border-white/30 pl-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="text-white font-medium">Estrutura e Controle da Reunião</h4>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.estruturaControleReuniao}</span>
-                                <span className="text-white/60 text-sm">/10</span>
-                              </div>
-                            </div>
-                            {selectedAnalysis.analysis.justificativaEstruturaControleReuniao && (
-                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaEstruturaControleReuniao}</p>
-                            )}
-                          </div>
-                        )}
-                        {selectedAnalysis.analysis.fechamentoProximosPassos !== undefined && (
-                          <div className="border-l-4 border-white/30 pl-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="text-white font-medium">Fechamento e Próximos Passos</h4>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis.fechamentoProximosPassos}</span>
-                                <span className="text-white/60 text-sm">/10</span>
-                              </div>
-                            </div>
-                            {selectedAnalysis.analysis.justificativaFechamentoProximosPassos && (
-                              <p className="text-white/80 text-sm leading-relaxed">{selectedAnalysis.analysis.justificativaFechamentoProximosPassos}</p>
-                            )}
-                          </div>
-                        )}
+                      <div className="text-white/90 text-sm leading-relaxed">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            h1: ({children}) => <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>,
+                            h2: ({children}) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
+                            h3: ({children}) => <h3 className="text-sm font-semibold mb-2 text-white">{children}</h3>,
+                            p: ({children}) => <p className="mb-3 text-white/90 leading-relaxed">{children}</p>,
+                            ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-1 text-white/90">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal list-outside mb-3 space-y-1 text-white/90 pl-4">{children}</ol>,
+                            li: ({children}) => <li className="mb-1 text-white/90">{children}</li>,
+                            strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                            em: ({children}) => <em className="italic text-white/80">{children}</em>,
+                            code: ({children}) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>,
+                            blockquote: ({children}) => <blockquote className="border-l-4 border-purple-500 pl-3 italic text-white/80 mb-3">{children}</blockquote>,
+                          }}
+                        >
+                          {selectedAnalysis.analysis?.analysis_fields?.focoParaProximasCalls || selectedAnalysis.analysis?.analysis?.focoParaProximasCalls || selectedAnalysis.analysis?.focoParaProximasCalls}
+                        </ReactMarkdown>
                       </div>
                     </div>
                   )}
+                  
+                  {/* 8 Scoring Fields - Always Show */}
+                  <div className="bg-white/5 p-6 rounded-lg">
+                    <h3 className="text-xl font-semibold text-white mb-6">Pontuação da Chamada</h3>
+                    <div className="space-y-6">
+                        <div className="border-l-4 border-white/30 pl-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="text-white font-medium">Clareza e Fluência da Fala</h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.clarezaFluenciaFala ?? selectedAnalysis.analysis?.analysis?.clarezaFluenciaFala ?? selectedAnalysis.analysis?.clarezaFluenciaFala ?? 0}</span>
+                              <span className="text-white/60 text-sm">/5</span>
+                            </div>
+                          </div>
+                          {(selectedAnalysis.analysis?.analysis_fields?.justificativaClarezaFluenciaFala || selectedAnalysis.analysis?.justificativaClarezaFluenciaFala) && (
+                            <div className="text-white/80 text-sm leading-relaxed">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  p: ({children}) => <p className="mb-2 text-white/80 leading-relaxed">{children}</p>,
+                                  strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                                  em: ({children}) => <em className="italic text-white/70">{children}</em>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-outside mb-2 space-y-1 text-white/80 pl-4">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1 text-white/80">{children}</li>,
+                                }}
+                              >
+                                {selectedAnalysis.analysis?.analysis_fields?.justificativaClarezaFluenciaFala || selectedAnalysis.analysis?.justificativaClarezaFluenciaFala}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-l-4 border-white/30 pl-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="text-white font-medium">Tom e Controlo</h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.tomControlo ?? selectedAnalysis.analysis?.analysis?.tomControlo ?? selectedAnalysis.analysis?.tomControlo ?? 0}</span>
+                              <span className="text-white/60 text-sm">/5</span>
+                            </div>
+                          </div>
+                          {(selectedAnalysis.analysis?.analysis_fields?.justificativaTomControlo || selectedAnalysis.analysis?.justificativaTomControlo) && (
+                            <div className="text-white/80 text-sm leading-relaxed">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  p: ({children}) => <p className="mb-2 text-white/80 leading-relaxed">{children}</p>,
+                                  strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                                  em: ({children}) => <em className="italic text-white/70">{children}</em>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-outside mb-2 space-y-1 text-white/80 pl-4">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1 text-white/80">{children}</li>,
+                                }}
+                              >
+                                {selectedAnalysis.analysis?.analysis_fields?.justificativaTomControlo || selectedAnalysis.analysis?.justificativaTomControlo}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-l-4 border-white/30 pl-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="text-white font-medium">Envolvimento Conversacional</h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.envolvimentoConversacional ?? selectedAnalysis.analysis?.analysis?.envolvimentoConversacional ?? selectedAnalysis.analysis?.envolvimentoConversacional ?? 0}</span>
+                              <span className="text-white/60 text-sm">/5</span>
+                            </div>
+                          </div>
+                          {(selectedAnalysis.analysis?.analysis_fields?.justificativaEnvolvimentoConversacional || selectedAnalysis.analysis?.justificativaEnvolvimentoConversacional) && (
+                            <div className="text-white/80 text-sm leading-relaxed">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  p: ({children}) => <p className="mb-2 text-white/80 leading-relaxed">{children}</p>,
+                                  strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                                  em: ({children}) => <em className="italic text-white/70">{children}</em>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-outside mb-2 space-y-1 text-white/80 pl-4">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1 text-white/80">{children}</li>,
+                                }}
+                              >
+                                {selectedAnalysis.analysis?.analysis_fields?.justificativaEnvolvimentoConversacional || selectedAnalysis.analysis?.justificativaEnvolvimentoConversacional}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-l-4 border-white/30 pl-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="text-white font-medium">Efetividade na Descoberta de Necessidades</h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.efetividadeDescobertaNecessidades ?? selectedAnalysis.analysis?.analysis?.efetividadeDescobertaNecessidades ?? selectedAnalysis.analysis?.efetividadeDescobertaNecessidades ?? 0}</span>
+                              <span className="text-white/60 text-sm">/5</span>
+                            </div>
+                          </div>
+                          {(selectedAnalysis.analysis?.analysis_fields?.justificativaEfetividadeDescobertaNecessidades || selectedAnalysis.analysis?.justificativaEfetividadeDescobertaNecessidades) && (
+                            <div className="text-white/80 text-sm leading-relaxed">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  p: ({children}) => <p className="mb-2 text-white/80 leading-relaxed">{children}</p>,
+                                  strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                                  em: ({children}) => <em className="italic text-white/70">{children}</em>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-outside mb-2 space-y-1 text-white/80 pl-4">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1 text-white/80">{children}</li>,
+                                }}
+                              >
+                                {selectedAnalysis.analysis?.analysis_fields?.justificativaEfetividadeDescobertaNecessidades || selectedAnalysis.analysis?.justificativaEfetividadeDescobertaNecessidades}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-l-4 border-white/30 pl-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="text-white font-medium">Entrega de Valor e Ajuste da Solução</h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.entregaValorAjusteSolucao ?? selectedAnalysis.analysis?.analysis?.entregaValorAjusteSolucao ?? selectedAnalysis.analysis?.entregaValorAjusteSolucao ?? 0}</span>
+                              <span className="text-white/60 text-sm">/5</span>
+                            </div>
+                          </div>
+                          {(selectedAnalysis.analysis?.analysis_fields?.justificativaEntregaValorAjusteSolucao || selectedAnalysis.analysis?.justificativaEntregaValorAjusteSolucao) && (
+                            <div className="text-white/80 text-sm leading-relaxed">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  p: ({children}) => <p className="mb-2 text-white/80 leading-relaxed">{children}</p>,
+                                  strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                                  em: ({children}) => <em className="italic text-white/70">{children}</em>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-outside mb-2 space-y-1 text-white/80 pl-4">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1 text-white/80">{children}</li>,
+                                }}
+                              >
+                                {selectedAnalysis.analysis?.analysis_fields?.justificativaEntregaValorAjusteSolucao || selectedAnalysis.analysis?.justificativaEntregaValorAjusteSolucao}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-l-4 border-white/30 pl-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="text-white font-medium">Habilidades de Lidar com Objeções</h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.habilidadesLidarObjeccoes ?? selectedAnalysis.analysis?.analysis?.habilidadesLidarObjeccoes ?? selectedAnalysis.analysis?.habilidadesLidarObjeccoes ?? 0}</span>
+                              <span className="text-white/60 text-sm">/5</span>
+                            </div>
+                          </div>
+                          {(selectedAnalysis.analysis?.analysis_fields?.justificativaHabilidadesLidarObjeccoes || selectedAnalysis.analysis?.justificativaHabilidadesLidarObjeccoes) && (
+                            <div className="text-white/80 text-sm leading-relaxed">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  p: ({children}) => <p className="mb-2 text-white/80 leading-relaxed">{children}</p>,
+                                  strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                                  em: ({children}) => <em className="italic text-white/70">{children}</em>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-outside mb-2 space-y-1 text-white/80 pl-4">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1 text-white/80">{children}</li>,
+                                }}
+                              >
+                                {selectedAnalysis.analysis?.analysis_fields?.justificativaHabilidadesLidarObjeccoes || selectedAnalysis.analysis?.justificativaHabilidadesLidarObjeccoes}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-l-4 border-white/30 pl-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="text-white font-medium">Estrutura e Controle da Reunião</h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.estruturaControleReuniao ?? selectedAnalysis.analysis?.analysis?.estruturaControleReuniao ?? selectedAnalysis.analysis?.estruturaControleReuniao ?? 0}</span>
+                              <span className="text-white/60 text-sm">/5</span>
+                            </div>
+                          </div>
+                          {(selectedAnalysis.analysis?.analysis_fields?.justificativaEstruturaControleReuniao || selectedAnalysis.analysis?.justificativaEstruturaControleReuniao) && (
+                            <div className="text-white/80 text-sm leading-relaxed">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  p: ({children}) => <p className="mb-2 text-white/80 leading-relaxed">{children}</p>,
+                                  strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                                  em: ({children}) => <em className="italic text-white/70">{children}</em>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-outside mb-2 space-y-1 text-white/80 pl-4">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1 text-white/80">{children}</li>,
+                                }}
+                              >
+                                {selectedAnalysis.analysis?.analysis_fields?.justificativaEstruturaControleReuniao || selectedAnalysis.analysis?.justificativaEstruturaControleReuniao}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-l-4 border-white/30 pl-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="text-white font-medium">Fechamento e Próximos Passos</h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.fechamentoProximosPassos ?? selectedAnalysis.analysis?.analysis?.fechamentoProximosPassos ?? selectedAnalysis.analysis?.fechamentoProximosPassos ?? 0}</span>
+                              <span className="text-white/60 text-sm">/5</span>
+                            </div>
+                          </div>
+                          {(selectedAnalysis.analysis?.analysis_fields?.justificativaFechamentoProximosPassos || selectedAnalysis.analysis?.justificativaFechamentoProximosPassos) && (
+                            <div className="text-white/80 text-sm leading-relaxed">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  p: ({children}) => <p className="mb-2 text-white/80 leading-relaxed">{children}</p>,
+                                  strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                                  em: ({children}) => <em className="italic text-white/70">{children}</em>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-outside mb-2 space-y-1 text-white/80 pl-4">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1 text-white/80">{children}</li>,
+                                }}
+                              >
+                                {selectedAnalysis.analysis?.analysis_fields?.justificativaFechamentoProximosPassos || selectedAnalysis.analysis?.justificativaFechamentoProximosPassos}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   
                 </div>
               )}

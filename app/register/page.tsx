@@ -8,13 +8,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Check } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { useFirstTimeUser } from '@/hooks/useFirstTimeUser'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -27,17 +26,10 @@ export default function RegisterPage() {
   const [generalError, setGeneralError] = useState('')
   const router = useRouter()
   const { signUp, signInWithGoogle } = useAuth()
+  const { isFirstTime } = useFirstTimeUser()
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
-
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'O nome é obrigatório'
-    }
-
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'O apelido é obrigatório'
-    }
 
     if (!formData.email.trim()) {
       newErrors.email = 'O email é obrigatório'
@@ -72,7 +64,8 @@ export default function RegisterPage() {
     setGeneralError('')
     
     try {
-      await signUp(formData.email, formData.password, formData.firstName, formData.lastName)
+      await signUp(formData.email, formData.password)
+      // Redirect to dashboard - first-time user check will be handled there
       router.push('/dashboard')
     } catch (error: any) {
       console.error('Registration error:', error)
@@ -91,7 +84,25 @@ export default function RegisterPage() {
       // The redirect will be handled by Supabase OAuth
     } catch (error: any) {
       console.error('❌ Google sign up error:', error)
-      setGeneralError('Falha ao registar-se com Google. Por favor, tente novamente.')
+      
+      // Provide more specific error messages
+      let errorMessage = 'Falha ao registar-se com Google. Por favor, tente novamente.'
+      
+      if (error.message?.includes('Invalid Refresh Token')) {
+        errorMessage = 'Esta conta Google já está registada. Por favor, use "Iniciar Sessão" em vez de "Registar-se".'
+      } else if (error.message?.includes('User already registered')) {
+        errorMessage = 'Esta conta Google já está registada. Por favor, use "Iniciar Sessão" em vez de "Registar-se".'
+      } else if (error.message?.includes('Email already registered')) {
+        errorMessage = 'Este email já está registado. Por favor, use "Iniciar Sessão" em vez de "Registar-se".'
+      } else if (error.message?.includes('Invalid redirect URI')) {
+        errorMessage = 'Erro de configuração OAuth. Contacte o administrador.'
+      } else if (error.message?.includes('OAuth provider not enabled')) {
+        errorMessage = 'Autenticação Google não está ativada. Contacte o administrador.'
+      } else if (error.message) {
+        errorMessage = `Erro: ${error.message}`
+      }
+      
+      setGeneralError(errorMessage)
     } finally {
       setIsGoogleLoading(false)
     }
@@ -122,57 +133,165 @@ export default function RegisterPage() {
       {/* Content */}
       <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          {/* Back to Home */}
+          {/* Back Button */}
           <Link 
             href="/" 
             className="inline-flex items-center text-white/70 hover:text-white mb-8 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar ao Início
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Voltar atrás
           </Link>
-
-          {/* Logo */}
-          <div className="text-center mb-8">
-            <Image
-              src="/images/logo-white.png"
-              alt="ScaleLabs"
-              width={200}
-              height={60}
-              className="h-8 w-auto mx-auto mb-4"
-            />
-            <h1 className="text-2xl font-bold text-white">Criar a sua conta</h1>
-            <p className="text-white/70 mt-2">Junte-se a milhares de empresas que crescem com IA</p>
-          </div>
 
           {/* Register Card */}
           <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-xl text-white">Registar-se</CardTitle>
-              <CardDescription className="text-white/70">
-                Crie a sua conta para começar
-              </CardDescription>
+            <CardHeader className="text-center space-y-6">
+              {/* Logo */}
+              <div className="flex justify-center">
+                <Image
+                  src="/images/logo-white.png"
+                  alt="ScaleAgents"
+                  width={200}
+                  height={60}
+                  className="h-12 w-auto mx-auto"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <CardTitle className="text-2xl font-bold text-white">Criar a sua Conta ScaleAgents</CardTitle>
+                <CardDescription className="text-white/70">
+                  Junte-se a milhares de empresas que usam ScaleAgents para formação de vendas com IA
+                </CardDescription>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               {generalError && (
                 <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
                   <p className="text-red-400 text-sm">{generalError}</p>
+                  {generalError.includes('já está registada') && (
+                    <div className="mt-2">
+                      <Link href="/login" className="text-purple-400 hover:text-purple-300 text-sm underline">
+                        Ir para Iniciar Sessão →
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* Email Input */}
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-white font-medium">Endereço de email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-white/50" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Introduza o seu endereço de email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    className={`pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500 focus:ring-purple-500 ${
+                      errors.email ? 'border-red-500' : ''
+                    }`}
+                    required
+                  />
+                </div>
+                {errors.email && (
+                  <p className="text-red-400 text-sm">{errors.email}</p>
+                )}
+              </div>
+
+              {/* Password Input */}
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-white font-medium">Palavra-passe</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-white/50" />
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Criar uma palavra-passe"
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    className={`pl-10 pr-10 bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500 focus:ring-purple-500 ${
+                      errors.password ? 'border-red-500' : ''
+                    }`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3 text-white/50 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p className="text-red-400 text-sm">{errors.password}</p>
+                )}
+              </div>
+
+              {/* Confirm Password Input */}
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-white font-medium">Confirmar Palavra-passe</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-white/50" />
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirmar a sua palavra-passe"
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                    className={`pl-10 pr-10 bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500 focus:ring-purple-500 ${
+                      errors.confirmPassword ? 'border-red-500' : ''
+                    }`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-3 text-white/50 hover:text-white"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.confirmPassword && (
+                  <p className="text-red-400 text-sm">{errors.confirmPassword}</p>
+                )}
+              </div>
+
+              {/* Continue with Email Button */}
+              <Button 
+                type="submit"
+                onClick={handleSubmit}
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white h-12 text-base font-medium"
+              >
+                {isLoading ? 'A continuar...' : 'Continuar com Email'}
+              </Button>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="flex items-center">
+                  <div className="flex-1 border-t border-white/20"></div>
+                  <span className="px-3 text-white/70 text-sm">Ou continuar com</span>
+                  <div className="flex-1 border-t border-white/20"></div>
+                </div>
+              </div>
 
               {/* Google Sign Up Button */}
               <Button 
                 type="button"
                 onClick={handleGoogleSignUp}
                 disabled={isGoogleLoading}
-                className="w-full mb-6 bg-white text-gray-900 hover:bg-gray-100 border border-white/20 font-medium"
+                className="w-full bg-white text-gray-900 hover:bg-gray-100 border border-white/20 h-12 text-base font-medium"
               >
                 {isGoogleLoading ? (
                   <div className="flex items-center space-x-2">
                     <div className="w-4 h-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin"></div>
-                    <span>A registar-se...</span>
+                    <span>A continuar...</span>
                   </div>
                 ) : (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
                     <svg className="w-5 h-5" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -184,168 +303,8 @@ export default function RegisterPage() {
                 )}
               </Button>
 
-              {/* Divider */}
-              <div className="relative mb-6">
-                <div className="flex items-center">
-                  <div className="flex-1 border-t border-white/20"></div>
-                  <span className="px-2 text-white text-xs uppercase">Ou registe-se com email</span>
-                  <div className="flex-1 border-t border-white/20"></div>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName" className="text-white">Nome</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-white/50" />
-                      <Input
-                        id="firstName"
-                        type="text"
-                        placeholder="João"
-                        value={formData.firstName}
-                        onChange={(e) => handleInputChange('firstName', e.target.value)}
-                        className={`pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500 ${
-                          errors.firstName ? 'border-red-500' : ''
-                        }`}
-                        required
-                      />
-                    </div>
-                    {errors.firstName && (
-                      <p className="text-red-400 text-sm">{errors.firstName}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName" className="text-white">Apelido</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-white/50" />
-                      <Input
-                        id="lastName"
-                        type="text"
-                        placeholder="Silva"
-                        value={formData.lastName}
-                        onChange={(e) => handleInputChange('lastName', e.target.value)}
-                        className={`pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500 ${
-                          errors.lastName ? 'border-red-500' : ''
-                        }`}
-                        required
-                      />
-                    </div>
-                    {errors.lastName && (
-                      <p className="text-red-400 text-sm">{errors.lastName}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-white">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-white/50" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="joao@exemplo.com"
-                      value={formData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      className={`pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500 ${
-                        errors.email ? 'border-red-500' : ''
-                      }`}
-                      required
-                    />
-                  </div>
-                  {errors.email && (
-                    <p className="text-red-400 text-sm">{errors.email}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-white">Palavra-passe</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-white/50" />
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Criar uma palavra-passe"
-                      value={formData.password}
-                      onChange={(e) => handleInputChange('password', e.target.value)}
-                      className={`pl-10 pr-10 bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500 ${
-                        errors.password ? 'border-red-500' : ''
-                      }`}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 text-white/50 hover:text-white"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {errors.password && (
-                    <p className="text-red-400 text-sm">{errors.password}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-white">Confirmar Palavra-passe</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-white/50" />
-                    <Input
-                      id="confirmPassword"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      placeholder="Confirmar a sua palavra-passe"
-                      value={formData.confirmPassword}
-                      onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                      className={`pl-10 pr-10 bg-white/5 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500 ${
-                        errors.confirmPassword ? 'border-red-500' : ''
-                      }`}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-3 text-white/50 hover:text-white"
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {errors.confirmPassword && (
-                    <p className="text-red-400 text-sm">{errors.confirmPassword}</p>
-                  )}
-                </div>
-
-                <div className="text-center mb-6">
-                  <div className="flex items-start justify-center space-x-3 max-w-sm mx-auto">
-                    <input
-                      type="checkbox"
-                      id="terms"
-                      className="mt-1 rounded border-white/20 bg-white/5 text-purple-500 focus:ring-purple-500 flex-shrink-0"
-                      required
-                    />
-                    <Label htmlFor="terms" className="text-sm text-white/70 leading-relaxed text-left">
-                      Ao continuar, concordas com os{' '}
-                      <Link href="/terms" className="text-purple-400 hover:text-purple-300">
-                        Terms of Service
-                      </Link>{' '}
-                      e{' '}
-                      <Link href="/privacy" className="text-purple-400 hover:text-purple-300">
-                        Privacy Policy
-                      </Link>
-                    </Label>
-                  </div>
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 h-12 text-base font-medium"
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'A criar conta...' : 'Criar Conta'}
-                </Button>
-              </form>
-
-              <div className="mt-6 text-center">
+              {/* Sign In Link */}
+              <div className="text-center pt-4">
                 <p className="text-white/70">
                   Já tem uma conta?{' '}
                   <Link href="/login" className="text-purple-400 hover:text-purple-300 font-medium">

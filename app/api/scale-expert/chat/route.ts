@@ -36,7 +36,7 @@ async function getAssistantId() {
     // Define tools for the Scale Expert assistant
     const tools = [
       {
-        type: 'function',
+        type: 'function' as const,
         function: {
           name: 'get_sales_call_analysis',
           description: 'Get detailed analysis of sales calls including transcriptions, dates, and patterns',
@@ -53,7 +53,7 @@ async function getAssistantId() {
         }
       },
       {
-        type: 'function',
+        type: 'function' as const,
         function: {
           name: 'get_business_metrics',
           description: 'Get comprehensive business metrics including sales calls, HR candidates, and overall performance KPIs',
@@ -65,7 +65,7 @@ async function getAssistantId() {
         }
       },
       {
-        type: 'function',
+        type: 'function' as const,
         function: {
           name: 'search_sales_patterns',
           description: 'Search for specific patterns, keywords, or phrases in sales call transcriptions',
@@ -82,7 +82,7 @@ async function getAssistantId() {
         }
       },
       {
-        type: 'function',
+        type: 'function' as const,
         function: {
           name: 'generate_scaling_recommendations',
           description: 'Generate specific scaling recommendations based on business data and focus area',
@@ -102,35 +102,29 @@ async function getAssistantId() {
     ]
 
     const assistantName = 'Scale Expert Agent'
-    const assistantInstructions = `You are a Scale Expert Agent, a specialized AI assistant focused on helping businesses scale and grow efficiently. You have access to the user's business data including sales calls and HR candidates.
+    const assistantInstructions = `You are a Scale Expert Agent helping businesses scale efficiently. You have access to the user's business profile, sales calls, and uploaded files.
 
-Your capabilities include:
-- Analyzing sales call patterns and providing insights
-- Generating business metrics and KPIs
-- Searching for specific patterns in sales conversations
-- Providing targeted scaling recommendations
-- Offering strategic advice for business growth
-- Analyzing uploaded files and documents to provide business insights
+Key capabilities:
+- Analyze sales patterns and provide actionable insights
+- Generate business metrics and scaling recommendations
+- Search sales conversations for specific patterns
+- Provide personalized advice based on their business context
 
-When users ask questions about their business, sales, hiring, or scaling challenges, use the available tools to gather relevant data and provide personalized insights.
+Always reference their specific business context: product/service, ideal customers, business model, pricing, performance metrics, challenges, and competitive landscape.
 
-When users upload files, analyze the content and provide insights related to their business questions. You can handle various file types including:
-- Business documents (PDFs, Word docs, Excel spreadsheets)
-- Sales presentations and reports
-- Financial documents and budgets
-- Strategic plans and proposals
-- Any other business-related files
+For uploaded files, analyze and provide relevant business insights. Handle: business documents, sales reports, financial docs, strategic plans.
 
-Always provide actionable, specific recommendations based on the user's actual data and uploaded files. Be conversational but professional, and focus on practical steps for business growth.
+Provide actionable, specific recommendations. Be conversational but professional. Focus on practical growth steps relevant to their situation.
 
-Use Portuguese when appropriate, as the user interface is in Portuguese.`
+Use Portuguese when appropriate. Keep responses concise and focused.
+
+IMPORTANT: When referring to leads in Portuguese, always use "as leads" (feminine plural) instead of "os leads". The word "lead" is feminine in Portuguese, so the correct plural form is "as leads".`
 
     const assistant = await openai.beta.assistants.create({
       name: assistantName,
       instructions: assistantInstructions,
       model: 'gpt-4o',
-      tools: tools,
-      file_ids: [] // Enable file attachments
+      tools: tools
     })
     
     console.log('✅ Assistant created:', assistant.id)
@@ -162,6 +156,27 @@ async function getUserSalesCalls(userId: string) {
   } catch (error) {
     console.error('❌ Error in getUserSalesCalls:', error)
     return []
+  }
+}
+
+// Function to fetch user's business profile for context
+async function getUserBusinessProfile(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (error) {
+      console.error('❌ Error fetching business profile:', error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error('❌ Error in getUserBusinessProfile:', error)
+    return null
   }
 }
 
@@ -207,17 +222,39 @@ export async function POST(request: NextRequest) {
     console.log('📝 Processing message for Scale Expert Agent...')
     console.log('📊 Message details:', { threadId, messageLength: message.length, userId })
 
-    // Fetch user's sales calls for context
-    console.log('📁 Fetching user sales calls for context...')
-    const salesCalls = await getUserSalesCalls(userId)
-    console.log('📊 Found sales calls:', salesCalls.length)
+    // Check if this is a simple greeting or basic message
+    const simpleGreetings = ['olá', 'ola', 'hello', 'hi', 'hey', 'bom dia', 'boa tarde', 'boa noite', 'como está', 'como vai', 'tudo bem', 'obrigado', 'obrigada', 'thanks', 'thank you']
+    const isSimpleMessage = simpleGreetings.some(greeting => 
+      message.toLowerCase().trim().includes(greeting) && message.length < 50
+    )
+    
+    let salesCalls = []
+    let businessProfile = null
+    
+    if (!isSimpleMessage) {
+      // Only fetch context for complex messages
+      console.log('📁 Fetching user sales calls for context...')
+      salesCalls = await getUserSalesCalls(userId)
+      console.log('📊 Found sales calls:', salesCalls.length)
 
-    // Prepare enhanced message with sales calls context and uploaded files
+      console.log('👤 Fetching user business profile for context...')
+      businessProfile = await getUserBusinessProfile(userId)
+      console.log('📋 Business profile found:', !!businessProfile)
+    } else {
+      console.log('💬 Simple message detected, skipping context fetching for speed')
+    }
+
+    // Prepare enhanced message with sales calls context, business profile, and uploaded files
     let enhancedMessage = message
     let fileContext = ''
+    let businessContext = ''
     
-    // Handle uploaded file if provided (validate it's a real file with URL)
-    if (uploadedFile && uploadedFile.url && uploadedFile.name) {
+    // For simple messages, skip complex context building
+    if (isSimpleMessage) {
+      enhancedMessage = message // Use original message for simple greetings
+    } else {
+      // Handle uploaded file if provided (validate it's a real file with URL)
+      if (uploadedFile && uploadedFile.url && uploadedFile.name) {
       console.log('📁 Processing uploaded file:', uploadedFile)
       
       if (uploadedFile.fileType === 'document' && uploadedFile.extractedText) {
@@ -255,28 +292,71 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+    } // Close the else block for non-simple messages
+
+    // Build business profile context (optimized for speed) - only for complex messages
+    if (!isSimpleMessage && businessProfile) {
+      const keyFields = []
+      
+      // Only include the most important fields to reduce context size
+      if (businessProfile.business_product_service) {
+        keyFields.push(`Produto: ${businessProfile.business_product_service}`)
+      }
+      if (businessProfile.ideal_customer) {
+        keyFields.push(`Cliente: ${businessProfile.ideal_customer}`)
+      }
+      if (businessProfile.business_model) {
+        keyFields.push(`Modelo: ${businessProfile.business_model}`)
+      }
+      if (businessProfile.monthly_revenue) {
+        keyFields.push(`Receita: €${businessProfile.monthly_revenue}`)
+      }
+      if (businessProfile.growth_bottleneck) {
+        keyFields.push(`Bottleneck: ${businessProfile.growth_bottleneck}`)
+      }
+
+      if (keyFields.length > 0) {
+        businessContext = `\n\nNegócio: ${keyFields.join(' | ')}`
+      }
+    }
     
-    if (salesCalls.length > 0) {
-      const salesCallsContext = salesCalls.map((call, index) => {
+    // Build enhanced message only for complex messages
+    if (!isSimpleMessage) {
+      if (salesCalls.length > 0) {
+      // Limit to 2 most recent calls and truncate transcriptions for speed
+      const recentCalls = salesCalls.slice(0, 2)
+      const salesCallsContext = recentCalls.map((call, index) => {
         const transcription = call.transcription || 'No transcription available'
+        const truncatedTranscription = transcription.length > 1000 ? transcription.substring(0, 1000) + '...' : transcription
         const date = new Date(call.created_at).toLocaleDateString('pt-PT')
-        return `\n\n--- Sales Call ${index + 1} (${date}) ---\nTitle: ${call.title}\nTranscription:\n${transcription}\n--- End Sales Call ${index + 1} ---`
+        return `\n\nCall ${index + 1} (${date}): ${call.title}\n${truncatedTranscription}`
       }).join('\n')
 
-      enhancedMessage = `Context: The user has ${salesCalls.length} recent sales calls available for analysis.${(uploadedFile && uploadedFile.url && uploadedFile.name) ? ' Additionally, they have uploaded a file for analysis.' : ''}
+      enhancedMessage = `Context: ${salesCalls.length} sales calls${(uploadedFile && uploadedFile.url && uploadedFile.name) ? ', uploaded file' : ''}${businessContext ? ', business profile' : ''}.
 
-${salesCallsContext}${fileContext}
+${businessContext}${salesCallsContext}${fileContext}
 
-User Question: ${message}
+Question: ${message}
 
-Please analyze the sales calls above${(uploadedFile && uploadedFile.url && uploadedFile.name) ? ' and the uploaded file' : ''} and provide insights related to the user's question about scaling, growth, or business challenges.`
+Provide actionable insights and recommendations based on the context above.`
     } else if (uploadedFile && uploadedFile.url && uploadedFile.name) {
-      enhancedMessage = `Context: The user has uploaded a file for analysis.${fileContext}
+      enhancedMessage = `Context: Uploaded file${businessContext ? ', business profile' : ''}.${fileContext}
 
-User Question: ${message}
+${businessContext}
 
-Please analyze the uploaded file and provide insights related to the user's question about scaling, growth, or business challenges.`
-    }
+Question: ${message}
+
+Analyze and provide actionable recommendations.`
+    } else if (businessContext) {
+      enhancedMessage = `Context: Business profile available.
+
+${businessContext}
+
+Question: ${message}
+
+Provide personalized recommendations based on their business context.`
+      }
+    } // Close the message building block for complex messages
 
     // Note: File content is already included in the enhanced message context
     // No need to upload files to OpenAI separately
@@ -293,7 +373,9 @@ Please analyze the uploaded file and provide insights related to the user's ques
         timestamp: new Date().toISOString(),
         hasSalesCalls: (salesCalls.length > 0).toString(),
         salesCallsCount: salesCalls.length.toString(),
-        hasFileAttachments: ((uploadedFile && uploadedFile.url && uploadedFile.name) ? 'true' : 'false')
+        hasFileAttachments: ((uploadedFile && uploadedFile.url && uploadedFile.name) ? 'true' : 'false'),
+        hasBusinessProfile: (!!businessProfile).toString(),
+        businessProfileComplete: (!!businessProfile && businessProfile.business_product_service && businessProfile.ideal_customer && businessProfile.problem_solved && businessProfile.business_model).toString()
       }
     }
     
@@ -326,7 +408,7 @@ Please analyze the uploaded file and provide insights related to the user's ques
     // Poll for completion
     let runStatus = run.status
     let attempts = 0
-    const maxAttempts = 60 // 5 minutes with 5-second intervals
+    const maxAttempts = 120 // 2 minutes with 1-second intervals for faster response
 
     console.log('🔄 Starting polling loop with:', { threadId, runId: run.id, initialStatus: runStatus })
 
@@ -341,7 +423,7 @@ Please analyze the uploaded file and provide insights related to the user's ques
         throw new Error('Run timed out after 5 minutes')
       }
 
-      await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
+      await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second for faster response
       
       try {
         // Validate threadId is still valid
@@ -353,7 +435,7 @@ Please analyze the uploaded file and provide insights related to the user's ques
         
         // Use list method with limit=1 to get only the most recent run efficiently
         const runs = await openai.beta.threads.runs.list(threadId, { limit: 1 })
-        const runCheck = runs.data.find(r => r.id === run.id)
+        let runCheck = runs.data.find(r => r.id === run.id)
         
         if (!runCheck) {
           // If not found in recent runs, try with a larger limit
@@ -430,7 +512,8 @@ Please analyze the uploaded file and provide insights related to the user's ques
 
           // Submit tool outputs
           console.log('📤 Submitting tool outputs...')
-          await openai.beta.threads.runs.submitToolOutputs(threadId, run.id, {
+          await openai.beta.threads.runs.submitToolOutputs(run.id, {
+            thread_id: threadId,
             tool_outputs: toolOutputs
           })
 

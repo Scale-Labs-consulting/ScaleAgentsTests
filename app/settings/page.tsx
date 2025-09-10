@@ -20,6 +20,7 @@ import {
   Check
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/lib/supabase'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -238,6 +239,29 @@ export default function SettingsPage() {
                             <span>Save Changes</span>
                           </div>
                         )}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Business Profile */}
+              <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-white mb-2">Business Profile</h3>
+                      <p className="text-white/70 text-sm">Complete your business information to get personalized recommendations from our AI agents.</p>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="border-white/20 text-white hover:bg-white/10 bg-white/5"
+                        onClick={() => router.push('/complete-profile')}
+                      >
+                        <Edit3 className="w-4 h-4 mr-2" />
+                        Complete Profile
                       </Button>
                     </div>
                   </div>

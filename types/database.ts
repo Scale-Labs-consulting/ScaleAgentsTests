@@ -11,6 +11,24 @@ export interface Database {
           first_name: string | null
           last_name: string | null
           avatar_url: string | null
+          company_name: string | null
+          industry: string | null
+          how_did_you_hear: string | null
+          business_product_service: string | null
+          ideal_customer: string | null
+          problem_solved: string | null
+          business_model: string | null
+          average_ticket: string | null
+          conversion_rate: string | null
+          sales_cycle: string | null
+          lead_generation: string | null
+          common_objections: string | null
+          main_competitors: string | null
+          differentiation: string | null
+          pricing_structure: string | null
+          monthly_revenue: string | null
+          growth_bottleneck: string | null
+          funnel_drop_off: string | null
           created_at: string
           updated_at: string
         }
@@ -20,6 +38,24 @@ export interface Database {
           first_name?: string | null
           last_name?: string | null
           avatar_url?: string | null
+          company_name?: string | null
+          industry?: string | null
+          how_did_you_hear?: string | null
+          business_product_service?: string | null
+          ideal_customer?: string | null
+          problem_solved?: string | null
+          business_model?: string | null
+          average_ticket?: string | null
+          conversion_rate?: string | null
+          sales_cycle?: string | null
+          lead_generation?: string | null
+          common_objections?: string | null
+          main_competitors?: string | null
+          differentiation?: string | null
+          pricing_structure?: string | null
+          monthly_revenue?: string | null
+          growth_bottleneck?: string | null
+          funnel_drop_off?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -29,6 +65,24 @@ export interface Database {
           first_name?: string | null
           last_name?: string | null
           avatar_url?: string | null
+          company_name?: string | null
+          industry?: string | null
+          how_did_you_hear?: string | null
+          business_product_service?: string | null
+          ideal_customer?: string | null
+          problem_solved?: string | null
+          business_model?: string | null
+          average_ticket?: string | null
+          conversion_rate?: string | null
+          sales_cycle?: string | null
+          lead_generation?: string | null
+          common_objections?: string | null
+          main_competitors?: string | null
+          differentiation?: string | null
+          pricing_structure?: string | null
+          monthly_revenue?: string | null
+          growth_bottleneck?: string | null
+          funnel_drop_off?: string | null
           created_at?: string
           updated_at?: string
         }

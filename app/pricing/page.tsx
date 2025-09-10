@@ -59,32 +59,32 @@ export default function PricingPage() {
   const getPlanGradient = (planId: string) => {
     switch (planId) {
       case 'base':
-        return 'from-blue-500 to-cyan-500'
+        return 'from-blue-500 to-cyan-600'
       case 'pro':
-        return 'from-purple-500 to-violet-500'
+        return 'from-purple-600 to-violet-600'
       case 'enterprise':
-        return 'from-orange-500 to-red-500'
+        return 'from-purple-700 to-pink-600'
       default:
-        return 'from-gray-500 to-gray-600'
+        return 'from-slate-500 to-slate-600'
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Header */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-6 py-6">
         <div className="flex items-center justify-between mb-8">
           <Button
             variant="ghost"
             onClick={() => router.push('/dashboard')}
-            className="text-white hover:bg-white/10"
+            className="text-white hover:bg-white/10 border border-white/20 hover:border-white/30"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Voltar ao Dashboard
           </Button>
           
           <div className="text-center">
-            <h1 className="text-4xl font-bold text-white mb-2">
+            <h1 className="text-3xl font-bold text-white mb-2">
               Escolha o seu Plano
             </h1>
             <p className="text-white/70 text-lg">
@@ -92,44 +92,44 @@ export default function PricingPage() {
             </p>
           </div>
           
-          <div className="w-24"></div> {/* Spacer for centering */}
+          <div className="w-32"></div> {/* Spacer for centering */}
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {SUBSCRIPTION_PLANS.map((plan) => (
             <Card 
               key={plan.id}
-              className={`relative bg-white/10 border-white/20 backdrop-blur-md shadow-2xl transition-all duration-300 hover:scale-105 ${
-                plan.popular ? 'ring-2 ring-purple-500 shadow-purple-500/25' : ''
+              className={`relative bg-white/10 border-white/20 backdrop-blur-md shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-purple-500/20 ${
+                plan.popular ? 'ring-2 ring-purple-500 shadow-purple-500/30 scale-105' : ''
               }`}
             >
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-gradient-to-r from-purple-500 to-violet-500 text-white px-4 py-1">
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                  <Badge className="bg-gradient-to-r from-purple-600 to-violet-600 text-white px-4 py-1 text-xs font-semibold shadow-lg">
                     Mais Popular
                   </Badge>
                 </div>
               )}
               
               <CardHeader className="text-center pb-4">
-                <div className={`w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r ${getPlanGradient(plan.id)} flex items-center justify-center text-white`}>
+                <div className={`w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r ${getPlanGradient(plan.id)} flex items-center justify-center text-white shadow-lg`}>
                   {getPlanIcon(plan.id)}
                 </div>
                 
-                <CardTitle className="text-2xl font-bold text-white">
+                <CardTitle className="text-2xl font-bold text-white mb-2">
                   {plan.name}
                 </CardTitle>
                 
-                <CardDescription className="text-white/70 text-base">
+                <CardDescription className="text-white/70 text-base mb-4">
                   {plan.description}
                 </CardDescription>
                 
-                <div className="mt-4">
+                <div className="bg-white/5 rounded-lg p-3 border border-white/10">
                   <span className="text-4xl font-bold text-white">
                     €{plan.price}
                   </span>
-                  <span className="text-white/60 ml-2">
+                  <span className="text-white/60 ml-2 text-base">
                     /{plan.interval === 'month' ? 'mês' : 'ano'}
                   </span>
                 </div>
@@ -138,32 +138,34 @@ export default function PricingPage() {
               <CardContent className="space-y-6">
                 {/* Features */}
                 <div className="space-y-3">
+                  <h3 className="text-white font-semibold text-base mb-3">Funcionalidades Incluídas</h3>
                   {plan.features.map((feature, index) => (
-                    <div key={index} className="flex items-start space-x-3">
-                      <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-white/80 text-sm">{feature}</span>
+                    <div key={index} className="flex items-start space-x-2">
+                      <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-white/90 text-sm">{feature}</span>
                     </div>
                   ))}
                 </div>
                 
                 {/* Limits */}
-                <div className="bg-white/5 rounded-lg p-4 space-y-2">
+                <div className="bg-white/5 rounded-lg p-4 space-y-3 border border-white/10">
+                  <h4 className="text-white font-semibold text-base mb-3">Limites do Plano</h4>
                   <div className="flex justify-between text-sm">
-                    <span className="text-white/60">Análises por mês:</span>
-                    <span className="text-white font-medium">
+                    <span className="text-white/70">Análises por mês:</span>
+                    <span className="text-white font-semibold">
                       {plan.maxAnalyses === -1 ? 'Ilimitadas' : plan.maxAnalyses}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-white/60">Tamanho máximo:</span>
-                    <span className="text-white font-medium">
-                      {plan.maxFileSize}MB
+                    <span className="text-white/70">Tamanho máximo:</span>
+                    <span className="text-white font-semibold">
+                      {plan.maxFileSize ? `${plan.maxFileSize}MB` : 'Sem limite'}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-white/60">Prioridade:</span>
-                    <span className="text-white font-medium capitalize">
-                      {plan.priority}
+                    <span className="text-white/70">Prioridade:</span>
+                    <span className="text-white font-semibold capitalize">
+                      {plan.priority === 'low' ? 'Normal' : plan.priority === 'medium' ? 'Alta' : 'Máxima'}
                     </span>
                   </div>
                 </div>
@@ -172,10 +174,10 @@ export default function PricingPage() {
                 <Button
                   onClick={() => handleSubscribe(plan)}
                   disabled={loading === plan.id}
-                  className={`w-full py-3 text-lg font-semibold transition-all duration-300 ${
+                  className={`w-full py-3 text-base font-semibold transition-all duration-300 shadow-lg ${
                     plan.popular
-                      ? 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
-                      : 'bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800'
+                      ? 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 hover:shadow-purple-500/25'
+                      : 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 hover:shadow-slate-500/25'
                   }`}
                 >
                   {loading === plan.id ? (

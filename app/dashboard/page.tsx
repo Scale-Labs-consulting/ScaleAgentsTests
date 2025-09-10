@@ -10,17 +10,24 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { Bot, TrendingUp, Users, Zap, MessageSquare, BarChart3, UserCheck, LogOut, Settings, Crown, ChevronRight, ChevronLeft, HelpCircle, Moon, UserPlus, FileText, Send, ArrowLeft, Loader2, Sparkles, Square, Upload, FileAudio, Plus, ArrowUp, Play, Pause, Volume2, VolumeX, Download, Trash2, CheckCircle, AlertCircle, Clock, Calendar, Target, Brain, ArrowRight, XCircle, X, MoreHorizontal, Edit3, FileVideo, Search, RefreshCw, Star } from 'lucide-react'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Bot, TrendingUp, Users, Zap, MessageSquare, BarChart3, UserCheck, LogOut, Settings, Crown, ChevronRight, ChevronLeft, HelpCircle, Moon, UserPlus, FileText, Send, ArrowLeft, Loader2, Sparkles, Square, Upload, FileAudio, Plus, ArrowUp, Play, Pause, Volume2, VolumeX, Download, Trash2, CheckCircle, AlertCircle, Clock, Calendar, Target, Brain, ArrowRight, XCircle, X, MoreHorizontal, Edit3, FileVideo, Search, RefreshCw, Star, Copy, StickyNote, Share2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { useFirstTimeUser } from '@/hooks/useFirstTimeUser'
 import { forceLogout, supabase } from '@/lib/supabase'
 import { ChatService, getScaleExpertAgentId } from '@/lib/chat-service'
 import { useToast } from '@/hooks/use-toast'
 import { convertVideoToAudio, shouldConvertVideo } from '@/lib/video-converter'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
 
 interface Message {
@@ -49,6 +56,7 @@ export default function DashboardPage() {
   const modalRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const { user, signOut, loading, initialized } = useAuth()
+  const { isFirstTime, isLoading: isFirstTimeLoading } = useFirstTimeUser()
 
   // Scale Expert states
   const [messages, setMessages] = useState<Message[]>([])
@@ -74,6 +82,77 @@ export default function DashboardPage() {
   const [salesAnalysisResult, setSalesAnalysisResult] = useState<any>(null)
   const [isFileSelectionInProgress, setIsFileSelectionInProgress] = useState(false)
   const [salesIsAnalyzing, setSalesIsAnalyzing] = useState(false)
+  
+  // Date filter state
+  const [dateFilter, setDateFilter] = useState<'1D' | '7D' | '14D' | '30D' | 'custom'>('1D')
+  const [customDateRange, setCustomDateRange] = useState<{start: Date | null, end: Date | null}>({start: null, end: null})
+
+  // Filter analyses based on date range
+  const getFilteredAnalyses = () => {
+    if (!analyses || analyses.length === 0) return []
+    
+    const now = new Date()
+    let startDate: Date
+    
+    switch (dateFilter) {
+      case '1D':
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+        break
+      case '7D':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        break
+      case '14D':
+        startDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
+        break
+      case '30D':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        break
+      case 'custom':
+        if (!customDateRange.start || !customDateRange.end) return analyses
+        return analyses.filter((analysis: any) => {
+          // Use uploadDate which is already formatted as YYYY-MM-DD
+          const analysisDate = new Date(analysis.uploadDate)
+          return analysisDate >= customDateRange.start! && analysisDate <= customDateRange.end!
+        })
+      default:
+        return analyses
+    }
+    
+    return analyses.filter((analysis: any) => {
+      // Use uploadDate which is already formatted as YYYY-MM-DD
+      const analysisDate = new Date(analysis.uploadDate)
+      return analysisDate >= startDate
+    })
+  }
+
+  // Prepare chart data for average score over time
+  const getChartData = () => {
+    const filtered = getFilteredAnalyses()
+    if (filtered.length === 0) return []
+
+    // Group analyses by date and calculate average score
+    const groupedByDate = filtered.reduce((acc: any, analysis: any) => {
+      const date = analysis.uploadDate
+      if (!acc[date]) {
+        acc[date] = { scores: [], count: 0 }
+      }
+      acc[date].scores.push(analysis.score || 0)
+      acc[date].count += 1
+      return acc
+    }, {})
+
+    // Convert to chart data format
+    const chartData = Object.entries(groupedByDate)
+      .map(([date, data]: [string, any]) => ({
+        date: new Date(date).toLocaleDateString('pt-PT', { month: 'short', day: 'numeric' }),
+        fullDate: date,
+        averageScore: Math.round(data.scores.reduce((sum: number, score: number) => sum + score, 0) / data.count),
+        count: data.count
+      }))
+      .sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime())
+
+    return chartData
+  }
   
   // AbortController for cancelling upload operations
   const salesAbortControllerRef = useRef<AbortController | null>(null)
@@ -134,6 +213,11 @@ export default function DashboardPage() {
   const [loadingAnalyses, setLoadingAnalyses] = useState(false)
   const [selectedAnalysis, setSelectedAnalysis] = useState<any>(null)
   const [showAnalysisModal, setShowAnalysisModal] = useState(false)
+  const [showTranscript, setShowTranscript] = useState(false)
+  const [showNotes, setShowNotes] = useState(false)
+  const [notes, setNotes] = useState('')
+  const [isSharing, setIsSharing] = useState(false)
+  const [loadingNotes, setLoadingNotes] = useState(false)
   
   // Keyboard escape handler for analysis modal
   useEffect(() => {
@@ -854,6 +938,26 @@ export default function DashboardPage() {
     }
   }, [user, initialized, router])
 
+  // Redirect first-time users to complete profile
+  useEffect(() => {
+    if (initialized && user && !isFirstTimeLoading && isFirstTime) {
+      console.log('🆕 First-time user detected, redirecting to complete profile')
+      router.push('/complete-profile')
+    }
+  }, [user, initialized, isFirstTime, isFirstTimeLoading, router])
+
+  // Show loading screen while checking if user is first-time
+  if (initialized && user && isFirstTimeLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-white/70">A carregar...</p>
+        </div>
+      </div>
+    )
+  }
+
   // Load subscription data when user is available
   useEffect(() => {
     if (user) {
@@ -895,7 +999,7 @@ export default function DashboardPage() {
       const agentParam = urlParams.get('agent')
       if (agentParam === 'sales-analyst') {
         setSelectedAgent('sales-analyst')
-        setActiveTab('upload')
+        setActiveTab('overview')
       }
     }
   }, [])
@@ -979,6 +1083,25 @@ export default function DashboardPage() {
     setSelectedAnalyses(new Set())
     setSelectAll(false)
   }, [analyses])
+
+  // Load notes when analysis is selected
+  const loadNotes = async (analysisId: string) => {
+    if (!user) return
+    
+    setLoadingNotes(true)
+    try {
+      const response = await fetch(`/api/sales-analyst/notes?analysisId=${analysisId}&userId=${user.id}`)
+      const result = await response.json()
+      
+      if (result.success) {
+        setNotes(result.notes || '')
+      }
+    } catch (error) {
+      console.error('Error loading notes:', error)
+    } finally {
+      setLoadingNotes(false)
+    }
+  }
 
   // Bulk selection functions
   const toggleSelectAll = () => {
@@ -1340,8 +1463,8 @@ export default function DashboardPage() {
         }
       } else if (selectedFile && !uploadedFileUrl) {
         console.log('⚠️ File selected but not uploaded yet - waiting for upload to complete')
-        // Wait a bit for upload to complete
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        // Wait a bit for upload to complete (reduced delay)
+        await new Promise(resolve => setTimeout(resolve, 500))
         
         // Check again after waiting
         if (uploadedFileUrl) {
@@ -1418,8 +1541,8 @@ export default function DashboardPage() {
               : msg
           ))
           
-          // Add a consistent delay for the streaming effect
-          await new Promise(resolve => setTimeout(resolve, 20))
+          // Add a consistent delay for the streaming effect (optimized for speed)
+          await new Promise(resolve => setTimeout(resolve, 2))
         }
       } catch (streamingError) {
         console.error('❌ Error during streaming:', streamingError)
@@ -1932,14 +2055,6 @@ export default function DashboardPage() {
       icon: BarChart3,
       status: 'active',
       lastUsed: 'há 1 dia'
-    },
-    {
-      id: 'hr-talent',
-      name: 'HR Agent',
-      description: 'Intelligent talent acquisition and human resources management',
-      icon: UserCheck,
-      status: 'coming-soon',
-      lastUsed: 'Em Breve'
     }
   ]
 
@@ -2319,7 +2434,7 @@ export default function DashboardPage() {
                         onClick={() => {
                           setShowProfileModal(false)
                           setSelectedAgent('sales-analyst')
-                          setActiveTab('upload')
+                          setActiveTab('overview')
                         }}
                       >
                         <div className="w-8 h-8 rounded-md bg-gradient-to-r from-blue-500 to-cyan-600 flex items-center justify-center">
@@ -2437,7 +2552,7 @@ export default function DashboardPage() {
                             onClick={() => {
                               setShowAgentDropdown(false)
                               setSelectedAgent('sales-analyst')
-                              setActiveTab('upload')
+                              setActiveTab('overview')
                             }}
                           >
                             <div className="w-5 h-5 rounded bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center justify-center">
@@ -2701,48 +2816,501 @@ export default function DashboardPage() {
                   {/* Sales Analyst Content */}
                   <div className="flex-1 overflow-y-auto p-6 w-full">
                     <div className="w-full mx-auto">
-                      {/* Tabs */}
-                      <div className="flex space-x-1 mb-6 bg-white/10 rounded-lg p-1">
-                        <button
-                          onClick={() => setActiveTab('upload')}
-                          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                            activeTab === 'upload' 
-                              ? 'bg-purple-600 text-white' 
-                              : 'text-white/70 hover:text-white hover:bg-white/10'
-                          }`}
-                        >
-                          <Upload className="w-4 h-4 inline mr-2" />
-                          Carregar Ficheiro
-                        </button>
-                        <button
-                          onClick={() => setActiveTab('analyses')}
-                          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                            activeTab === 'analyses' 
-                              ? 'bg-purple-600 text-white' 
-                              : 'text-white/70 hover:text-white hover:bg-white/10'
-                          }`}
-                        >
-                          <FileText className="w-4 h-4 inline mr-2" />
-                          Ver Análises ({analyses.length})
-                        </button>
+                      {/* Tabs and Date Filter */}
+                      <div className="mb-6 flex items-center justify-between">
+                        <div className="bg-white/10 rounded-lg p-1 inline-flex">
+                          <button
+                            onClick={() => setActiveTab('overview')}
+                            className={`px-6 py-3 rounded-md text-sm font-medium transition-colors ${
+                              activeTab === 'overview' 
+                                ? 'bg-purple-600 text-white shadow-lg' 
+                                : 'text-white/70 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            <BarChart3 className="w-4 h-4 inline mr-2" />
+                            Visão Geral
+                          </button>
+                          <button
+                            onClick={() => setActiveTab('upload')}
+                            className={`px-6 py-3 rounded-md text-sm font-medium transition-colors ${
+                              activeTab === 'upload' 
+                                ? 'bg-purple-600 text-white shadow-lg' 
+                                : 'text-white/70 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            <Upload className="w-4 h-4 inline mr-2" />
+                            Carregar Ficheiro
+                          </button>
+                          <button
+                            onClick={() => setActiveTab('analyses')}
+                            className={`px-6 py-3 rounded-md text-sm font-medium transition-colors ${
+                              activeTab === 'analyses' 
+                                ? 'bg-purple-600 text-white shadow-lg' 
+                                : 'text-white/70 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            <FileText className="w-4 h-4 inline mr-2" />
+                            Ver Análises
+                          </button>
+                        </div>
+                        
+                        {/* Date Filter - Only show on overview tab */}
+                        {activeTab === 'overview' && (
+                          <div className="bg-white/10 rounded-lg p-1 flex items-center space-x-0">
+                            <button
+                              onClick={() => setDateFilter('1D')}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                dateFilter === '1D'
+                                  ? 'bg-purple-600 text-white shadow-lg'
+                                  : 'text-white/70 hover:text-white hover:bg-white/10'
+                              }`}
+                            >
+                              1D
+                            </button>
+                            <div className="w-px h-4 bg-white/20 mx-1"></div>
+                            <button
+                              onClick={() => setDateFilter('7D')}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                dateFilter === '7D'
+                                  ? 'bg-purple-600 text-white shadow-lg'
+                                  : 'text-white/70 hover:text-white hover:bg-white/10'
+                              }`}
+                            >
+                              7D
+                            </button>
+                            <div className="w-px h-4 bg-white/20 mx-1"></div>
+                            <button
+                              onClick={() => setDateFilter('14D')}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                dateFilter === '14D'
+                                  ? 'bg-purple-600 text-white shadow-lg'
+                                  : 'text-white/70 hover:text-white hover:bg-white/10'
+                              }`}
+                            >
+                              14D
+                            </button>
+                            <div className="w-px h-4 bg-white/20 mx-1"></div>
+                            <button
+                              onClick={() => setDateFilter('30D')}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                dateFilter === '30D'
+                                  ? 'bg-purple-600 text-white shadow-lg'
+                                  : 'text-white/70 hover:text-white hover:bg-white/10'
+                              }`}
+                            >
+                              30D
+                            </button>
+                            <div className="w-px h-4 bg-white/20 mx-1"></div>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                    dateFilter === 'custom'
+                                      ? 'bg-purple-600 text-white shadow-lg'
+                                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                                  }`}
+                                >
+                                  Definir Data
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0 bg-slate-800 border-slate-700" align="end">
+                                <div className="p-4">
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label className="text-white text-sm font-medium">Selecionar Período</Label>
+                                      <div className="mt-2 space-y-2">
+                                        <div>
+                                          <Label className="text-white/70 text-xs">Data de Início</Label>
+                                          <CalendarComponent
+                                            mode="single"
+                                            selected={customDateRange.start || undefined}
+                                            onSelect={(date) => setCustomDateRange(prev => ({ ...prev, start: date || null }))}
+                                            className="rounded-md border-slate-600 bg-slate-800"
+                                            classNames={{
+                                              day: "bg-transparent text-white hover:bg-purple-600 hover:text-white",
+                                              day_selected: "bg-purple-600 text-white",
+                                              day_today: "bg-purple-600/20 text-white",
+                                              head_cell: "text-white/70",
+                                              cell: "text-white",
+                                              button: "text-white hover:bg-purple-600/20",
+                                              nav_button: "text-white hover:bg-purple-600/20",
+                                              caption: "text-white"
+                                            }}
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label className="text-white/70 text-xs">Data de Fim</Label>
+                                          <CalendarComponent
+                                            mode="single"
+                                            selected={customDateRange.end || undefined}
+                                            onSelect={(date) => setCustomDateRange(prev => ({ ...prev, end: date || null }))}
+                                            className="rounded-md border-slate-600 bg-slate-800"
+                                            classNames={{
+                                              day: "bg-transparent text-white hover:bg-purple-600 hover:text-white",
+                                              day_selected: "bg-purple-600 text-white",
+                                              day_today: "bg-purple-600/20 text-white",
+                                              head_cell: "text-white/70",
+                                              cell: "text-white",
+                                              button: "text-white hover:bg-purple-600/20",
+                                              nav_button: "text-white hover:bg-purple-600/20",
+                                              caption: "text-white"
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex space-x-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => {
+                                          if (customDateRange.start && customDateRange.end) {
+                                            setDateFilter('custom')
+                                          }
+                                        }}
+                                        disabled={!customDateRange.start || !customDateRange.end}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                                      >
+                                        Aplicar
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setCustomDateRange({ start: null, end: null })
+                                          setDateFilter('1D')
+                                        }}
+                                        className="bg-white text-black border-white hover:bg-gray-100"
+                                      >
+                                        Limpar
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        )}
                       </div>
+
+
+                      {/* Overview Tab */}
+                      {activeTab === 'overview' && (
+                        <div className="space-y-8">
+                          {/* Statistics Cards */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
+                              <CardContent className="p-6">
+                                <div>
+                                  <p className="text-white/70 text-sm font-medium">Total de Análises</p>
+                                  <p className="text-3xl font-bold text-white mt-2">{getFilteredAnalyses().length}</p>
+                                </div>
+                              </CardContent>
+                            </Card>
+
+                            <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
+                              <CardContent className="p-6">
+                                <div>
+                                  <p className="text-white/70 text-sm font-medium">Pontuação Média</p>
+                                  <p className="text-3xl font-bold text-white mt-2">
+                                    {(() => {
+                                      const filtered = getFilteredAnalyses()
+                                      return filtered.length > 0 
+                                        ? Math.round(filtered.reduce((sum: number, analysis: any) => sum + (analysis.score || 0), 0) / filtered.length)
+                                        : 0
+                                    })()}/40
+                                  </p>
+                                </div>
+                              </CardContent>
+                            </Card>
+
+                            <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
+                              <CardContent className="p-6">
+                                <div>
+                                  <p className="text-white/70 text-sm font-medium">Total de Horas Analisadas</p>
+                                  <p className="text-3xl font-bold text-white mt-2">
+                                    {(() => {
+                                      const filtered = getFilteredAnalyses()
+                                      // Calculate total hours from analysis metadata or estimate from call duration
+                                      const totalMinutes = filtered.reduce((total: number, analysis: any) => {
+                                        // Try to get duration from analysis metadata
+                                        const metadata = analysis.analysis?.metadata || analysis.analysis_metadata || {}
+                                        const duration = metadata.duration || metadata.call_duration || metadata.audio_duration
+                                        
+                                        if (duration) {
+                                          // If duration is in seconds, convert to minutes
+                                          return total + (typeof duration === 'number' ? duration / 60 : 0)
+                                        }
+                                        
+                                        // If no duration available, estimate based on transcription length
+                                        const transcription = analysis.analysis?.transcription || analysis.transcription || ''
+                                        if (transcription) {
+                                          // Rough estimate: 150 words per minute for speech
+                                          const wordCount = transcription.split(' ').length
+                                          return total + (wordCount / 150)
+                                        }
+                                        
+                                        // Default estimate: 30 minutes per call
+                                        return total + 30
+                                      }, 0)
+                                      
+                                      const totalHours = Math.round(totalMinutes / 60 * 10) / 10 // Round to 1 decimal place
+                                      return `${totalHours}h`
+                                    })()}
+                                  </p>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          {/* Average Score Chart */}
+                          {(() => {
+                            const chartData = getChartData()
+                            return chartData.length > 0 && (
+                              <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
+                                <CardHeader>
+                                  <CardTitle className="text-white flex items-center">
+                                    <TrendingUp className="w-5 h-5 mr-2" />
+                                    Evolução da Pontuação Média
+                                  </CardTitle>
+                                  <CardDescription className="text-white/70">
+                                    Pontuação média das suas análises ao longo do tempo
+                                  </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                  <div className="h-80 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                                        <XAxis 
+                                          dataKey="date" 
+                                          stroke="#9CA3AF"
+                                          fontSize={12}
+                                          tickLine={false}
+                                          axisLine={false}
+                                        />
+                                        <YAxis 
+                                          stroke="#9CA3AF"
+                                          fontSize={12}
+                                          tickLine={false}
+                                          axisLine={false}
+                                          domain={[0, 40]}
+                                          tickFormatter={(value) => `${value}/40`}
+                                        />
+                                        <Tooltip
+                                          contentStyle={{
+                                            backgroundColor: '#1F2937',
+                                            border: '1px solid #374151',
+                                            borderRadius: '8px',
+                                            color: '#F9FAFB'
+                                          }}
+                                          labelStyle={{ color: '#F9FAFB' }}
+                                          formatter={(value: any, name: string) => [
+                                            `${value}/40`,
+                                            'Pontuação Média'
+                                          ]}
+                                          labelFormatter={(label) => `Data: ${label}`}
+                                        />
+                                        <Line
+                                          type="monotone"
+                                          dataKey="averageScore"
+                                          stroke="#8B5CF6"
+                                          strokeWidth={3}
+                                          dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 4 }}
+                                          activeDot={{ r: 6, stroke: '#8B5CF6', strokeWidth: 2, fill: '#1F2937' }}
+                                        />
+                                      </LineChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )
+                          })()}
+
+                          {/* Recent Analyses */}
+                          <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
+                            <CardHeader>
+                              <CardTitle className="text-white flex items-center">
+                                <Clock className="w-5 h-5 mr-2" />
+                                Análises Recentes
+                              </CardTitle>
+                              <CardDescription className="text-white/70">
+                                As suas últimas análises de chamadas de vendas
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              {(() => {
+                                const filtered = getFilteredAnalyses()
+                                return filtered.length > 0 ? (
+                                  <div className="space-y-4">
+                                    {filtered.slice(0, 5).map((analysis: any, index: number) => (
+                                    <div key={analysis.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
+                                      <div className="flex items-center space-x-4">
+                                        <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-600 flex items-center justify-center">
+                                          <FileText className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div>
+                                          <h4 className="text-white font-medium">{analysis.title}</h4>
+                                          <p className="text-white/60 text-sm">
+                                            {new Date(analysis.uploadDate).toLocaleDateString('pt-PT')} • 
+                                            {analysis.analysis?.callType || analysis.analysis?.call_type || 'N/A'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center space-x-4">
+                                        <div className="text-right">
+                                          <p className="text-white font-bold text-lg">{analysis.score || 0}/40</p>
+                                          <p className="text-white/60 text-xs">Pontuação</p>
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setSelectedAnalysis(analysis)}
+                                          className="border-white/20 text-white hover:bg-white/10 bg-white/5"
+                                        >
+                                          Ver Detalhes
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-8">
+                                    <FileText className="w-16 h-16 text-white/30 mx-auto mb-4" />
+                                    <h3 className="text-white/70 text-lg font-medium mb-2">Nenhuma análise encontrada</h3>
+                                    <p className="text-white/50 mb-4">
+                                      {analyses.length === 0 
+                                        ? "Carregue o seu primeiro ficheiro para começar a analisar as suas chamadas de vendas."
+                                        : "Nenhuma análise encontrada para o período selecionado."
+                                      }
+                                    </p>
+                                    {analyses.length === 0 && (
+                                      <Button
+                                        onClick={() => setActiveTab('upload')}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                                      >
+                                        <Upload className="w-4 h-4 mr-2" />
+                                        Carregar Ficheiro
+                                      </Button>
+                                    )}
+                                  </div>
+                                )
+                              })()}
+                            </CardContent>
+                          </Card>
+
+                          {/* Performance Insights */}
+                          {(() => {
+                            const filtered = getFilteredAnalyses()
+                            return filtered.length > 0 && (
+                            <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
+                              <CardHeader>
+                                <CardTitle className="text-white flex items-center">
+                                  <Brain className="w-5 h-5 mr-2" />
+                                  Insights de Performance
+                                </CardTitle>
+                                <CardDescription className="text-white/70">
+                                  Análise das suas tendências de performance
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  <div className="space-y-4">
+                                    <h4 className="text-white font-medium">Áreas de Força</h4>
+                                    <div className="space-y-2">
+                                      {(() => {
+                                        const filtered = getFilteredAnalyses()
+                                        return filtered.length > 0 && (
+                                          <>
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-white/70 text-sm">Clareza e Fluência</span>
+                                              <span className="text-white font-medium">
+                                                {Math.round(filtered.reduce((sum: number, analysis: any) => 
+                                                  sum + (analysis.analysis?.analysis_fields?.clarezaFluenciaFala || 0), 0) / filtered.length
+                                                )}/5
+                                              </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-white/70 text-sm">Tom e Controlo</span>
+                                              <span className="text-white font-medium">
+                                                {Math.round(filtered.reduce((sum: number, analysis: any) => 
+                                                  sum + (analysis.analysis?.analysis_fields?.tomControlo || 0), 0) / filtered.length
+                                                )}/5
+                                              </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-white/70 text-sm">Envolvimento</span>
+                                              <span className="text-white font-medium">
+                                                {Math.round(filtered.reduce((sum: number, analysis: any) => 
+                                                  sum + (analysis.analysis?.analysis_fields?.envolvimentoConversacional || 0), 0) / filtered.length
+                                                )}/5
+                                              </span>
+                                            </div>
+                                          </>
+                                        )
+                                      })()}
+                                    </div>
+                                  </div>
+                                  <div className="space-y-4">
+                                    <h4 className="text-white font-medium">Áreas de Melhoria</h4>
+                                    <div className="space-y-2">
+                                      {(() => {
+                                        const filtered = getFilteredAnalyses()
+                                        return filtered.length > 0 && (
+                                          <>
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-white/70 text-sm">Descoberta de Necessidades</span>
+                                              <span className="text-white font-medium">
+                                                {Math.round(filtered.reduce((sum: number, analysis: any) => 
+                                                  sum + (analysis.analysis?.analysis_fields?.efetividadeDescobertaNecessidades || 0), 0) / filtered.length
+                                                )}/5
+                                              </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-white/70 text-sm">Lidar com Objeções</span>
+                                              <span className="text-white font-medium">
+                                                {Math.round(filtered.reduce((sum: number, analysis: any) => 
+                                                  sum + (analysis.analysis?.analysis_fields?.habilidadesLidarObjeccoes || 0), 0) / filtered.length
+                                                )}/5
+                                              </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-white/70 text-sm">Fechamento</span>
+                                              <span className="text-white font-medium">
+                                                {Math.round(filtered.reduce((sum: number, analysis: any) => 
+                                                  sum + (analysis.analysis?.analysis_fields?.fechamentoProximosPassos || 0), 0) / filtered.length
+                                                )}/5
+                                              </span>
+                                            </div>
+                                          </>
+                                        )
+                                      })()}
+                                    </div>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            )
+                          })()}
+                        </div>
+                      )}
 
                       {/* Upload Tab */}
                       {activeTab === 'upload' && (
-                        <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
-                          <CardHeader>
-                            <CardTitle className="flex items-center space-x-2 text-white">
-                              <Upload className="w-5 h-5" />
-                              <span>Carregar Chamada de Vendas</span>
-                            </CardTitle>
-                            <CardDescription>
-                              Carregue um ficheiro MP4 para obter análise de vendas com IA
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-6">
+                        <div className="space-y-8">
+                          {/* Upload Call Recording Section */}
+                          <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
+                            <CardHeader>
+                              <CardTitle className="text-white text-xl font-semibold">
+                                Carregar Gravação de Chamada
+                              </CardTitle>
+                              <CardDescription className="text-white/70">
+                                Carregue um ficheiro de áudio para gerar automaticamente uma transcrição
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
                             {/* File Upload */}
                             <div 
-                              className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
+                              className={`border-2 border-dashed rounded-lg p-12 text-center transition-all duration-300 ${
                                 isFileSelectionInProgress 
                                   ? 'cursor-not-allowed border-gray-500 bg-gray-500/10' 
                                   : isDragOver 
@@ -2765,7 +3333,7 @@ export default function DashboardPage() {
                               <input
                                 ref={salesFileInputRef}
                                 type="file"
-                                accept="video/*"
+                                accept=".mp4,.mp3,.mov,.avi,.wmv"
                                 onChange={(e) => {
                                   console.log('📁 File input onChange triggered')
                                   console.log('🔒 File selection in progress:', isFileSelectionInProgress)
@@ -2790,18 +3358,18 @@ export default function DashboardPage() {
                               />
                               {!salesUploadedFile ? (
                                 <>
-                                  <div className="flex items-center justify-center mb-4">
-                                    <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
+                                  <div className="flex items-center justify-center mb-6">
+                                    <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
                                       isDragOver 
                                         ? 'bg-purple-500/30 scale-110' 
                                         : 'bg-purple-500/20'
                                     }`}>
-                                      <Upload className={`w-8 h-8 transition-colors duration-300 ${
+                                      <Upload className={`w-10 h-10 transition-colors duration-300 ${
                                         isDragOver ? 'text-purple-300' : 'text-purple-400'
                                       }`} />
                                     </div>
                                   </div>
-                                  <p className="text-lg font-medium text-white mb-2">
+                                  <p className="text-lg font-medium text-white mb-4">
                                     {isFileSelectionInProgress 
                                       ? 'A processar seleção de ficheiro...' 
                                       : isDragOver 
@@ -2810,7 +3378,7 @@ export default function DashboardPage() {
                                     }
                                   </p>
                                   <p className="text-white/50 text-sm mb-4">
-                                    Formatos suportados: MP4, MOV, AVI, WMV
+                                    Formatos suportados: MP4, MP3, MOV, AVI, WMV
                                   </p>
                                 </>
                               ) : (
@@ -2842,7 +3410,7 @@ export default function DashboardPage() {
                                       e.stopPropagation() // Prevent event bubbling to parent drag-and-drop area
                                       cancelSalesUpload()
                                     }}
-                                    className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                                    className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white border-purple-500/50"
                                   >
                                     Cancelar
                                   </Button>
@@ -2938,8 +3506,10 @@ export default function DashboardPage() {
                                 {salesUploadStatus}
                               </div>
                             )}
-                          </CardContent>
-                        </Card>
+                            </CardContent>
+                          </Card>
+
+                        </div>
                       )}
 
                       {/* Analyses Tab */}
@@ -3054,6 +3624,7 @@ export default function DashboardPage() {
                                             onClick={() => {
                                               setSelectedAnalysis(analysis)
                                               setShowAnalysisModal(true)
+                                              loadNotes(analysis.id)
                                             }}
                                           >
                                             <h3 className="text-white font-medium mb-1">{analysis.title}</h3>
@@ -3127,7 +3698,7 @@ export default function DashboardPage() {
             }}
           >
             <div 
-              className="bg-gray-900 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+              className="bg-gray-900 rounded-lg p-6 max-w-7xl w-full mx-4 max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
             <div className="flex items-center justify-between mb-6">
@@ -3145,7 +3716,26 @@ export default function DashboardPage() {
               </Button>
             </div>
             
-            <div className="space-y-6">
+            {/* Two Column Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Main Content - Left Side */}
+              <div className="lg:col-span-3 space-y-6">
+            
+                {/* Transcript Section */}
+                {showTranscript && (
+                  <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                    <h3 className="text-lg font-semibold text-white mb-3 flex items-center">
+                      <FileText className="w-5 h-5 mr-2" />
+                      Transcrição da Chamada
+                    </h3>
+                    <div className="max-h-96 overflow-y-auto">
+                      <p className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">
+                        {selectedAnalysis.transcription || selectedAnalysis.analysis?.transcription || 'Transcrição não disponível'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              
               {/* Analysis Summary */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div className="bg-white/5 p-4 rounded-lg">
@@ -3527,6 +4117,175 @@ export default function DashboardPage() {
                   
                 </div>
               )}
+              </div>
+              
+              {/* Right Sidebar */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* Share Section */}
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-3">Partilhar</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      setIsSharing(true)
+                      try {
+                        const response = await fetch('/api/sales-analyst/share', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            analysisId: selectedAnalysis.id,
+                            userId: user?.id
+                          })
+                        })
+                        
+                        const result = await response.json()
+                        
+                        if (result.success) {
+                          const shareUrl = `${window.location.origin}/shared/${result.shareId}`
+                          await navigator.clipboard.writeText(shareUrl)
+                          toast({
+                            title: "Link partilhado!",
+                            description: "O link foi copiado para a área de transferência.",
+                          })
+                        } else {
+                          throw new Error(result.error || 'Erro ao criar link de partilha')
+                        }
+                      } catch (error) {
+                        console.error('Error sharing analysis:', error)
+                        toast({
+                          title: "Erro ao partilhar",
+                          description: "Não foi possível criar o link de partilha.",
+                          variant: "destructive"
+                        })
+                      } finally {
+                        setIsSharing(false)
+                      }
+                    }}
+                    disabled={isSharing}
+                    className="w-full border-white/20 text-white hover:bg-white/10 bg-white/5"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    {isSharing ? 'A partilhar...' : 'Partilhar chamada'}
+                  </Button>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-white/10"></div>
+
+                {/* Notes Section */}
+                <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                  <h3 className="text-sm font-semibold text-white mb-3">Notas</h3>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder={loadingNotes ? "A carregar notas..." : "Clique para adicionar notas..."}
+                    disabled={loadingNotes}
+                    className="w-full h-24 p-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 text-sm"
+                  />
+                  <div className="flex justify-end mt-2">
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch('/api/sales-analyst/notes', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              analysisId: selectedAnalysis.id,
+                              userId: user?.id,
+                              notes: notes
+                            })
+                          })
+                          
+                          if (response.ok) {
+                            toast({
+                              title: "Notas guardadas!",
+                              description: "As suas notas foram guardadas com sucesso.",
+                            })
+                          }
+                        } catch (error) {
+                          toast({
+                            title: "Erro ao guardar",
+                            description: "Não foi possível guardar as notas.",
+                            variant: "destructive"
+                          })
+                        }
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700 text-white text-xs"
+                    >
+                      Guardar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-white/10"></div>
+
+                {/* Transcript Section */}
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-3">Transcrição</h3>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const transcript = selectedAnalysis.transcription || selectedAnalysis.analysis?.transcription || 'Transcrição não disponível'
+                        try {
+                          await navigator.clipboard.writeText(transcript)
+                          toast({
+                            title: "Transcrição copiada!",
+                            description: "A transcrição foi copiada para a área de transferência.",
+                          })
+                        } catch (err) {
+                          toast({
+                            title: "Erro ao copiar",
+                            description: "Não foi possível copiar a transcrição.",
+                            variant: "destructive"
+                          })
+                        }
+                      }}
+                      className="w-full border-white/20 text-white hover:bg-white/10 bg-white/5"
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copiar transcrição
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTranscript(!showTranscript)}
+                      className="w-full border-white/20 text-white hover:bg-white/10 bg-white/5"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      {showTranscript ? 'Ocultar transcrição' : 'Ver transcrição'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-white/10"></div>
+
+                {/* Delete Section */}
+                <div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setAnalysisToDelete(selectedAnalysis)
+                      setShowAnalysisDeleteConfirmation(true)
+                    }}
+                    className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 bg-red-500/5"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Eliminar conversa
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

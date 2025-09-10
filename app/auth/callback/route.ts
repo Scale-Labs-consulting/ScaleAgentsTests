@@ -6,6 +6,9 @@ export async function GET(request: NextRequest) {
   
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const state = requestUrl.searchParams.get('state')
+  
+  console.log('🔍 Callback parameters:', { code: !!code, state: !!state })
   
   if (!code) {
     console.error('❌ No auth code found in callback')
@@ -21,7 +24,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/login?error=missing_env_vars', request.url))
     }
     
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        flowType: 'pkce',
+        detectSessionInUrl: true,
+        autoRefreshToken: true,
+        persistSession: true,
+      }
+    })
     
     // Exchange the code for a session
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
@@ -35,8 +45,10 @@ export async function GET(request: NextRequest) {
       console.log('✅ Auth callback successful, session established')
       console.log('👤 User ID:', data.session.user?.id)
       console.log('📧 User email:', data.session.user?.email)
+      console.log('🆕 Is new user:', data.session.user?.created_at === data.session.user?.updated_at)
       
-      // Redirect to dashboard on success
+      // Always redirect to dashboard - first-time user check will be handled there
+      console.log('✅ User authenticated, redirecting to dashboard')
       return NextResponse.redirect(new URL('/dashboard', request.url))
     } else {
       console.error('❌ No session found after code exchange')

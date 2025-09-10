@@ -2,17 +2,21 @@ import Stripe from 'stripe'
 import { loadStripe } from '@stripe/stripe-js'
 
 // Server-side Stripe instance
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20',
-})
+export const stripe = process.env.STRIPE_SECRET_KEY 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-06-20',
+    })
+  : null
 
 // Client-side Stripe instance
 export const getStripe = () => {
-  return loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+  return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
+    ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+    : null
 }
 
 // Stripe webhook secret
-export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!
+export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || ''
 
 // Helper function to create checkout session
 export const createCheckoutSession = async (
@@ -20,6 +24,10 @@ export const createCheckoutSession = async (
   customerId?: string,
   metadata?: Record<string, string>
 ) => {
+  if (!stripe) {
+    throw new Error('Stripe not configured')
+  }
+  
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card'],
@@ -45,6 +53,10 @@ export const createCheckoutSession = async (
 
 // Helper function to create customer portal session
 export const createCustomerPortalSession = async (customerId: string) => {
+  if (!stripe) {
+    throw new Error('Stripe not configured')
+  }
+  
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
     return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
@@ -55,6 +67,10 @@ export const createCustomerPortalSession = async (customerId: string) => {
 
 // Helper function to get customer subscriptions
 export const getCustomerSubscriptions = async (customerId: string) => {
+  if (!stripe) {
+    throw new Error('Stripe not configured')
+  }
+  
   const subscriptions = await stripe.subscriptions.list({
     customer: customerId,
     status: 'all',
@@ -66,6 +82,10 @@ export const getCustomerSubscriptions = async (customerId: string) => {
 
 // Helper function to cancel subscription
 export const cancelSubscription = async (subscriptionId: string) => {
+  if (!stripe) {
+    throw new Error('Stripe not configured')
+  }
+  
   const subscription = await stripe.subscriptions.update(subscriptionId, {
     cancel_at_period_end: true,
   })
@@ -75,6 +95,10 @@ export const cancelSubscription = async (subscriptionId: string) => {
 
 // Helper function to reactivate subscription
 export const reactivateSubscription = async (subscriptionId: string) => {
+  if (!stripe) {
+    throw new Error('Stripe not configured')
+  }
+  
   const subscription = await stripe.subscriptions.update(subscriptionId, {
     cancel_at_period_end: false,
   })

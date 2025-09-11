@@ -940,6 +940,14 @@ export default function DashboardPage() {
 
   // Redirect first-time users to complete profile
   useEffect(() => {
+    console.log('🔄 Dashboard redirect check:', {
+      initialized,
+      hasUser: !!user,
+      isFirstTimeLoading,
+      isFirstTime,
+      willRedirect: initialized && user && !isFirstTimeLoading && isFirstTime
+    })
+    
     if (initialized && user && !isFirstTimeLoading && isFirstTime) {
       console.log('🆕 First-time user detected, redirecting to complete profile')
       router.push('/complete-profile')

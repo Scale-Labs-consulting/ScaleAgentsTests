@@ -18,22 +18,10 @@ export function useFirstTimeUser() {
       try {
         console.log('🔍 Checking if user is first-time...')
         
-        // Quick check: if user was just created (within last 5 minutes), likely first-time
-        const userCreatedAt = new Date(user.created_at)
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
-        const isRecentlyCreated = userCreatedAt > fiveMinutesAgo
-        
-        if (isRecentlyCreated) {
-          console.log('🆕 User created recently, likely first-time')
-          setIsFirstTime(true)
-          setIsLoading(false)
-          return
-        }
-        
         // Check if user has completed their profile - optimized query with timeout
         const queryPromise = supabase
           .from('profiles')
-          .select('first_name, last_name, company_name, business_product_service, ideal_customer, problem_solved, business_model')
+          .select('onboarding_completed')
           .eq('id', user.id)
           .single()
         
@@ -53,36 +41,18 @@ export function useFirstTimeUser() {
           // If there's an error, assume user is not first-time to avoid blocking them
           setIsFirstTime(false)
         } else {
-          // Check if profile is complete (core business fields)
-          // Also check if user has "skipped" onboarding (has default values)
-          const isSkipped = data?.first_name === 'User' && 
-                           data?.last_name === 'Skipped' && 
-                           data?.business_product_service === 'Skipped onboarding'
+          // Check if onboarding is completed using the dedicated field
+          const isOnboardingCompleted = data?.onboarding_completed === true
           
-          const isComplete = data?.first_name && 
-                            data?.last_name && 
-                            data?.company_name && 
-                            data?.business_product_service && 
-                            data?.ideal_customer && 
-                            data?.problem_solved && 
-                            data?.business_model &&
-                            !isSkipped // Don't consider skipped profiles as complete
-          
-          console.log('📋 Profile completeness check:', { 
-            hasFirstName: !!data?.first_name,
-            hasLastName: !!data?.last_name,
-            hasCompanyName: !!data?.company_name,
-            hasBusinessProductService: !!data?.business_product_service,
-            hasIdealCustomer: !!data?.ideal_customer,
-            hasProblemSolved: !!data?.problem_solved,
-            hasBusinessModel: !!data?.business_model,
-            isSkipped,
-            isComplete 
+          console.log('📋 Onboarding completion check:', { 
+            onboarding_completed: data?.onboarding_completed,
+            onboarding_completed_type: typeof data?.onboarding_completed,
+            isOnboardingCompleted,
+            willBeFirstTime: !isOnboardingCompleted
           })
           
-          // If user has skipped, they are not first-time (won't see onboarding again)
-          // If profile is incomplete and not skipped, they are first-time
-          setIsFirstTime(!isComplete && !isSkipped)
+          // User is first-time if onboarding is not completed
+          setIsFirstTime(!isOnboardingCompleted)
         }
       } catch (error) {
         console.error('Error checking first-time user:', error)

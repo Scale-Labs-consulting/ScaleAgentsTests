@@ -196,6 +196,7 @@ export default function CompleteProfilePage() {
         monthly_revenue: formData.monthlyRevenue,
         growth_bottleneck: formData.growthBottleneck,
         funnel_drop_off: formData.funnelDropOff,
+        onboarding_completed: true, // Mark onboarding as completed
           updated_at: new Date().toISOString()
       }
 
@@ -223,13 +224,27 @@ export default function CompleteProfilePage() {
         }
         
         console.log('✅ Profile saved successfully!', savedProfile)
+        
+        // Verify the profile was saved with all required fields
+        const requiredFields = ['first_name', 'last_name', 'company_name', 'business_product_service', 'ideal_customer', 'problem_solved', 'business_model']
+        const missingFields = requiredFields.filter(field => !savedProfile[field])
+        
+        if (missingFields.length > 0) {
+          console.warn('⚠️ Some required fields are missing from saved profile:', missingFields)
+        } else {
+          console.log('✅ All required fields are present in saved profile')
+        }
       } catch (saveError) {
         console.error('❌ Save error:', saveError)
         throw saveError
       }
       
-      // Redirect to dashboard
-      router.push('/dashboard')
+      // Redirect to dashboard with a small delay to ensure database is updated
+      console.log('✅ Profile saved successfully, redirecting to dashboard...')
+      setTimeout(() => {
+        // Force a hard navigation to ensure the useFirstTimeUser hook re-evaluates
+        window.location.href = '/dashboard'
+      }, 500)
     } catch (error: any) {
       console.error('Error saving profile:', error)
       console.error('Error type:', typeof error)
@@ -285,6 +300,7 @@ export default function CompleteProfilePage() {
           ideal_customer: 'Not specified',
           problem_solved: 'Not specified',
           business_model: 'Not specified',
+          onboarding_completed: true, // Mark onboarding as completed (skipped)
           updated_at: new Date().toISOString()
         })
 
@@ -295,11 +311,16 @@ export default function CompleteProfilePage() {
         console.log('✅ User marked as completed onboarding')
       }
       
-      router.push('/dashboard')
+      // Force a hard navigation to ensure the useFirstTimeUser hook re-evaluates
+      setTimeout(() => {
+        window.location.href = '/dashboard'
+      }, 500)
     } catch (error) {
       console.error('❌ Error in handleSkip:', error)
       // Still redirect even if there's an error
-    router.push('/dashboard')
+      setTimeout(() => {
+        window.location.href = '/dashboard'
+      }, 500)
     }
   }
 
@@ -442,8 +463,14 @@ export default function CompleteProfilePage() {
                         placeholder="Descreve o teu cliente ideal..."
                         value={formData.idealCustomer}
                         onChange={(e) => handleInputChange('idealCustomer', e.target.value)}
-                        className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500 focus:ring-purple-500 min-h-[100px]"
+                        className={`bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-purple-500 focus:ring-purple-500 min-h-[100px] ${
+                          errors.idealCustomer ? 'border-red-500' : ''
+                        }`}
+                        required
                       />
+                      {errors.idealCustomer && (
+                        <p className="text-red-400 text-sm">{errors.idealCustomer}</p>
+                      )}
                     </div>
 
                     <div className="space-y-2">

@@ -29,6 +29,7 @@ export interface Database {
           monthly_revenue: string | null
           growth_bottleneck: string | null
           funnel_drop_off: string | null
+          onboarding_completed: boolean
           created_at: string
           updated_at: string
         }
@@ -56,6 +57,7 @@ export interface Database {
           monthly_revenue?: string | null
           growth_bottleneck?: string | null
           funnel_drop_off?: string | null
+          onboarding_completed?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -83,6 +85,7 @@ export interface Database {
           monthly_revenue?: string | null
           growth_bottleneck?: string | null
           funnel_drop_off?: string | null
+          onboarding_completed?: boolean
           created_at?: string
           updated_at?: string
         }

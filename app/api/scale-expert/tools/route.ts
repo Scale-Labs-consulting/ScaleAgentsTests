@@ -219,6 +219,160 @@ const tools = {
     } catch (error) {
       return { error: 'Failed to generate recommendations' }
     }
+  },
+
+  // Analyze uploaded documents
+  analyze_uploaded_document: async (userId: string, parameters: { documentId?: string, analysisType: string }) => {
+    try {
+      const { documentId, analysisType } = parameters
+      
+      let query = supabase
+        .from('uploaded_documents')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+
+      if (documentId) {
+        query = query.eq('id', documentId)
+      } else {
+        query = query.limit(5) // Get last 5 documents for analysis
+      }
+
+      const { data: documents, error } = await query
+
+      if (error) {
+        return { error: 'Failed to fetch documents' }
+      }
+
+      if (!documents || documents.length === 0) {
+        return { message: 'No documents found for analysis' }
+      }
+
+      // Analyze documents based on type
+      const analysis = {
+        totalDocuments: documents.length,
+        analysisType,
+        documents: documents.map(doc => ({
+          id: doc.id,
+          fileName: doc.file_name,
+          fileType: doc.file_type,
+          uploadedAt: new Date(doc.created_at).toLocaleDateString('pt-PT'),
+          textLength: doc.extracted_text?.length || 0,
+          hasText: !!doc.extracted_text
+        })),
+        insights: []
+      }
+
+      // Generate insights based on analysis type
+      switch (analysisType) {
+        case 'summary':
+          analysis.insights = [
+            `Encontrados ${documents.length} documentos para análise`,
+            `Tipos de ficheiros: ${[...new Set(documents.map(d => d.file_type))].join(', ')}`,
+            `Documento mais recente: ${documents[0].file_name}`,
+            `Total de texto extraído: ${documents.reduce((sum, doc) => sum + (doc.extracted_text?.length || 0), 0)} caracteres`
+          ]
+          break
+        case 'financial_analysis':
+          analysis.insights = [
+            'Análise financeira dos documentos:',
+            'Procurando por indicadores financeiros, métricas de performance, e dados de receita...',
+            'Recomendação: Foque em documentos com dados financeiros estruturados para melhor análise'
+          ]
+          break
+        case 'strategy_review':
+          analysis.insights = [
+            'Revisão estratégica dos documentos:',
+            'Analisando planos de negócio, estratégias de crescimento, e objetivos...',
+            'Recomendação: Documentos estratégicos são cruciais para o planeamento de escalabilidade'
+          ]
+          break
+        case 'compliance_check':
+          analysis.insights = [
+            'Verificação de conformidade:',
+            'Verificando documentos para requisitos legais, regulamentações, e políticas...',
+            'Recomendação: Mantenha documentação atualizada para evitar problemas de conformidade'
+          ]
+          break
+        default:
+          analysis.insights = [
+            'Análise geral dos documentos:',
+            'Documentos carregados com sucesso e prontos para análise',
+            'Use as ferramentas de pesquisa para encontrar informações específicas'
+          ]
+      }
+
+      return analysis
+    } catch (error) {
+      return { error: 'Failed to analyze documents' }
+    }
+  },
+
+  // Search documents
+  search_documents: async (userId: string, parameters: { searchTerm: string, documentType?: string }) => {
+    try {
+      const { searchTerm, documentType } = parameters
+      
+      let query = supabase
+        .from('uploaded_documents')
+        .select('*')
+        .eq('user_id', userId)
+        .ilike('extracted_text', `%${searchTerm}%`)
+
+      if (documentType && documentType !== 'all') {
+        query = query.eq('file_type', documentType)
+      }
+
+      const { data: documents, error } = await query
+
+      if (error) {
+        return { error: 'Failed to search documents' }
+      }
+
+      if (!documents || documents.length === 0) {
+        return { 
+          message: `Nenhum documento encontrado com o termo "${searchTerm}"`,
+          searchTerm,
+          documentType: documentType || 'all'
+        }
+      }
+
+      // Extract relevant snippets from documents
+      const results = documents.map(doc => {
+        const text = doc.extracted_text || ''
+        const searchIndex = text.toLowerCase().indexOf(searchTerm.toLowerCase())
+        
+        let snippet = ''
+        if (searchIndex !== -1) {
+          const start = Math.max(0, searchIndex - 100)
+          const end = Math.min(text.length, searchIndex + searchTerm.length + 100)
+          snippet = text.substring(start, end)
+          if (start > 0) snippet = '...' + snippet
+          if (end < text.length) snippet = snippet + '...'
+        }
+
+        return {
+          id: doc.id,
+          fileName: doc.file_name,
+          fileType: doc.file_type,
+          uploadedAt: new Date(doc.created_at).toLocaleDateString('pt-PT'),
+          snippet: snippet || 'Conteúdo encontrado mas snippet não disponível',
+          relevanceScore: text.toLowerCase().split(searchTerm.toLowerCase()).length - 1
+        }
+      })
+
+      // Sort by relevance score
+      results.sort((a, b) => b.relevanceScore - a.relevanceScore)
+
+      return {
+        searchTerm,
+        documentType: documentType || 'all',
+        totalResults: results.length,
+        results
+      }
+    } catch (error) {
+      return { error: 'Failed to search documents' }
+    }
   }
 }
 

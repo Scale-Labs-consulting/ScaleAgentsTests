@@ -49,6 +49,12 @@ export default function LoginPage() {
         case 'missing_env_vars':
           errorMessage = 'Erro de configuração. Contacte o administrador.'
           break
+        case 'session_error':
+          errorMessage = errorDetails ? `Erro de sessão: ${errorDetails}` : 'Erro de sessão. Tente novamente.'
+          break
+        case 'manual_exchange_failed':
+          errorMessage = errorDetails ? `Falha na troca de código: ${errorDetails}` : 'Falha na troca de código. Tente novamente.'
+          break
       }
       
       setError(errorMessage)
@@ -60,6 +66,7 @@ export default function LoginPage() {
       window.history.replaceState({}, '', newUrl.toString())
     }
   }, [])
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

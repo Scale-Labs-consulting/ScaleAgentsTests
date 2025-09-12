@@ -98,6 +98,50 @@ async function getAssistantId() {
             required: ['focusArea']
           }
         }
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'analyze_uploaded_document',
+          description: 'Analyze uploaded documents (PDF, Word, Excel, etc.) and extract business insights',
+          parameters: {
+            type: 'object',
+            properties: {
+              documentId: {
+                type: 'string',
+                description: 'Optional specific document ID to analyze. If not provided, analyzes the most recent documents.'
+              },
+              analysisType: {
+                type: 'string',
+                description: 'Type of analysis to perform on the document',
+                enum: ['summary', 'financial_analysis', 'strategy_review', 'compliance_check', 'general_insights']
+              }
+            },
+            required: ['analysisType']
+          }
+        }
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'search_documents',
+          description: 'Search for specific content, keywords, or patterns in uploaded documents',
+          parameters: {
+            type: 'object',
+            properties: {
+              searchTerm: {
+                type: 'string',
+                description: 'The term or phrase to search for in document content'
+              },
+              documentType: {
+                type: 'string',
+                description: 'Optional filter by document type',
+                enum: ['pdf', 'word', 'excel', 'powerpoint', 'text', 'all']
+              }
+            },
+            required: ['searchTerm']
+          }
+        }
       }
     ]
 
@@ -108,17 +152,29 @@ Key capabilities:
 - Analyze sales patterns and provide actionable insights
 - Generate business metrics and scaling recommendations
 - Search sales conversations for specific patterns
+- Analyze uploaded documents (PDF, Word, Excel, PowerPoint, text files)
+- Search through document content for specific information
 - Provide personalized advice based on their business context
 
 Always reference their specific business context: product/service, ideal customers, business model, pricing, performance metrics, challenges, and competitive landscape.
 
-For uploaded files, analyze and provide relevant business insights. Handle: business documents, sales reports, financial docs, strategic plans.
+For uploaded files, analyze and provide relevant business insights. Handle: business documents, sales reports, financial docs, strategic plans, presentations, spreadsheets, and any other business-related files.
+
+When analyzing documents, you can:
+- Provide summaries of document content
+- Perform financial analysis on financial documents
+- Review strategic plans and business strategies
+- Check compliance and regulatory requirements
+- Search for specific information across all documents
+- Extract key insights and recommendations
 
 Provide actionable, specific recommendations. Be conversational but professional. Focus on practical growth steps relevant to their situation.
 
 Use Portuguese when appropriate. Keep responses concise and focused.
 
-IMPORTANT: When referring to leads in Portuguese, always use "as leads" (feminine plural) instead of "os leads". The word "lead" is feminine in Portuguese, so the correct plural form is "as leads".`
+IMPORTANT: When referring to leads in Portuguese, always use "as leads" (feminine plural) instead of "os leads". The word "lead" is feminine in Portuguese, so the correct plural form is "as leads".
+
+CRITICAL: Never include citation markers, source references, or any text in brackets like 【4:0†source】 in your responses. Provide clean, professional responses without any citation formatting.`
 
     const assistant = await openai.beta.assistants.create({
       name: assistantName,
@@ -543,10 +599,18 @@ Provide personalized recommendations based on their business context.`
     }
 
     // Extract the text content
-    const responseText = assistantMessage.content
+    let responseText = assistantMessage.content
       .filter(content => content.type === 'text')
       .map(content => (content as any).text.value)
       .join('\n')
+
+    // Clean up citation markers and source references
+    responseText = responseText
+      .replace(/【\d+:\d+†source】/g, '') // Remove citation markers like 【4:0†source】
+      .replace(/【.*?†.*?】/g, '') // Remove any other citation patterns
+      .replace(/\[\d+:\d+†source\]/g, '') // Remove alternative citation formats
+      .replace(/\[.*?†.*?\]/g, '') // Remove any other bracket citation patterns
+      .trim()
 
     console.log('✅ Assistant response retrieved:', responseText.substring(0, 100) + '...')
 

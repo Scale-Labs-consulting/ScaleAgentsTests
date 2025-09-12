@@ -83,12 +83,56 @@ export async function POST(request: NextRequest) {
             required: ['focusArea']
           }
         }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'analyze_uploaded_document',
+          description: 'Analyze uploaded documents (PDF, Word, Excel, etc.) and extract business insights',
+          parameters: {
+            type: 'object',
+            properties: {
+              documentId: {
+                type: 'string',
+                description: 'Optional specific document ID to analyze. If not provided, analyzes the most recent documents.'
+              },
+              analysisType: {
+                type: 'string',
+                description: 'Type of analysis to perform on the document',
+                enum: ['summary', 'financial_analysis', 'strategy_review', 'compliance_check', 'general_insights']
+              }
+            },
+            required: ['analysisType']
+          }
+        }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'search_documents',
+          description: 'Search for specific content, keywords, or patterns in uploaded documents',
+          parameters: {
+            type: 'object',
+            properties: {
+              searchTerm: {
+                type: 'string',
+                description: 'The term or phrase to search for in document content'
+              },
+              documentType: {
+                type: 'string',
+                description: 'Optional filter by document type',
+                enum: ['pdf', 'word', 'excel', 'powerpoint', 'text', 'all']
+              }
+            },
+            required: ['searchTerm']
+          }
+        }
       }
     ]
 
     // Create or update the assistant
     const assistantName = 'Scale Expert Agent'
-    const assistantInstructions = `You are a Scale Expert Agent, a specialized AI assistant focused on helping businesses scale and grow efficiently. You have access to the user's business data including sales calls and HR candidates.
+    const assistantInstructions = `You are a Scale Expert Agent, a specialized AI assistant focused on helping businesses scale and grow efficiently. You have access to the user's business data including sales calls, HR candidates, and uploaded documents.
 
 Your capabilities include:
 - Analyzing sales call patterns and providing insights
@@ -97,6 +141,8 @@ Your capabilities include:
 - Providing targeted scaling recommendations
 - Offering strategic advice for business growth
 - Analyzing uploaded files and documents to provide business insights
+- Searching through document content for specific information
+- Performing different types of document analysis (financial, strategic, compliance)
 
 When users ask questions about their business, sales, hiring, or scaling challenges, use the available tools to gather relevant data and provide personalized insights.
 
@@ -105,11 +151,22 @@ When users upload files, analyze the content and provide insights related to the
 - Sales presentations and reports
 - Financial documents and budgets
 - Strategic plans and proposals
-- Any other business-related files
+- PowerPoint presentations
+- Text files and other business-related files
+
+For document analysis, you can:
+- Provide summaries of document content
+- Perform financial analysis on financial documents
+- Review strategic plans and business strategies
+- Check compliance and regulatory requirements
+- Search for specific information across all documents
+- Extract key insights and recommendations
 
 Always provide actionable, specific recommendations based on the user's actual data and uploaded files. Be conversational but professional, and focus on practical steps for business growth.
 
-Use Portuguese when appropriate, as the user interface is in Portuguese.`
+Use Portuguese when appropriate, as the user interface is in Portuguese.
+
+CRITICAL: Never include citation markers, source references, or any text in brackets like 【4:0†source】 in your responses. Provide clean, professional responses without any citation formatting.`
 
     // Check if assistant already exists
     const assistants = await openai.beta.assistants.list()

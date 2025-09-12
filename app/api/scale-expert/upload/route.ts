@@ -266,44 +266,61 @@ export async function POST(request: NextRequest) {
        return NextResponse.json(response)
 
     } else {
-      // Handle as business document - extract text content immediately
+      // Handle as business document - use blob-transcribe for processing
       console.log('📄 Processing business document for text extraction...')
       
       try {
-        // Extract text content from the document
-        const textContent = await extractTextFromURL(blob.url)
+        // Use the blob-transcribe route for document processing
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        const transcribeUrl = `${baseUrl}/api/scale-expert/blob-transcribe`
         
-        if (textContent && textContent.trim()) {
-          console.log('✅ Document text extracted successfully')
-          
-          // Store the extracted text in a temporary way for the chat session
-          // We'll pass this information back to the frontend
-          return NextResponse.json({
-            success: true,
-            fileUrl: blob.url,
-            fileType: 'document',
-            extractedText: textContent.substring(0, 1000) + '...', // Preview for frontend
-            fullTextLength: textContent.length,
-            message: 'Document uploaded and processed successfully'
+        const transcribeResponse = await fetch(transcribeUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            blobUrl: blob.url,
+            fileName: originalFileName,
+            userId: userId
           })
-        } else {
-          console.warn('⚠️ No text content extracted from document')
+        })
+
+        console.log('📥 Document processing response status:', transcribeResponse.status)
+        
+        if (!transcribeResponse.ok) {
+          const errorText = await transcribeResponse.text()
+          console.warn('⚠️ Document processing failed:', errorText)
+          
           return NextResponse.json({
             success: true,
             fileUrl: blob.url,
             fileType: 'document',
             extractedText: null,
-            message: 'Document uploaded but no text content could be extracted'
+            message: 'Document uploaded but processing failed'
+          })
+        } else {
+          const transcribeData = await transcribeResponse.json()
+          console.log('✅ Document processed successfully:', transcribeData)
+          
+          return NextResponse.json({
+            success: true,
+            fileUrl: blob.url,
+            fileType: 'document',
+            extractedText: transcribeData.transcription?.substring(0, 1000) + '...', // Preview for frontend
+            fullTextLength: transcribeData.transcription?.length || 0,
+            documentType: transcribeData.documentType,
+            message: 'Document uploaded and processed successfully'
           })
         }
-      } catch (extractionError) {
-        console.error('❌ Document text extraction error:', extractionError)
+      } catch (processingError) {
+        console.error('❌ Document processing error:', processingError)
         return NextResponse.json({
           success: true,
           fileUrl: blob.url,
           fileType: 'document',
           extractedText: null,
-          message: 'Document uploaded but text extraction failed'
+          message: 'Document uploaded but processing failed'
         })
       }
     }

@@ -23,8 +23,9 @@ export async function POST(request: NextRequest) {
     const fileExtension = fileName.toLowerCase().split('.').pop()
     const isAudioVideo = ['mp4', 'mp3', 'wav', 'avi', 'mov', 'm4a', 'aac', 'ogg'].includes(fileExtension || '')
     const isTextFile = ['txt', 'md', 'csv', 'json', 'xml', 'html', 'css', 'js'].includes(fileExtension || '')
+    const isDocumentFile = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(fileExtension || '')
 
-    console.log('📁 File type detection:', { fileName, fileExtension, isAudioVideo, isTextFile })
+    console.log('📁 File type detection:', { fileName, fileExtension, isAudioVideo, isTextFile, isDocumentFile })
 
     // Handle text files differently - read content directly
     if (isTextFile) {
@@ -54,10 +55,85 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Handle document files (PDF, Word, Excel, PowerPoint)
+    if (isDocumentFile) {
+      console.log('📄 Processing document file for text extraction...')
+      
+      try {
+        // Import the PDF utils
+        const { extractTextFromURL } = await import('@/lib/pdf-utils')
+        
+        // Extract text content from the document
+        const textContent = await extractTextFromURL(blobUrl)
+        
+        if (textContent && textContent.trim()) {
+          console.log('✅ Document text extracted successfully:', textContent.length, 'characters')
+          
+          // Store the document in the database for future reference
+          const { createClient } = await import('@supabase/supabase-js')
+          const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+          )
+          
+          // Get user ID from the request body
+          const { userId } = await request.json().catch(() => ({}))
+          
+          if (userId) {
+            try {
+              const { data: document, error: dbError } = await supabase
+                .from('uploaded_documents')
+                .insert({
+                  user_id: userId,
+                  file_name: fileName,
+                  file_url: blobUrl,
+                  file_type: fileExtension,
+                  extracted_text: textContent,
+                  created_at: new Date().toISOString()
+                })
+                .select()
+                .single()
+
+              if (dbError) {
+                console.warn('⚠️ Failed to store document in database:', dbError)
+              } else {
+                console.log('✅ Document stored in database:', document.id)
+              }
+            } catch (dbError) {
+              console.warn('⚠️ Database error (non-critical):', dbError)
+            }
+          }
+
+          return NextResponse.json({
+            success: true,
+            transcription: textContent,
+            message: 'Document content extracted successfully for scale expert',
+            documentType: fileExtension
+          })
+        } else {
+          console.warn('⚠️ No text content extracted from document')
+          return NextResponse.json({
+            success: true,
+            transcription: `Document file (${fileExtension}) uploaded but no text content could be extracted. This might be an image-based document or a scanned file.`,
+            message: 'Document uploaded but text extraction failed',
+            documentType: fileExtension
+          })
+        }
+      } catch (extractionError) {
+        console.error('❌ Document text extraction error:', extractionError)
+        return NextResponse.json({
+          success: true,
+          transcription: `Document file (${fileExtension}) uploaded but text extraction failed: ${extractionError instanceof Error ? extractionError.message : 'Unknown error'}`,
+          message: 'Document uploaded but text extraction failed',
+          documentType: fileExtension
+        })
+      }
+    }
+
     // For audio/video files, use AssemblyAI
     if (!isAudioVideo) {
       return NextResponse.json(
-        { error: 'Unsupported file type. Please upload audio/video files (MP4, MP3, etc.) or text files (TXT, MD, etc.)' },
+        { error: 'Unsupported file type. Please upload audio/video files (MP4, MP3, etc.), text files (TXT, MD, etc.), or document files (PDF, Word, Excel, PowerPoint).' },
         { status: 400 }
       )
     }

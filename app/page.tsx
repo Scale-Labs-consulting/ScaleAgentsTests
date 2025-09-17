@@ -489,9 +489,9 @@ export default function HomePage() {
 
 
         {/* Problem Section */}
-        <section className="py-24 px-4">
+        <section className="py-24 px-4 min-h-screen">
           <div className="container mx-auto">
-            <div className="text-center mb-24">
+            <div className="text-center mb-16">
               <h2 
                 id="problem-title"
                 data-animate
@@ -504,19 +504,31 @@ export default function HomePage() {
             </div>
             
             <div className="flex justify-center">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-6xl">
               {[
                 {
-                  icon: "⏰",
-                  title: "Processos Manuais Consomem Tempo",
-                  description: "Founders gastam 80% do tempo em tarefas que sistemas poderiam fazer. Resultado? Zero tempo para estratégia e crescimento.",
+                  icon: "👥",
+                  title: "Equipas Sem Performance Optimizada",
+                  description: "Contratar vendedores custa €50k+ por pessoa/ano. Já que o investimento é alto, mais vale garantir que eles performam ao máximo com sistemas e formação adequada.",
+                  gradient: "from-purple-600 to-violet-700"
+                },
+                {
+                  icon: "🎯",
+                  title: "Investem nos Sítios Errados",
+                  description: "Sem dados precisos, os diretores investem em marketing quando o problema é o fecho de negócio, ou em leads quando o problema é a oferta. Desperdiçam recursos no sintoma, não na causa.",
                   gradient: "from-purple-600 to-violet-700"
                 },
                 {
                   icon: "🛒",
                   title: "Ofertas Que Não Convertem",
-                  description: "Mesmo com produtos excelentes, as ofertas não convertem porque não foram testadas e otimizadas com dados reais.",
-                  gradient: "from-violet-600 to-purple-700"
+                  description: "Scripts genéricos, ofertas não testadas, processos amadores. Como esperas competir contra empresas com sistemas profissionais e dados reais?",
+                  gradient: "from-purple-600 to-violet-700"
+                },
+                {
+                  icon: "📊",
+                  title: "Falta de Dados Para Optimizar",
+                  description: "A maioria dos negócios não analisa as suas reuniões de venda nem têm feedback baseado em dados reais. Como vais melhorar sem saber onde estás a falhar?",
+                  gradient: "from-purple-600 to-violet-700"
                 }
               ].map((problem, index) => (
                 <div 

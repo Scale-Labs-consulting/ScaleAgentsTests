@@ -1067,161 +1067,161 @@ export default function HomePage() {
                 {
                   company: "Hook Point",
                   speaker: "José Brizida",
-                  videoFile: "/testemunhos/TESTEMUNHO - José Brizida - Hook Point - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Jos%C3%A9%20Brizida%20-%20Hook%20Point%20-%202025.mp4",
                   website: "https://hookpoint.com/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Cyberprotech",
                   speaker: "João Pacheco",
-                  videoFile: "/testemunhos/TESTEMUNHO - João Pacheco - Cyberprotech - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Jo%C3%A3o%20Pacheco%20-%20Cyberprotech%20-%202025.mp4",
                   website: "https://cyberprotech.org/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Sigma Code",
                   speaker: "Carlos Costa",
-                  videoFile: "/testemunhos/TESTEMUNHO - Carlos Costa - Sigma Code .mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Carlos%20Costa%20-%20Sigma%20Code%20.mp4",
                   website: "https://youtu.be/M82JIpX4bcE",
                   videoTime: "0:00"
                 },
                 {
                   company: "Lugotech",
                   speaker: "Pedro Lisboa",
-                  videoFile: "/testemunhos/TESTEMUNHO - Pedro Lisboa - Lugotech - 2025_03_26.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Pedro%20Lisboa%20-%20Lugotech%20-%202025_03_26.mp4",
                   website: "https://lugo.tech/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Narrativa de Espaços",
                   speaker: "Cheila",
-                  videoFile: "/testemunhos/SCALE LABS - OD Testemunho Cheila - (Apex Reach).webm",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/SCALE%20LABS%20-%20OD%20Testemunho%20Cheila%20-%20(Apex%20Reach).webm",
                   website: "https://narrativadeespacos.com/",
                   videoTime: "0:00"
                 },
                 {
                   company: "DUPLO NETWORK", 
                   speaker: "Francisco Marta",
-                  videoFile: "/testemunhos/TESTEMUNHO - Francisco Marta - Duplo Network - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Francisco%20Marta%20-%20Duplo%20Network%20-%202025.mp4",
                   website: "https://duplonetwork.com/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Brasfone",
                   speaker: "Fábio Igor CEO - Grupo Brasfone", 
-                  videoFile: "/testemunhos/TESTEMUNHO - Fábio Igor - Brasfone - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20F%C3%A1bio%20Igor%20-%20Brasfone%20-%202025.mp4",
                   website: "https://www.brasfone.pt/",
                   videoTime: "0:00"
                 },
                 {
                   company: "MoBrand",
                   speaker: "Adriano Prates COO da Mobrand",
-                  videoFile: "/testemunhos/TESTEMUNHO - Adriano Prates - Mobrand - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Adriano%20Prates%20-%20Mobrand%20-%202025.mp4",
                   website: "https://www.mobrand.com/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Maria Maia Group",
                   speaker: "Maria Maia",
-                  videoFile: "/testemunhos/TESTEMUNHO - Maria Maia - Mariamaiagroup - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Maria%20Maia%20-%20Mariamaiagroup%20-%202025.mp4",
                   website: "https://mariamaiabeauty.com/pt",
                   videoTime: "0:00"
                 },
                 {
                   company: "SlideLab Presentations",
                   speaker: "João Tavares",
-                  videoFile: "/testemunhos/TESTEMUNHO - João Tavares - SlideLab - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Jo%C3%A3o%20Tavares%20-%20SlideLab%20-%202025.mp4",
                   website: "https://slidelabpresentations.com/",
                   videoTime: "0:00"
                 },
                 {
                   company: "JP Crédito e Seguros",
                   speaker: "João Pereira",
-                  videoFile: "/testemunhos/TESTEMUNHO - João Pereira - JP Crédito e Seguros - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Jo%C3%A3o%20Pereira%20-%20JP%20Cr%C3%A9dito%20e%20Seguros%20-%202025.mp4",
                   website: "https://youtu.be/5dQCmMpb3a8",
                   videoTime: "0:00"
                 },
                 {
                   company: "PKE Automotive",
                   speaker: "Nuno Zeferino",
-                  videoFile: "/testemunhos/TESTEMUNHO - Nuno Zeferino - PKE - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Nuno%20Zeferino%20-%20PKE%20-%202025.mp4",
                   website: "https://www.pke.pt/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Bateria",
                   speaker: "Rita Garcia",
-                  videoFile: "/testemunhos/TESTEMUNHO - Rita Garcia - Bateria - 2025_03_26.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Rita%20Garcia%20-%20Bateria%20-%202025_03_26.mp4",
                   website: "https://www.bateria.com.pt/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Grand'Ideia",
                   speaker: "Joana Lino",
-                  videoFile: "/testemunhos/TESTEMUNHO - Joana Lino - Grand_Ideia - 2025_07_14.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Joana%20Lino%20-%20Grand_Ideia%20-%202025_07_14.mp4",
                   website: "https://www.grandideia.pt/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Fluxe Agency",
                   speaker: "Pedro Silva",
-                  videoFile: "/testemunhos/TESTEMUNHO - Pedro Silva - Fluxe - 2025_03_26.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Pedro%20Silva%20-%20Fluxe%20-%202025_03_26.mp4",
                   website: "https://www.fluxeagency.com/home",
                   videoTime: "0:00"
                 },
                 {
                   company: "ETHIC Wellness Boutique",
                   speaker: "Samuel Silva",
-                  videoFile: "/testemunhos/TESTEMUNHO - Samuel Silva - Ethic - 2025_03_26.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Samuel%20Silva%20-%20Ethic%20-%202025_03_26.mp4",
                   website: "https://ethic.pt/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Joyn",
                   speaker: "Pedro Oliveira",
-                  videoFile: "/testemunhos/TESTEMUNHO - Pedro Oliveira - Joyn - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Pedro%20Oliveira%20-%20Joyn%20-%202025.mp4",
                   website: "https://www.youtube.com/watch?v=XUD_Mb0FjR0",
                   videoTime: "0:00"
                 },
                 {
                   company: "MotoNow",
                   speaker: "Gustavo Alvez",
-                  videoFile: "/testemunhos/TESTEMUNHO - Gustavo Alvez - Motonow - 2025.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Gustavo%20Alvez%20-%20Motonow%20-%202025.mp4",
                   website: "https://youtu.be/_UJNiEGGKSs",
                   videoTime: "0:00"
                 },
                 {
                   company: "Growth Partner",
                   speaker: "Bruno Pinheiro",
-                  videoFile: "/testemunhos/TESTEMUNHO - Bruno Pinheiro - Growth Partner - 2025_03_26.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Bruno%20Pinheiro%20-%20Growth%20Partner%20-%202025_03_26.mp4",
                   website: "https://growthpartner.pt/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Next2B",
                   speaker: "João Martins",
-                  videoFile: "/testemunhos/TESTEMUNHO - João Martins - Next2B - 2025.mov",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Jo%C3%A3o%20Martins%20-%20Next2B%20-%202025.mov",
                   website: "https://next2b.pt/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Adency",
                   speaker: "João Mafra",
-                  videoFile: "/testemunhos/TESTEMUNHO - João Mafra - Adency.mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Jo%C3%A3o%20Mafra%20-%20Adency.mp4",
                   website: "https://adency.io/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Diário de Um Ambicioso",
                   speaker: "Rui Nogueira",
-                  videoFile: "/testemunhos/TESTEMUNHO - Rui Nogueira - DDUA.MP4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Rui%20Nogueira%20-%20DDUA.MP4",
                   website: "https://diariodeumambicioso.com/",
                   videoTime: "0:00"
                 },
                 {
                   company: "Tomás Lopes",
                   speaker: "Tomás Lopes",
-                  videoFile: "/testemunhos/Scale Labs - Testemunho Tomas (Apex Reach).mp4",
+                  videoFile: "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/Scale%20Labs%20-%20Testemunho%20Tomas%20(Apex%20Reach).mp4",
                   website: "https://www.instagram.com/tomaslopes.consultor/",
                   videoTime: "0:00"
                 },

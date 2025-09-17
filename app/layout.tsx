@@ -12,13 +12,13 @@ export const metadata: Metadata = {
   description: 'Scale your business with AI agents for sales and customer support',
   icons: {
     icon: [
-      { url: '/images/scaleExpert.png', sizes: '32x32', type: 'image/png' },
-      { url: '/images/scaleExpert.png', sizes: '16x16', type: 'image/png' }
+      { url: 'https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/scaleExpert.png', sizes: '32x32', type: 'image/png' },
+      { url: 'https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/scaleExpert.png', sizes: '16x16', type: 'image/png' }
     ],
     apple: [
-      { url: '/images/scaleExpert.png', sizes: '180x180', type: 'image/png' }
+      { url: 'https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/scaleExpert.png', sizes: '180x180', type: 'image/png' }
     ],
-    shortcut: '/images/scaleExpert.png'
+    shortcut: 'https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/scaleExpert.png'
   }
 }
 

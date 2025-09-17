@@ -1,0 +1,32 @@
+{
+  "testemunhos": {
+    "TESTEMUNHO - João Tavares - SlideLab - 2025.mp4": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Jo%C3%A3o%20Tavares%20-%20SlideLab%20-%202025.mp4",
+    "TESTEMUNHO - Nuno Zeferino - PKE - 2025.mp4": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Nuno%20Zeferino%20-%20PKE%20-%202025.mp4",
+    "TESTEMUNHO - Pedro Lisboa - Lugotech - 2025_03_26.mp4": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Pedro%20Lisboa%20-%20Lugotech%20-%202025_03_26.mp4",
+    "TESTEMUNHO - Pedro Oliveira - Joyn - 2025.mp4": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Pedro%20Oliveira%20-%20Joyn%20-%202025.mp4",
+    "TESTEMUNHO - Pedro Silva - Fluxe - 2025_03_26.mp4": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Pedro%20Silva%20-%20Fluxe%20-%202025_03_26.mp4",
+    "TESTEMUNHO - Rita Garcia - Bateria - 2025_03_26.mp4": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Rita%20Garcia%20-%20Bateria%20-%202025_03_26.mp4",
+    "TESTEMUNHO - Rui Nogueira - DDUA.MP4": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Rui%20Nogueira%20-%20DDUA.MP4",
+    "TESTEMUNHO - Samuel Silva - Ethic - 2025_03_26.mp4": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/testemunhos/TESTEMUNHO%20-%20Samuel%20Silva%20-%20Ethic%20-%202025_03_26.mp4"
+  },
+  "images": {
+    "background-1.png": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/background-1.png",
+    "background-2.jpg": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/background-2.jpg",
+    "background-3.jpg": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/background-3.jpg",
+    "background-4.jpg": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/background-4.jpg",
+    "background-5.jpg": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/background-5.jpg",
+    "brand-background.png": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/brand-background.png",
+    "logo-black.png": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/logo-black.png",
+    "logo-square.png": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/logo-square.png",
+    "logo-white.png": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/logo-white.png",
+    "scaleExpert.png": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/scaleExpert.png"
+  },
+  "root": {
+    "trustFactor.png": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/trustFactor.png",
+    "placeholder-logo.png": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/placeholder-logo.png",
+    "placeholder-logo.svg": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/placeholder-logo.svg",
+    "placeholder-user.jpg": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/placeholder-user.jpg",
+    "placeholder.jpg": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/placeholder.jpg",
+    "placeholder.svg": "https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/placeholder.svg"
+  }
+}

@@ -733,13 +733,11 @@ export default function HomePage() {
                     €{isYearly ? '116' : '139'}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
-                    {isYearly ? '/mês' : '/mês'}
+                    /mês
                   </p>
-                  {isYearly && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                      €1,390/ano
-                    </p>
-                  )}
+                  <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
+                    €{isYearly ? '1,392' : '1,668'}/ano
+                  </p>
                 </div>
                 
                 <ul className="space-y-4 mb-8 flex-grow">
@@ -796,13 +794,11 @@ export default function HomePage() {
                     €{isYearly ? '224' : '269'}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
-                    {isYearly ? '/mês' : '/mês'}
+                    /mês
                   </p>
-                  {isYearly && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                      €2,690/ano
-                    </p>
-                  )}
+                  <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
+                    €{isYearly ? '2,688' : '3,228'}/ano
+                  </p>
                 </div>
                 
                 <ul className="space-y-4 mb-8 flex-grow">
@@ -865,13 +861,11 @@ export default function HomePage() {
                     €{isYearly ? '375' : '450'}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
-                    {isYearly ? '/mês' : '/mês'}
+                    /mês
                   </p>
-                  {isYearly && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                      €4,500/ano
-                    </p>
-                  )}
+                  <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
+                    €{isYearly ? '4,500' : '5,400'}/ano
+                  </p>
                 </div>
                 
                 <ul className="space-y-4 mb-8 flex-grow">

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -2286,13 +2287,15 @@ export default function DashboardPage() {
             <div className="p-3 border-b border-white/10">
               <div className="flex items-center justify-between">
                 {!sidebarCollapsed && (
-                  <Image
-                    src="/images/logo-white.png"
-                    alt="ScaleLabs"
-                    width={200}
-                    height={60}
-                    className="h-8 w-auto"
-                  />
+                  <Link href="/" className="block">
+                    <Image
+                      src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/logo-white.png"
+                      alt="ScaleLabs"
+                      width={200}
+                      height={60}
+                      className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+                    />
+                  </Link>
                 )}
                 <button
                   onClick={() => setSidebarCollapsed(!sidebarCollapsed)}

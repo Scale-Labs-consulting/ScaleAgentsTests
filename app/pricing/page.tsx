@@ -73,7 +73,7 @@ export default function PricingPage() {
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/images/background-4.jpg"
+          src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/background-4.jpg"
           alt="Background"
           fill
           className="object-cover opacity-80"
@@ -152,13 +152,13 @@ export default function PricingPage() {
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Base</h3>
                 <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
-                  €{isYearly ? SUBSCRIPTION_PLANS[0].yearlyPrice : SUBSCRIPTION_PLANS[0].price}
+                  €{isYearly ? SUBSCRIPTION_PLANS[1].yearlyPrice : SUBSCRIPTION_PLANS[1].price}
                 </div>
                 <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
                   /mês
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                  €{isYearly ? 1390 : SUBSCRIPTION_PLANS[0].price * 12}/ano
+                  €{isYearly ? '1,392' : '1,668'}/ano
                 </p>
               </div>
 
@@ -190,7 +190,7 @@ export default function PricingPage() {
               </ul>
 
               <Button 
-                onClick={() => handleSubscribe(SUBSCRIPTION_PLANS[0])}
+                onClick={() => handleSubscribe(SUBSCRIPTION_PLANS[1])}
                 disabled={loading === 'base'}
                 className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 group-hover:bg-white group-hover:text-purple-600"
               >
@@ -216,13 +216,13 @@ export default function PricingPage() {
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Pro</h3>
                 <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
-                  €{isYearly ? SUBSCRIPTION_PLANS[1].yearlyPrice : SUBSCRIPTION_PLANS[1].price}
+                  €{isYearly ? SUBSCRIPTION_PLANS[2].yearlyPrice : SUBSCRIPTION_PLANS[2].price}
                 </div>
                 <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
                   /mês
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                  €{isYearly ? 2690 : SUBSCRIPTION_PLANS[1].price * 12}/ano
+                  €{isYearly ? '2,688' : '3,228'}/ano
                 </p>
               </div>
 
@@ -260,7 +260,7 @@ export default function PricingPage() {
               </ul>
 
               <Button 
-                onClick={() => handleSubscribe(SUBSCRIPTION_PLANS[1])}
+                onClick={() => handleSubscribe(SUBSCRIPTION_PLANS[2])}
                 disabled={loading === 'pro'}
                 className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 group-hover:bg-white group-hover:text-purple-600"
               >
@@ -280,13 +280,13 @@ export default function PricingPage() {
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Enterprise</h3>
                 <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
-                  €{isYearly ? SUBSCRIPTION_PLANS[2].yearlyPrice : SUBSCRIPTION_PLANS[2].price}
+                  €{isYearly ? SUBSCRIPTION_PLANS[3].yearlyPrice : SUBSCRIPTION_PLANS[3].price}
                 </div>
                 <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
                   /mês
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                  €{isYearly ? 4500 : SUBSCRIPTION_PLANS[2].price * 12}/ano
+                  €{isYearly ? '4,500' : '5,400'}/ano
                 </p>
               </div>
 
@@ -324,7 +324,7 @@ export default function PricingPage() {
               </ul>
 
               <Button 
-                onClick={() => handleSubscribe(SUBSCRIPTION_PLANS[2])}
+                onClick={() => handleSubscribe(SUBSCRIPTION_PLANS[3])}
                 disabled={loading === 'enterprise'}
                 className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 group-hover:bg-white group-hover:text-purple-600"
               >

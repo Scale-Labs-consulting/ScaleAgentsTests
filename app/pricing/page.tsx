@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Check, Star, Zap, Crown, ArrowLeft } from 'lucide-react'
+import { Check, ArrowLeft } from 'lucide-react'
+import Image from 'next/image'
 import { SUBSCRIPTION_PLANS } from '@/lib/subscription-plans'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/use-toast'
@@ -15,6 +15,27 @@ export default function PricingPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState<string | null>(null)
+  const [isYearly, setIsYearly] = useState(false)
+
+  // Handle Stripe checkout cancellation
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const canceled = urlParams.get('canceled')
+    
+    if (canceled === 'true') {
+      toast({
+        title: "Pagamento cancelado",
+        description: "O pagamento foi cancelado. Pode tentar novamente quando quiser.",
+        variant: "destructive",
+        duration: 5000,
+      })
+      
+      // Clear URL parameters
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('canceled')
+      window.history.replaceState({}, '', newUrl.toString())
+    }
+  }, [toast])
 
   const handleSubscribe = async (plan: typeof SUBSCRIPTION_PLANS[0]) => {
     if (!user) {
@@ -30,8 +51,11 @@ export default function PricingPage() {
     setLoading(plan.id)
     
     try {
-      // Redirect to custom checkout page
-      router.push(`/checkout?plan=${plan.id}`)
+      // Use the appropriate checkout URL based on billing period
+      const checkoutUrl = isYearly ? plan.stripeYearlyCheckoutUrl : plan.stripeCheckoutUrl
+      
+      // Redirect directly to Stripe checkout
+      window.location.href = checkoutUrl
     } catch (error) {
       console.error('Error redirecting to checkout:', error)
       toast({
@@ -43,157 +67,279 @@ export default function PricingPage() {
     }
   }
 
-  const getPlanIcon = (planId: string) => {
-    switch (planId) {
-      case 'base':
-        return <Zap className="w-6 h-6" />
-      case 'pro':
-        return <Star className="w-6 h-6" />
-      case 'enterprise':
-        return <Crown className="w-6 h-6" />
-      default:
-        return <Zap className="w-6 h-6" />
-    }
-  }
-
-  const getPlanGradient = (planId: string) => {
-    switch (planId) {
-      case 'base':
-        return 'from-blue-500 to-cyan-600'
-      case 'pro':
-        return 'from-purple-600 to-violet-600'
-      case 'enterprise':
-        return 'from-purple-700 to-pink-600'
-      default:
-        return 'from-slate-500 to-slate-600'
-    }
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Header */}
-      <div className="container mx-auto px-6 py-6">
-        <div className="flex items-center justify-between mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/dashboard')}
-            className="text-white hover:bg-white/10 border border-white/20 hover:border-white/30"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar ao Dashboard
-          </Button>
-          
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Escolha o seu Plano
-            </h1>
-            <p className="text-white/70 text-lg">
-              Desbloqueie o poder da análise de vendas com IA
-            </p>
+    <div className="min-h-screen relative">
+      {/* Background Image */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/images/background-4.jpg"
+          alt="Background"
+          fill
+          className="object-cover opacity-80"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-purple-900/20 to-black/70" />
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10 min-h-screen flex flex-col">
+        {/* Header */}
+        <div className="px-6 py-8">
+          <div className="flex items-center justify-between mb-8">
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/dashboard')}
+              className="text-white/70 hover:text-white hover:bg-white/10"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar ao Dashboard
+            </Button>
+            
+            <div className="text-center">
+              <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                Escolhe o Teu Plano
+              </h1>
+            </div>
+            
+            <div className="w-32"></div> {/* Spacer for centering */}
           </div>
-          
-          <div className="w-32"></div> {/* Spacer for centering */}
+
+          {/* Pricing Toggle */}
+          <div className="flex items-center justify-center mb-12">
+            <div className="bg-white dark:bg-gray-800 rounded-full p-1 shadow-lg border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center relative">
+                {/* Monthly Option */}
+                <button
+                  onClick={() => setIsYearly(false)}
+                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    !isYearly 
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' 
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  Mensal
+                </button>
+                
+                {/* Yearly Option with Badge */}
+                <button
+                  onClick={() => setIsYearly(true)}
+                  className={`flex items-center px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    isYearly 
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' 
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  <span>Anual</span>
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ml-2 ${
+                    isYearly 
+                      ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white' 
+                      : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                  }`}>
+                    Poupe 20%
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {SUBSCRIPTION_PLANS.map((plan) => (
-            <Card 
-              key={plan.id}
-              className={`relative bg-white/10 border-white/20 backdrop-blur-md shadow-2xl transition-all duration-300 hover:scale-105 hover:shadow-purple-500/20 ${
-                plan.popular ? 'ring-2 ring-purple-500 shadow-purple-500/30 scale-105' : ''
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-gradient-to-r from-purple-600 to-violet-600 text-white px-4 py-1 text-xs font-semibold shadow-lg">
-                    Mais Popular
-                  </Badge>
+        <div className="flex-1 flex items-center justify-center px-6 pb-6">
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl w-full">
+            {/* Plano Base */}
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 shadow-sm hover:shadow-xl hover:scale-105 hover:-translate-y-2 flex flex-col group hover:bg-gradient-to-br hover:from-purple-600 hover:to-violet-700 hover:text-white transition-all duration-300">
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Base</h3>
+                <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
+                  €{isYearly ? SUBSCRIPTION_PLANS[0].yearlyPrice : SUBSCRIPTION_PLANS[0].price}
                 </div>
-              )}
-              
-              <CardHeader className="text-center pb-4">
-                <div className={`w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r ${getPlanGradient(plan.id)} flex items-center justify-center text-white shadow-lg`}>
-                  {getPlanIcon(plan.id)}
-                </div>
-                
-                <CardTitle className="text-2xl font-bold text-white mb-2">
-                  {plan.name}
-                </CardTitle>
-                
-                <CardDescription className="text-white/70 text-base mb-4">
-                  {plan.description}
-                </CardDescription>
-                
-                <div className="bg-white/5 rounded-lg p-3 border border-white/10">
-                  <span className="text-4xl font-bold text-white">
-                    €{plan.price}
-                  </span>
-                  <span className="text-white/60 ml-2 text-base">
-                    /{plan.interval === 'month' ? 'mês' : 'ano'}
-                  </span>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="space-y-6">
-                {/* Features */}
-                <div className="space-y-3">
-                  <h3 className="text-white font-semibold text-base mb-3">Funcionalidades Incluídas</h3>
-                  {plan.features.map((feature, index) => (
-                    <div key={index} className="flex items-start space-x-2">
-                      <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-white/90 text-sm">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Limits */}
-                <div className="bg-white/5 rounded-lg p-4 space-y-3 border border-white/10">
-                  <h4 className="text-white font-semibold text-base mb-3">Limites do Plano</h4>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white/70">Análises por mês:</span>
-                    <span className="text-white font-semibold">
-                      {plan.maxAnalyses === -1 ? 'Ilimitadas' : plan.maxAnalyses}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white/70">Tamanho máximo:</span>
-                    <span className="text-white font-semibold">
-                      {plan.maxFileSize ? `${plan.maxFileSize}MB` : 'Sem limite'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white/70">Prioridade:</span>
-                    <span className="text-white font-semibold capitalize">
-                      {plan.priority === 'low' ? 'Normal' : plan.priority === 'medium' ? 'Alta' : 'Máxima'}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Subscribe Button */}
-                <Button
-                  onClick={() => handleSubscribe(plan)}
-                  disabled={loading === plan.id}
-                  className={`w-full py-3 text-base font-semibold transition-all duration-300 shadow-lg ${
-                    plan.popular
-                      ? 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 hover:shadow-purple-500/25'
-                      : 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 hover:shadow-slate-500/25'
-                  }`}
-                >
-                  {loading === plan.id ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      <span>A processar...</span>
-                    </div>
-                  ) : (
-                    `Subscrever ${plan.name}`
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
+                  /mês
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
+                  €{isYearly ? 1390 : SUBSCRIPTION_PLANS[0].price * 12}/ano
+                </p>
+              </div>
 
+              <ul className="space-y-4 mb-8 flex-grow">
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Scale Expert Agent</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Análises de crescimento</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Estratégias de escala</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Suporte por email</span>
+                </li>
+              </ul>
+
+              <Button 
+                onClick={() => handleSubscribe(SUBSCRIPTION_PLANS[0])}
+                disabled={loading === 'base'}
+                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 group-hover:bg-white group-hover:text-purple-600"
+              >
+                {loading === 'base' ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>A processar...</span>
+                  </div>
+                ) : (
+                  'Começar Agora'
+                )}
+              </Button>
+            </div>
+
+            {/* Plano Pro */}
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 shadow-sm hover:shadow-xl hover:scale-105 hover:-translate-y-2 flex flex-col group hover:bg-gradient-to-br hover:from-purple-600 hover:to-violet-700 hover:text-white transition-all duration-300 relative">
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                <Badge className="bg-gradient-to-r from-purple-600 to-violet-600 text-white px-4 py-1 text-xs font-semibold">
+                  Mais Popular
+                </Badge>
+              </div>
+              
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Pro</h3>
+                <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
+                  €{isYearly ? SUBSCRIPTION_PLANS[1].yearlyPrice : SUBSCRIPTION_PLANS[1].price}
+                </div>
+                <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
+                  /mês
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
+                  €{isYearly ? 2690 : SUBSCRIPTION_PLANS[1].price * 12}/ano
+                </p>
+              </div>
+
+              <ul className="space-y-4 mb-8 flex-grow">
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Sales Analyst Agent</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Análise de chamadas de vendas</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Otimização de pipeline</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Previsão de receita</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Suporte prioritário</span>
+                </li>
+              </ul>
+
+              <Button 
+                onClick={() => handleSubscribe(SUBSCRIPTION_PLANS[1])}
+                disabled={loading === 'pro'}
+                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 group-hover:bg-white group-hover:text-purple-600"
+              >
+                {loading === 'pro' ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>A processar...</span>
+                  </div>
+                ) : (
+                  'Começar Agora'
+                )}
+              </Button>
+            </div>
+
+            {/* Plano Enterprise */}
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 shadow-sm hover:shadow-xl hover:scale-105 hover:-translate-y-2 flex flex-col group hover:bg-gradient-to-br hover:from-purple-600 hover:to-violet-700 hover:text-white transition-all duration-300">
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Enterprise</h3>
+                <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
+                  €{isYearly ? SUBSCRIPTION_PLANS[2].yearlyPrice : SUBSCRIPTION_PLANS[2].price}
+                </div>
+                <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
+                  /mês
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
+                  €{isYearly ? 4500 : SUBSCRIPTION_PLANS[2].price * 12}/ano
+                </p>
+              </div>
+
+              <ul className="space-y-4 mb-8 flex-grow">
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Todos os agents atuais</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Agents futuros incluídos</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Scale Expert Agent</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Sales Analyst Agent</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs">✓</span>
+                  </div>
+                  <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Suporte 24/7</span>
+                </li>
+              </ul>
+
+              <Button 
+                onClick={() => handleSubscribe(SUBSCRIPTION_PLANS[2])}
+                disabled={loading === 'enterprise'}
+                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 group-hover:bg-white group-hover:text-purple-600"
+              >
+                {loading === 'enterprise' ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>A processar...</span>
+                  </div>
+                ) : (
+                  'Começar Agora'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

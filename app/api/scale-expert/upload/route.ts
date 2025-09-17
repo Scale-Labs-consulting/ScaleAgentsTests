@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate file type - expanded to include business documents
+    // Validate file type - expanded to include business documents, images, and binary data
     const allowedTypes = [
       // Audio/Video files (for sales calls)
       'audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/ogg', 'audio/mp3',
@@ -61,7 +61,19 @@ export async function POST(request: NextRequest) {
       'text/csv',
       'application/json',
       'application/xml',
-      'text/xml'
+      'text/xml',
+      // Image files (for visual analysis)
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml',
+      'image/bmp',
+      'image/tiff',
+      'image/ico',
+      // Binary data files
+      'application/octet-stream'
     ]
     
     if (!allowedTypes.includes(file.type)) {
@@ -70,9 +82,62 @@ export async function POST(request: NextRequest) {
         allowedTypes: allowedTypes 
       })
       return NextResponse.json(
-        { error: 'Invalid file type. Supported types: audio, video, PDF, Word, Excel, PowerPoint, text files, CSV, JSON, XML.' },
+        { error: 'Invalid file type. Supported types: audio, video, PDF, Word, Excel, PowerPoint, text files, CSV, JSON, XML, images (PNG, JPEG, GIF, WebP, SVG, BMP, TIFF), and binary data files.' },
         { status: 400 }
       )
+    }
+
+    // Determine file category
+    const isAudioVideo = file.type.startsWith('audio/') || file.type.startsWith('video/')
+    const isBinaryData = file.type === 'application/octet-stream'
+    
+    // For binary data files, try to detect actual file type from extension
+    let detectedFileType = file.type
+    if (isBinaryData) {
+      const fileExtension = file.name.toLowerCase().split('.').pop()
+      const extensionToMimeType: { [key: string]: string } = {
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls': 'application/vnd.ms-excel',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'ppt': 'application/vnd.ms-powerpoint',
+        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'txt': 'text/plain',
+        'csv': 'text/csv',
+        'json': 'application/json',
+        'xml': 'application/xml',
+        'mp3': 'audio/mpeg',
+        'wav': 'audio/wav',
+        'mp4': 'video/mp4',
+        'avi': 'video/avi',
+        'mov': 'video/quicktime',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'svg': 'image/svg+xml',
+        'bmp': 'image/bmp',
+        'tiff': 'image/tiff',
+        'ico': 'image/ico',
+        'zip': 'application/zip',
+        'rar': 'application/x-rar-compressed',
+        '7z': 'application/x-7z-compressed',
+        'dat': 'application/octet-stream',
+        'bin': 'application/octet-stream',
+        'exe': 'application/x-msdownload',
+        'dll': 'application/x-msdownload'
+      }
+      
+      if (fileExtension && extensionToMimeType[fileExtension]) {
+        detectedFileType = extensionToMimeType[fileExtension]
+        console.log('🔍 Detected file type from extension:', {
+          originalType: file.type,
+          detectedType: detectedFileType,
+          extension: fileExtension
+        })
+      }
     }
 
     // File size validation removed - all plans can upload any file size
@@ -82,7 +147,8 @@ export async function POST(request: NextRequest) {
       type: file.type, 
       size: file.size,
       userId,
-      isAudioVideo
+      isAudioVideo,
+      isBinaryData
     })
 
     // Convert video to audio if needed (using server-side FFmpeg like sales analyst)
@@ -171,15 +237,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Determine file category and processing approach
-    const isSalesCall = isAudioVideo
-    const isDocument = !isAudioVideo
+    // Determine file category and processing approach based on detected type
+    const isDetectedAudioVideo = detectedFileType.startsWith('audio/') || detectedFileType.startsWith('video/')
+    const isDetectedDocument = detectedFileType.startsWith('application/pdf') || 
+                              detectedFileType.startsWith('application/msword') ||
+                              detectedFileType.startsWith('application/vnd.openxmlformats-officedocument') ||
+                              detectedFileType.startsWith('text/') ||
+                              detectedFileType.startsWith('application/json') ||
+                              detectedFileType.startsWith('application/xml')
+    const isDetectedImage = detectedFileType.startsWith('image/')
+    
+    const isSalesCall = isAudioVideo || isDetectedAudioVideo
+    const isDocument = isDetectedDocument
+    const isImage = isDetectedImage
+    const isDataFile = isBinaryData && !isDetectedAudioVideo && !isDetectedDocument && !isDetectedImage
 
     console.log('📊 File classification:', {
+      originalType: file.type,
+      detectedType: detectedFileType,
       isAudioVideo,
+      isDetectedAudioVideo,
       isSalesCall,
       isDocument,
-      fileType: file.type
+      isImage,
+      isDataFile,
+      isBinaryData
     })
 
     if (isSalesCall) {
@@ -265,7 +347,7 @@ export async function POST(request: NextRequest) {
        console.log('📤 Sending success response:', response)
        return NextResponse.json(response)
 
-    } else {
+    } else if (isDocument) {
       // Handle as business document - use blob-transcribe for processing
       console.log('📄 Processing business document for text extraction...')
       
@@ -321,6 +403,106 @@ export async function POST(request: NextRequest) {
           fileType: 'document',
           extractedText: null,
           message: 'Document uploaded but processing failed'
+        })
+      }
+    } else if (isImage) {
+      // Handle as image file - store in database for analysis
+      console.log('🖼️ Processing image file for visual analysis...')
+      
+      try {
+        // Create database record for the image file
+        const { data: imageFile, error: dbError } = await supabase
+          .from('uploaded_documents')
+          .insert({
+            user_id: userId,
+            file_name: originalFileName,
+            file_type: detectedFileType, // Use detected file type
+            file_url: blob.url,
+            file_size: file.size,
+            extracted_text: null, // Images don't have extractable text
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single()
+
+        if (dbError) {
+          console.error('❌ Database error:', dbError)
+          return NextResponse.json(
+            { error: 'Failed to create database record' },
+            { status: 500 }
+          )
+        }
+
+        console.log('✅ Image file database record created:', imageFile.id)
+
+        return NextResponse.json({
+          success: true,
+          fileUrl: blob.url,
+          fileType: 'image',
+          documentId: imageFile.id,
+          originalFileName: originalFileName,
+          fileSize: file.size,
+          message: 'Image uploaded successfully. The Scale Expert can analyze this image for visual content, charts, diagrams, screenshots, and other visual business information.'
+        })
+      } catch (processingError) {
+        console.error('❌ Image file processing error:', processingError)
+        return NextResponse.json({
+          success: true,
+          fileUrl: blob.url,
+          fileType: 'image',
+          originalFileName: originalFileName,
+          fileSize: file.size,
+          message: 'Image uploaded but processing failed'
+        })
+      }
+    } else if (isDataFile) {
+      // Handle as binary data file - store in database for analysis
+      console.log('📊 Processing binary data file...')
+      
+      try {
+        // Create database record for the data file
+        const { data: dataFile, error: dbError } = await supabase
+          .from('uploaded_documents')
+          .insert({
+            user_id: userId,
+            file_name: originalFileName,
+            file_type: detectedFileType, // Use detected file type instead of original
+            file_url: blob.url,
+            file_size: file.size,
+            extracted_text: null, // Binary data cannot be extracted as text
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single()
+
+        if (dbError) {
+          console.error('❌ Database error:', dbError)
+          return NextResponse.json(
+            { error: 'Failed to create database record' },
+            { status: 500 }
+          )
+        }
+
+        console.log('✅ Binary data file database record created:', dataFile.id)
+
+        return NextResponse.json({
+          success: true,
+          fileUrl: blob.url,
+          fileType: 'data',
+          documentId: dataFile.id,
+          originalFileName: originalFileName,
+          fileSize: file.size,
+          message: 'Binary data file uploaded successfully. The Scale Expert can analyze this file based on its content and context.'
+        })
+      } catch (processingError) {
+        console.error('❌ Binary data file processing error:', processingError)
+        return NextResponse.json({
+          success: true,
+          fileUrl: blob.url,
+          fileType: 'data',
+          originalFileName: originalFileName,
+          fileSize: file.size,
+          message: 'Binary data file uploaded but processing failed'
         })
       }
     }

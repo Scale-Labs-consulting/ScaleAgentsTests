@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { del } from '@vercel/blob'
+import { deleteBlobFile } from '@/lib/blob-cleanup'
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,8 +25,9 @@ export async function POST(request: NextRequest) {
     const isAudioVideo = ['mp4', 'mp3', 'wav', 'avi', 'mov', 'm4a', 'aac', 'ogg'].includes(fileExtension || '')
     const isTextFile = ['txt', 'md', 'csv', 'json', 'xml', 'html', 'css', 'js'].includes(fileExtension || '')
     const isDocumentFile = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(fileExtension || '')
+    const isBinaryData = ['dat', 'bin', 'exe', 'dll', 'zip', 'rar', '7z'].includes(fileExtension || '')
 
-    console.log('📁 File type detection:', { fileName, fileExtension, isAudioVideo, isTextFile, isDocumentFile })
+    console.log('📁 File type detection:', { fileName, fileExtension, isAudioVideo, isTextFile, isDocumentFile, isBinaryData })
 
     // Handle text files differently - read content directly
     if (isTextFile) {
@@ -40,12 +42,12 @@ export async function POST(request: NextRequest) {
       console.log('✅ Text file content extracted:', textContent.length, 'characters')
 
       // Delete the file from Vercel Blob to save storage costs
-      try {
-        console.log('🗑️ Deleting text file from Vercel Blob to save storage costs...')
-        await del(blobUrl)
+      console.log('🗑️ Deleting text file from Vercel Blob to save storage costs...')
+      const deleteSuccess = await deleteBlobFile(blobUrl)
+      if (deleteSuccess) {
         console.log('✅ Text file deleted from Vercel Blob successfully')
-      } catch (deleteError) {
-        console.warn('⚠️ Failed to delete blob file:', deleteError)
+      } else {
+        console.warn('⚠️ Failed to delete text file from blob storage')
       }
 
       return NextResponse.json({
@@ -130,10 +132,69 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Handle binary data files
+    if (isBinaryData) {
+      console.log('📊 Processing binary data file...')
+      
+      try {
+        // Store the binary data file in the database for future reference
+        const { createClient } = await import('@supabase/supabase-js')
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+        
+        // Get user ID from the request body
+        const { userId } = await request.json().catch(() => ({}))
+        
+        if (userId) {
+          try {
+            const { data: dataFile, error: dbError } = await supabase
+              .from('uploaded_documents')
+              .insert({
+                user_id: userId,
+                file_name: fileName,
+                file_url: blobUrl,
+                file_type: `application/octet-stream`,
+                extracted_text: null, // Binary data cannot be extracted as text
+                created_at: new Date().toISOString()
+              })
+              .select()
+              .single()
+
+            if (dbError) {
+              console.warn('⚠️ Failed to store binary data file in database:', dbError)
+            } else {
+              console.log('✅ Binary data file stored in database:', dataFile.id)
+            }
+          } catch (dbError) {
+            console.warn('⚠️ Database error (non-critical):', dbError)
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          transcription: `Binary data file (${fileExtension}) uploaded successfully. This file contains structured data that the Scale Expert can analyze based on context and your specific questions.`,
+          message: 'Binary data file uploaded successfully for scale expert analysis',
+          documentType: 'binary-data',
+          fileExtension: fileExtension
+        })
+      } catch (processingError) {
+        console.error('❌ Binary data file processing error:', processingError)
+        return NextResponse.json({
+          success: true,
+          transcription: `Binary data file (${fileExtension}) uploaded but processing failed: ${processingError instanceof Error ? processingError.message : 'Unknown error'}`,
+          message: 'Binary data file uploaded but processing failed',
+          documentType: 'binary-data',
+          fileExtension: fileExtension
+        })
+      }
+    }
+
     // For audio/video files, use AssemblyAI
     if (!isAudioVideo) {
       return NextResponse.json(
-        { error: 'Unsupported file type. Please upload audio/video files (MP4, MP3, etc.), text files (TXT, MD, etc.), or document files (PDF, Word, Excel, PowerPoint).' },
+        { error: 'Unsupported file type. Please upload audio/video files (MP4, MP3, etc.), text files (TXT, MD, etc.), document files (PDF, Word, Excel, PowerPoint), or binary data files (DAT, BIN, etc.).' },
         { status: 400 }
       )
     }
@@ -259,12 +320,12 @@ export async function POST(request: NextRequest) {
     console.log('✅ Transcription completed for scale expert')
 
     // Delete the file from Vercel Blob to save storage costs
-    try {
-      console.log('🗑️ Deleting file from Vercel Blob to save storage costs...')
-      await del(blobUrl)
+    console.log('🗑️ Deleting file from Vercel Blob to save storage costs...')
+    const deleteSuccess = await deleteBlobFile(blobUrl)
+    if (deleteSuccess) {
       console.log('✅ File deleted from Vercel Blob successfully')
-    } catch (deleteError) {
-      console.warn('⚠️ Failed to delete blob file:', deleteError)
+    } else {
+      console.warn('⚠️ Failed to delete file from blob storage')
       // Don't fail the entire process if blob deletion fails
       // The file will eventually be cleaned up by Vercel's retention policies
     }

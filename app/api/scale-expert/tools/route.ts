@@ -11,8 +11,9 @@ const tools = {
   // Get detailed sales call analysis
   get_sales_call_analysis: async (userId: string, callId?: string) => {
     try {
+      // Try sales_call_analyses table first (this is where the actual data is stored)
       let query = supabase
-        .from('sales_calls')
+        .from('sales_call_analyses')
         .select('*')
         .eq('user_id', userId)
         .eq('status', 'completed')
@@ -27,6 +28,7 @@ const tools = {
       const { data: salesCalls, error } = await query
 
       if (error) {
+        console.error('❌ Error fetching sales calls:', error)
         return { error: 'Failed to fetch sales calls' }
       }
 
@@ -34,7 +36,7 @@ const tools = {
         return { message: 'No sales calls found for analysis' }
       }
 
-      // Analyze sales calls
+      // Analyze the sales calls data
       const analysis = {
         totalCalls: salesCalls.length,
         dateRange: {
@@ -43,12 +45,20 @@ const tools = {
         },
         calls: salesCalls.map(call => ({
           id: call.id,
-          title: call.title,
+          title: call.title || 'Análise de Chamada',
           date: new Date(call.created_at).toLocaleDateString('pt-PT'),
-          transcription: call.transcription,
-          duration: call.duration || 'Unknown',
-          status: call.status
-        }))
+          transcription: call.transcription || 'Transcrição não disponível',
+          duration: call.duration_seconds ? `${Math.round(call.duration_seconds / 60)} min` : 'Análise completa',
+          status: call.status,
+          score: call.score || 'N/A',
+          callType: call.call_type || 'Não especificado',
+          feedback: call.feedback || 'Sem feedback disponível'
+        })),
+        insights: [
+          `Total de ${salesCalls.length} análises de chamadas`,
+          `Período: ${new Date(salesCalls[salesCalls.length - 1].created_at).toLocaleDateString('pt-PT')} a ${new Date(salesCalls[0].created_at).toLocaleDateString('pt-PT')}`,
+          'Dados baseados em análises completas de chamadas de vendas'
+        ]
       }
 
       return analysis
@@ -108,22 +118,59 @@ const tools = {
   // Search for specific patterns in sales calls
   search_sales_patterns: async (userId: string, searchTerm: string) => {
     try {
+      // Try sales_call_analyses table first
       const { data: salesCalls, error } = await supabase
-        .from('sales_calls')
+        .from('sales_call_analyses')
         .select('*')
         .eq('user_id', userId)
         .eq('status', 'completed')
         .order('created_at', { ascending: false })
 
       if (error) {
-        return { error: 'Failed to search sales patterns' }
+        console.error('❌ Error searching sales patterns from sales_call_analyses:', error)
+        
+        // Fallback: try sales_calls table
+        console.log('🔄 Trying fallback to sales_calls table for pattern search...')
+        const { data: fallbackCalls, error: fallbackError } = await supabase
+          .from('sales_calls')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false })
+
+        if (fallbackError) {
+          return { error: 'Failed to search sales patterns from both tables' }
+        }
+
+        if (!fallbackCalls || fallbackCalls.length === 0) {
+          return { message: 'No sales calls found for pattern search' }
+        }
+
+        // Search for patterns in fallback data
+        const matchingCalls = fallbackCalls.filter(call => 
+          call.transcription && 
+          call.transcription.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+
+        return {
+          searchTerm,
+          totalCalls: fallbackCalls.length,
+          matchingCalls: matchingCalls.length,
+          results: matchingCalls.map(call => ({
+            id: call.id,
+            title: call.title,
+            date: new Date(call.created_at).toLocaleDateString('pt-PT'),
+            snippet: call.transcription?.substring(0, 200) + '...' || 'No transcription available',
+            relevanceScore: call.transcription?.toLowerCase().split(searchTerm.toLowerCase()).length - 1 || 0
+          }))
+        }
       }
 
       if (!salesCalls || salesCalls.length === 0) {
         return { message: 'No sales calls found for pattern search' }
       }
 
-      // Search for patterns in transcriptions
+      // Search for patterns in transcriptions from sales_call_analyses
       const matchingCalls = salesCalls.filter(call => 
         call.transcription && 
         call.transcription.toLowerCase().includes(searchTerm.toLowerCase())
@@ -305,6 +352,59 @@ const tools = {
       return analysis
     } catch (error) {
       return { error: 'Failed to analyze documents' }
+    }
+  },
+
+  // Analyze uploaded images for visual content
+  analyze_image: async (userId: string, parameters: { imageId?: string }) => {
+    try {
+      const { imageId } = parameters
+      
+      let query = supabase
+        .from('uploaded_documents')
+        .select('*')
+        .eq('user_id', userId)
+        .like('file_type', 'image/%')
+        .order('created_at', { ascending: false })
+
+      if (imageId) {
+        query = query.eq('id', imageId)
+      } else {
+        query = query.limit(5) // Get last 5 images
+      }
+
+      const { data: images, error } = await query
+
+      if (error) {
+        console.error('❌ Error fetching images:', error)
+        return { error: 'Failed to fetch images' }
+      }
+
+      if (!images || images.length === 0) {
+        return { message: 'No images found for analysis' }
+      }
+
+      const analysis = {
+        totalImages: images.length,
+        images: images.map(image => ({
+          id: image.id,
+          fileName: image.file_name,
+          fileType: image.file_type,
+          fileSize: image.file_size,
+          uploadDate: new Date(image.created_at).toLocaleDateString('pt-PT'),
+          fileUrl: image.file_url
+        })),
+        insights: [
+          `Total de ${images.length} imagens analisadas`,
+          'Tipos de imagem: ' + [...new Set(images.map(img => img.file_type.split('/')[1]))].join(', '),
+          'As imagens podem conter gráficos, diagramas, screenshots, infográficos ou outras informações visuais de negócio'
+        ]
+      }
+
+      return analysis
+    } catch (error) {
+      console.error('❌ Error in analyze_image:', error)
+      return { error: 'Failed to analyze images' }
     }
   },
 

@@ -68,7 +68,7 @@ function AuthCallbackContent() {
           console.log('✅ Session found via getSession()')
           console.log('👤 User ID:', session.user?.id)
           console.log('📧 User email:', session.user?.email)
-          router.push('/dashboard')
+          router.push('/loading')
           return
         }
         
@@ -94,9 +94,9 @@ function AuthCallbackContent() {
           console.log('👤 User ID:', data.session.user?.id)
           console.log('📧 User email:', data.session.user?.email)
           
-          // Redirect to dashboard
-          console.log('✅ User authenticated, redirecting to dashboard')
-          router.push('/dashboard')
+          // Redirect to loading page
+          console.log('✅ User authenticated, redirecting to loading page')
+          router.push('/loading')
         } else {
           console.error('❌ No session found after code exchange')
           setError('Sessão não encontrada. Tente novamente.')

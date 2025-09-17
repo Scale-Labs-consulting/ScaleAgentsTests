@@ -18,6 +18,7 @@ function CheckoutContent() {
   const [error, setError] = useState<string | null>(null)
 
   const planId = searchParams.get('plan')
+  const billingPeriod = searchParams.get('billing') || 'monthly'
 
   useEffect(() => {
     if (!user) {
@@ -31,30 +32,37 @@ function CheckoutContent() {
       return
     }
 
-    // Simulate loading and redirect to Stripe
-    const timer = setTimeout(() => {
-      // You can customize the Stripe checkout URL here
-      const stripeUrls: { [key: string]: string } = {
-        'base': 'https://buy.stripe.com/test_7sY6oA6sqakYdWcfkWbo401',
-        'pro': 'https://buy.stripe.com/test_cNi7sE04278M05m6Oqbo402',
-        'enterprise': 'https://buy.stripe.com/test_eVqbIU0429gUaK0fkWbo403'
-      }
+    // Get the plan and use the appropriate Stripe checkout URL
+    const getCheckoutUrl = async () => {
+      try {
+        // Import the subscription plans to get the correct URL
+        const { SUBSCRIPTION_PLANS } = await import('@/lib/subscription-plans')
+        const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId)
+        
+        if (!plan) {
+          setError('Plano não encontrado')
+          setLoading(false)
+          return
+        }
 
-      const url = stripeUrls[planId]
-      if (url) {
+        // Use the appropriate checkout URL based on billing period
+        const url = billingPeriod === 'yearly' ? plan.stripeYearlyCheckoutUrl : plan.stripeCheckoutUrl
+        
         setCheckoutUrl(url)
         // Auto-redirect after showing the page briefly
         setTimeout(() => {
           window.location.href = url
         }, 2000)
-      } else {
-        setError('Plano inválido')
+      } catch (error) {
+        console.error('Error getting checkout URL:', error)
+        setError('Erro ao obter URL de checkout')
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
-    }, 1000)
+    }
 
-    return () => clearTimeout(timer)
-  }, [user, planId, router])
+    getCheckoutUrl()
+  }, [user, planId, billingPeriod, router])
 
   const handleGoBack = () => {
     router.push('/pricing')

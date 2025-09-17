@@ -23,6 +23,7 @@ import { forceLogout, supabase } from '@/lib/supabase'
 import { ChatService, getScaleExpertAgentId } from '@/lib/chat-service'
 import { useToast } from '@/hooks/use-toast'
 import { convertVideoToAudio, shouldConvertVideo } from '@/lib/video-converter'
+import { hasAgentAccess, getAvailableAgents, getPlanById, hasReachedUsageLimit, getUsageLimit } from '@/lib/subscription-plans'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -167,6 +168,44 @@ export default function DashboardPage() {
       }
     }
   }, [])
+
+  // Handle Stripe checkout success/cancel
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const success = urlParams.get('success')
+    const canceled = urlParams.get('canceled')
+    const sessionId = urlParams.get('session_id')
+    
+    // Handle Stripe checkout success
+    if (success === 'true' && sessionId) {
+      toast({
+        title: "Pagamento realizado com sucesso! 🎉",
+        description: "A sua subscrição foi ativada. Bem-vindo ao ScaleAgents!",
+        duration: 5000,
+      })
+      
+      // Clear URL parameters
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('success')
+      newUrl.searchParams.delete('session_id')
+      window.history.replaceState({}, '', newUrl.toString())
+    }
+    
+    // Handle Stripe checkout cancellation
+    if (canceled === 'true') {
+      toast({
+        title: "Pagamento cancelado",
+        description: "O pagamento foi cancelado. Pode tentar novamente quando quiser.",
+        variant: "destructive",
+        duration: 5000,
+      })
+      
+      // Clear URL parameters
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('canceled')
+      window.history.replaceState({}, '', newUrl.toString())
+    }
+  }, [toast])
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -178,7 +217,7 @@ export default function DashboardPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null)
 
-  const [uploadedFileType, setUploadedFileType] = useState<'sales_call' | 'document' | null>(null)
+  const [uploadedFileType, setUploadedFileType] = useState<'sales_call' | 'document' | 'data' | null>(null)
   const [extractedText, setExtractedText] = useState<string | null>(null)
   const [salesCallId, setSalesCallId] = useState<string | null>(null)
 
@@ -207,6 +246,10 @@ export default function DashboardPage() {
   // Subscription states
   const [subscription, setSubscription] = useState<any>(null)
   const [subscriptionLoading, setSubscriptionLoading] = useState(false)
+  
+  // Usage tracking states
+  const [scaleExpertUsage, setScaleExpertUsage] = useState(0)
+  const [salesAnalystUsage, setSalesAnalystUsage] = useState(0)
   
   // Analysis list states
   const [analyses, setAnalyses] = useState<any[]>([])
@@ -302,9 +345,9 @@ export default function DashboardPage() {
 
   // Enhanced file validation
   const validateFile = (file: File): string | null => {
-    // Check file type
-    if (!file.type.startsWith('video/')) {
-      return 'Por favor, carregue um ficheiro de vídeo (MP4, MOV, AVI, etc.)'
+    // Check file type - now supports video files and application/octet-stream
+    if (!file.type.startsWith('video/') && file.type !== 'application/octet-stream') {
+      return 'Por favor, carregue um ficheiro de vídeo (MP4, MOV, AVI, etc.) ou um ficheiro de dados (application/octet-stream)'
     }
     
     // File size validation removed - all plans can upload any file size
@@ -347,12 +390,64 @@ export default function DashboardPage() {
         .select('subscription_status, subscription_plan, subscription_current_period_end, stripe_customer_id')
         .eq('id', user.id)
         .single()
-      
+
       if (profile) {
         setSubscription(profile)
       }
     } catch (error) {
       console.error('Error loading subscription:', error)
+    }
+  }
+
+  const loadUsageData = async () => {
+    if (!user) return
+    
+    try {
+      // Load usage data from the dedicated usage_tracking table
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+      
+      // Get Scale Expert message usage
+      const { data: scaleExpertUsage } = await supabase
+        .from('usage_tracking')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('agent_type', 'scale-expert')
+        .eq('action_type', 'message')
+        .gte('created_at', startOfMonth.toISOString())
+      
+      // Get Sales Analyst upload usage
+      const { data: salesAnalystUsage } = await supabase
+        .from('usage_tracking')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('agent_type', 'sales-analyst')
+        .eq('action_type', 'upload')
+        .gte('created_at', startOfMonth.toISOString())
+      
+      setScaleExpertUsage(scaleExpertUsage?.length || 0)
+      setSalesAnalystUsage(salesAnalystUsage?.length || 0)
+    } catch (error) {
+      console.error('Error loading usage data:', error)
+      // Fallback to old method if usage_tracking table doesn't exist yet
+      try {
+        const startOfMonth = new Date()
+        startOfMonth.setDate(1)
+        startOfMonth.setHours(0, 0, 0, 0)
+        
+        const { data: salesAnalystUploads } = await supabase
+          .from('sales_calls')
+          .select('id')
+          .eq('user_id', user.id)
+          .gte('created_at', startOfMonth.toISOString())
+        
+        setSalesAnalystUsage(salesAnalystUploads?.length || 0)
+        // Scale Expert usage will be 0 until proper tracking is implemented
+        setScaleExpertUsage(0)
+      } catch (fallbackError) {
+        console.error('Fallback usage loading also failed:', fallbackError)
+      }
     }
   }
 
@@ -434,6 +529,10 @@ export default function DashboardPage() {
     if (file.type.startsWith('video/')) {
       const url = URL.createObjectURL(file)
       setFilePreview(url)
+    } else if (file.type === 'application/octet-stream') {
+      // For binary data files, we'll show a generic file icon
+      // No preview available for binary data
+      setFilePreview(null)
     }
 
     setSalesUploadedFile(file)
@@ -970,8 +1069,38 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user) {
       loadSubscription()
+      loadUsageData()
     }
   }, [user])
+
+  // Check agent access when subscription or selected agent changes
+  useEffect(() => {
+    if (subscription && selectedAgent) {
+      const userPlan = subscription.subscription_plan
+      const hasAccess = hasAgentAccess(userPlan, selectedAgent)
+      
+      if (!hasAccess) {
+        // Redirect to the first available agent or show upgrade prompt
+        const availableAgents = getAvailableAgents(userPlan)
+        if (availableAgents.length > 0) {
+          setSelectedAgent(availableAgents[0])
+          toast({
+            title: "Acesso Restrito",
+            description: `O seu plano atual não inclui acesso ao ${selectedAgent === 'scale-expert' ? 'Scale Expert' : 'Sales Analyst'}. Redirecionado para o agente disponível.`,
+            variant: "destructive"
+          })
+        } else {
+          // No agents available, show upgrade prompt
+          setShowSubscriptionModal(true)
+          toast({
+            title: "Upgrade Necessário",
+            description: "O seu plano atual não inclui acesso a nenhum agente. Considere fazer upgrade para aceder às funcionalidades.",
+            variant: "destructive"
+          })
+        }
+      }
+    }
+  }, [subscription, selectedAgent, toast])
 
   // Handle success/cancel messages from Stripe checkout
   useEffect(() => {
@@ -1331,6 +1460,18 @@ export default function DashboardPage() {
   const sendMessage = async () => {
     if ((!inputMessage.trim() && !selectedFile) || isLoading || !user) return
 
+    // Check usage limits for free users
+    const userPlan = subscription?.subscription_plan
+    if (selectedAgent === 'scale-expert' && hasReachedUsageLimit(userPlan, 'scale-expert', scaleExpertUsage)) {
+      toast({
+        title: "Limite de Uso Atingido",
+        description: "Atingiu o limite de 5 mensagens para o Scale Expert. Faça upgrade para enviar mais mensagens.",
+        variant: "destructive"
+      })
+      setShowSubscriptionModal(true)
+      return
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -1346,6 +1487,14 @@ export default function DashboardPage() {
 
     setMessages(prev => [...prev, userMessage])
     setInputMessage('')
+    
+        // Update usage tracking for free users
+        if (selectedAgent === 'scale-expert' && !subscription?.subscription_plan) {
+          console.log('📊 Updating Scale Expert usage counter:', scaleExpertUsage, '->', scaleExpertUsage + 1)
+          setScaleExpertUsage(prev => prev + 1)
+          // Reload usage data to ensure accuracy
+          loadUsageData()
+        }
     
     // Create database conversation if none exists
     if (!currentConversationId && chatService) {
@@ -1529,19 +1678,22 @@ export default function DashboardPage() {
         return
       }
       
-      // Use character-based streaming for better formatting preservation
+      // Use chunk-based streaming that works even when tab is not active
       try {
         const characters = fullResponse.split('')
         let currentText = ''
+        const chunkSize = 3 // Process 3 characters at a time for faster display
         
-        for (let i = 0; i < characters.length; i++) {
+        for (let i = 0; i < characters.length; i += chunkSize) {
           // Check if the request was aborted
           if (!abortControllerRef.current || abortControllerRef.current.signal.aborted) {
             console.log('Streaming stopped by user')
             return
           }
           
-          currentText += characters[i]
+          // Add a chunk of characters
+          const chunk = characters.slice(i, i + chunkSize).join('')
+          currentText += chunk
           
           setMessages(prev => prev.map(msg => 
             msg.id === streamingMessageId 
@@ -1549,8 +1701,25 @@ export default function DashboardPage() {
               : msg
           ))
           
-          // Add a consistent delay for the streaming effect (optimized for speed)
-          await new Promise(resolve => setTimeout(resolve, 2))
+          // Use a more reliable delay that works in background tabs
+          await new Promise(resolve => {
+            const start = performance.now()
+            const delay = 1.5 // 1.5ms delay per chunk (3 characters)
+            
+            const checkTime = () => {
+              if (performance.now() - start >= delay) {
+                resolve(undefined)
+              } else {
+                // Use setImmediate if available, otherwise setTimeout
+                if (typeof setImmediate !== 'undefined') {
+                  setImmediate(checkTime)
+                } else {
+                  setTimeout(checkTime, 0)
+                }
+              }
+            }
+            checkTime()
+          })
         }
       } catch (streamingError) {
         console.error('❌ Error during streaming:', streamingError)
@@ -1678,6 +1847,18 @@ export default function DashboardPage() {
       return
     }
 
+    // Check usage limits for free users
+    const userPlan = subscription?.subscription_plan
+    if (selectedAgent === 'sales-analyst' && hasReachedUsageLimit(userPlan, 'sales-analyst', salesAnalystUsage)) {
+      toast({
+        title: "Limite de Uso Atingido",
+        description: "Atingiu o limite de 2 uploads para o Sales Analyst. Faça upgrade para fazer mais uploads.",
+        variant: "destructive"
+      })
+      setShowSubscriptionModal(true)
+      return
+    }
+
     setUploading(true)
     setUploadedFileUrl(null) // Clear previous URL
     
@@ -1785,12 +1966,34 @@ export default function DashboardPage() {
 
       const result = await transcriptionResponse.json()
 
+      // Determine file type based on response and file characteristics
+      let fileType: 'sales_call' | 'document' | 'data' = 'sales_call'
+      
+      if (result.documentType) {
+        // Document file with extracted text
+        fileType = 'document'
+      } else if (file.type === 'application/octet-stream') {
+        // Binary data file
+        fileType = 'data'
+      } else if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+        // Audio/video file for sales call
+        fileType = 'sales_call'
+      }
+
       // Store the uploaded file information for use in chat
       setUploadedFileUrl(blob.url)
-      setUploadedFileType('sales_call')
+      setUploadedFileType(fileType)
       setSalesCallId(salesCallId)
       
+        // Update usage tracking for free users
+        if (selectedAgent === 'sales-analyst' && !subscription?.subscription_plan) {
+          setSalesAnalystUsage(prev => prev + 1)
+          // Reload usage data to ensure accuracy
+          loadUsageData()
+        }
+      
       if (result.transcription) {
+        // Document/audio transcription completed
         setExtractedText(result.transcription)
         
         // Update conversation metadata with file information if conversation exists
@@ -1808,15 +2011,6 @@ export default function DashboardPage() {
           }
         }
         
-        // Show success message with duplicate info if applicable
-        const message = result.duplicateInfo 
-          ? `Ficheiro carregado e transcrito com sucesso (análise existente encontrada)`
-          : "Ficheiro carregado e transcrito com sucesso"
-        
-        toast({
-          title: "Sucesso",
-          description: message
-        })
       } else {
         toast({
           title: "Sucesso",
@@ -2071,7 +2265,7 @@ export default function DashboardPage() {
       {/* Background */}
       <div className="fixed inset-0 z-0">
         <Image
-          src="/images/brand-background.png"
+          src="/images/background-4.jpg"
           alt="Background"
           fill
           className="object-cover opacity-80"
@@ -2415,46 +2609,65 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Credits */}
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-white font-semibold text-sm">Créditos</span>
-                      <div className="flex items-center space-x-1">
-                        <span className="text-white/60 text-sm">3 restantes</span>
-                        <ChevronRight className="w-3 h-3 text-white/60" />
-                      </div>
-                    </div>
-                    <div className="w-full bg-white/10 rounded-full h-2 mb-2">
-                      <div className="bg-blue-500 h-2 rounded-full" style={{ width: '75%' }}></div>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-blue-400 text-xs">Créditos diários usados primeiro</span>
-                    </div>
-                  </div>
-
-                  {/* Quick Actions Section */}
-                  <div className="mb-4">
-                    <h3 className="text-white font-semibold text-sm mb-2">Quick Actions</h3>
-                    <div className="space-y-2">
-                      <button 
-                        className="w-full flex items-center space-x-3 p-2 rounded-lg hover:bg-white/10 cursor-pointer transition-colors text-left"
-                        onClick={() => {
-                          setShowProfileModal(false)
-                          setSelectedAgent('sales-analyst')
-                          setActiveTab('overview')
-                        }}
-                      >
-                        <div className="w-8 h-8 rounded-md bg-gradient-to-r from-blue-500 to-cyan-600 flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-white" />
-                        </div>
+                  {/* Credits - Only show for free users */}
+                    {!subscription?.subscription_plan && (
+                      <div className="mb-4 space-y-4">
+                        {/* Scale Expert Usage */}
                         <div>
-                          <p className="text-white text-sm font-medium">Ficheiros de Análise de Vendas</p>
-                          <p className="text-white/60 text-xs">Ver e gerir as suas análises de chamadas de vendas</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-white font-semibold text-sm">Créditos Scale Expert</span>
+                            <div className="flex items-center space-x-1">
+                              <span className="text-white/60 text-sm">
+                                {5 - scaleExpertUsage} restantes
+                              </span>
+                              <ChevronRight className="w-3 h-3 text-white/60" />
+                            </div>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 mb-2">
+                            <div 
+                              className="h-2 rounded-full transition-all duration-300 bg-gradient-to-r from-purple-600 to-violet-600"
+                              style={{ 
+                                width: `${(scaleExpertUsage / 5) * 100}%` 
+                              }}
+                            />
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                            <span className="text-xs text-purple-400">
+                              Mensagens Restantes do Scale Expert
+                            </span>
+                          </div>
                         </div>
-                      </button>
-                    </div>
-                  </div>
+
+                        {/* Sales Analyst Usage */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-white font-semibold text-sm">Créditos Sales Analyst</span>
+                            <div className="flex items-center space-x-1">
+                              <span className="text-white/60 text-sm">
+                                {2 - salesAnalystUsage} restantes
+                              </span>
+                              <ChevronRight className="w-3 h-3 text-white/60" />
+                            </div>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-2 mb-2">
+                            <div 
+                              className="h-2 rounded-full transition-all duration-300 bg-gradient-to-r from-blue-600 to-cyan-600"
+                              style={{ 
+                                width: `${(salesAnalystUsage / 2) * 100}%` 
+                              }}
+                            />
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                            <span className="text-xs text-blue-400">
+                              Análises Restantes do Sales Analyst
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
 
                   {/* Action Buttons */}
                   <div className="mb-4">
@@ -2544,29 +2757,61 @@ export default function DashboardPage() {
                       <div className="absolute top-full left-0 mt-1 w-48 bg-gray-900/95 border border-white/20 rounded-lg shadow-2xl backdrop-blur-md z-50">
                         <div className="py-1">
                           <button 
-                            className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-white/10 cursor-pointer transition-colors"
+                            className={`w-full flex items-center space-x-3 px-3 py-2 transition-colors ${
+                              hasAgentAccess(subscription?.subscription_plan, 'scale-expert') 
+                                ? 'hover:bg-white/10 cursor-pointer' 
+                                : 'opacity-50 cursor-not-allowed'
+                            }`}
                             onClick={() => {
                               setShowAgentDropdown(false)
-                              setSelectedAgent('scale-expert')
+                              if (hasAgentAccess(subscription?.subscription_plan, 'scale-expert')) {
+                                setSelectedAgent('scale-expert')
+                              } else {
+                                setShowSubscriptionModal(true)
+                                toast({
+                                  title: "Upgrade Necessário",
+                                  description: "O Scale Expert está disponível no Plano Base. Faça upgrade para aceder.",
+                                  variant: "destructive"
+                                })
+                              }
                             }}
                           >
                             <div className="w-5 h-5 rounded bg-gradient-to-r from-purple-600 to-violet-600 flex items-center justify-center">
                               <TrendingUp className="w-3 h-3 text-white" />
                             </div>
                             <span className="text-white text-sm">Scale Expert</span>
+                            {!hasAgentAccess(subscription?.subscription_plan, 'scale-expert') && (
+                              <Crown className="w-3 h-3 text-yellow-400 ml-auto" />
+                            )}
                           </button>
                           <button 
-                            className="w-full flex items-center space-x-3 px-3 py-2 hover:bg-white/10 cursor-pointer transition-colors"
+                            className={`w-full flex items-center space-x-3 px-3 py-2 transition-colors ${
+                              hasAgentAccess(subscription?.subscription_plan, 'sales-analyst') 
+                                ? 'hover:bg-white/10 cursor-pointer' 
+                                : 'opacity-50 cursor-not-allowed'
+                            }`}
                             onClick={() => {
                               setShowAgentDropdown(false)
-                              setSelectedAgent('sales-analyst')
-                              setActiveTab('overview')
+                              if (hasAgentAccess(subscription?.subscription_plan, 'sales-analyst')) {
+                                setSelectedAgent('sales-analyst')
+                                setActiveTab('overview')
+                              } else {
+                                setShowSubscriptionModal(true)
+                                toast({
+                                  title: "Upgrade Necessário",
+                                  description: "O Sales Analyst está disponível no Plano Pro. Faça upgrade para aceder.",
+                                  variant: "destructive"
+                                })
+                              }
                             }}
                           >
                             <div className="w-5 h-5 rounded bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center justify-center">
                               <BarChart3 className="w-3 h-3 text-white" />
                             </div>
                             <span className="text-white text-sm">Sales Analyst</span>
+                            {!hasAgentAccess(subscription?.subscription_plan, 'sales-analyst') && (
+                              <Crown className="w-3 h-3 text-yellow-400 ml-auto" />
+                            )}
                           </button>
                         </div>
                       </div>
@@ -2592,7 +2837,7 @@ export default function DashboardPage() {
 
             {/* Agent Content */}
             <div className="flex-1 overflow-hidden">
-              {selectedAgent === 'scale-expert' && (
+              {selectedAgent === 'scale-expert' && hasAgentAccess(subscription?.subscription_plan, 'scale-expert') && (
                 <div className="h-full flex flex-col">
                   {/* Scale Expert Chat Messages */}
                   <div className="flex-1 overflow-y-auto">
@@ -2819,7 +3064,7 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {selectedAgent === 'sales-analyst' && (
+              {selectedAgent === 'sales-analyst' && hasAgentAccess(subscription?.subscription_plan, 'sales-analyst') && (
                 <div className="h-full flex flex-col">
                   {/* Sales Analyst Content */}
                   <div className="flex-1 overflow-y-auto p-6 w-full">
@@ -3305,6 +3550,7 @@ export default function DashboardPage() {
                       {/* Upload Tab */}
                       {activeTab === 'upload' && (
                         <div className="space-y-8">
+
                           {/* Upload Call Recording Section */}
                           <Card className="bg-white/10 border-white/20 backdrop-blur-md shadow-2xl shadow-purple-500/20">
                             <CardHeader>
@@ -3426,7 +3672,7 @@ export default function DashboardPage() {
                                   // Show normal buttons when not uploading
                                   <>
                                     <Button 
-                                      className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+                                      className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white"
                                       onClick={(e) => {
                                         e.stopPropagation() // Prevent event bubbling to parent drag-and-drop area
                                         console.log('🔘 Button clicked, current file:', salesFileInputRef.current?.files?.[0]?.name)

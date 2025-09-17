@@ -1,3 +1,6 @@
+/* eslint-disable */
+/* stylelint-disable */
+/* @tailwindcss/unknown-at-rule */
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -223,3 +226,63 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
+
+/* Logo carousel animation */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 30s linear infinite;
+}
+
+.animate-scroll:hover {
+  animation-play-state: paused;
+}
+
+.animate-scroll-fast {
+  animation: scroll 100s linear infinite;
+}
+
+.animate-scroll-fast:hover {
+  animation-play-state: paused;
+}
+
+/* Hide scrollbar for testimonials carousel */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar { 
+  display: none;  /* Safari and Chrome */
+}
+
+/* Custom volume slider styling */
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.slider::-moz-range-thumb {
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* eslint-enable */
+/* stylelint-enable */

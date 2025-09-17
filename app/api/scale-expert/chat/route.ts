@@ -142,6 +142,23 @@ async function getAssistantId() {
             required: ['searchTerm']
           }
         }
+      },
+      {
+        type: 'function' as const,
+        function: {
+          name: 'analyze_image',
+          description: 'Analyze uploaded images for visual content, charts, diagrams, screenshots, and other visual business information',
+          parameters: {
+            type: 'object',
+            properties: {
+              imageId: {
+                type: 'string',
+                description: 'Optional specific image ID to analyze. If not provided, analyzes the most recent images.'
+              }
+            },
+            required: []
+          }
+        }
       }
     ]
 
@@ -153,12 +170,13 @@ Key capabilities:
 - Generate business metrics and scaling recommendations
 - Search sales conversations for specific patterns
 - Analyze uploaded documents (PDF, Word, Excel, PowerPoint, text files)
+- Analyze uploaded images (PNG, JPEG, GIF, WebP, SVG, BMP, TIFF) for visual content
 - Search through document content for specific information
 - Provide personalized advice based on their business context
 
 Always reference their specific business context: product/service, ideal customers, business model, pricing, performance metrics, challenges, and competitive landscape.
 
-For uploaded files, analyze and provide relevant business insights. Handle: business documents, sales reports, financial docs, strategic plans, presentations, spreadsheets, and any other business-related files.
+For uploaded files, analyze and provide relevant business insights. Handle: business documents, sales reports, financial docs, strategic plans, presentations, spreadsheets, images, and any other business-related files.
 
 When analyzing documents, you can:
 - Provide summaries of document content
@@ -167,6 +185,13 @@ When analyzing documents, you can:
 - Check compliance and regulatory requirements
 - Search for specific information across all documents
 - Extract key insights and recommendations
+
+When analyzing images, you can:
+- Analyze charts, graphs, and data visualizations
+- Review screenshots of dashboards or applications
+- Examine infographics and visual presentations
+- Identify key metrics and trends shown in images
+- Provide insights based on visual business information
 
 Provide actionable, specific recommendations. Be conversational but professional. Focus on practical growth steps relevant to their situation.
 
@@ -195,8 +220,9 @@ CRITICAL: Never include citation markers, source references, or any text in brac
 // Function to fetch user's sales calls with transcriptions
 async function getUserSalesCalls(userId: string) {
   try {
+    // Fetch from sales_call_analyses table (this is where the actual data is stored)
     const { data: salesCalls, error } = await supabase
-      .from('sales_calls')
+      .from('sales_call_analyses')
       .select('*')
       .eq('user_id', userId)
       .eq('status', 'completed')
@@ -317,6 +343,10 @@ export async function POST(request: NextRequest) {
         // Document with pre-extracted text
         fileContext = `\n\n--- Uploaded Document Analysis ---\nFile: ${uploadedFile.name}\nType: ${uploadedFile.type}\nDocument Type: Business Document\nContent:\n${uploadedFile.extractedText}\n--- End Uploaded Document ---`
         console.log('✅ Document content provided from frontend')
+      } else if (uploadedFile.fileType === 'data') {
+        // Binary data file
+        fileContext = `\n\n--- Uploaded Data File ---\nFile: ${uploadedFile.name}\nType: ${uploadedFile.type}\nFile Type: Binary Data File\nNote: This is a binary data file that may contain structured data, databases, or other business information. The Scale Expert can provide analysis and recommendations based on the file context and your specific questions.\n--- End Uploaded Data File ---`
+        console.log('✅ Binary data file provided from frontend')
       } else if (uploadedFile.fileType === 'sales_call') {
         // Sales call - use transcription if provided directly from frontend
         console.log('🎙️ Processing sales call file:', uploadedFile)
@@ -613,6 +643,36 @@ Provide personalized recommendations based on their business context.`
       .trim()
 
     console.log('✅ Assistant response retrieved:', responseText.substring(0, 100) + '...')
+
+    // Track usage for free users
+    try {
+      const usageResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/usage/track`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          agentType: 'scale-expert',
+          actionType: 'message',
+          referenceId: null, // Don't use OpenAI message ID as it's not a UUID
+          metadata: {
+            threadId: threadId,
+            runId: run.id,
+            openaiMessageId: assistantMessage.id,
+            messageLength: responseText.length
+          }
+        })
+      })
+      
+      if (usageResponse.ok) {
+        console.log('✅ Usage tracked for Scale Expert message')
+      } else {
+        console.warn('⚠️ Failed to track usage:', await usageResponse.text())
+      }
+    } catch (usageError) {
+      console.warn('⚠️ Usage tracking error (non-critical):', usageError)
+    }
 
     return NextResponse.json({
       success: true,

@@ -116,6 +116,35 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Analysis saved to Supabase with ID:', data.id)
 
+    // Track usage for free users
+    try {
+      const usageResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/usage/track`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          agentType: 'sales-analyst',
+          actionType: 'upload',
+          referenceId: data.id,
+          metadata: {
+            salesCallId: salesCallId,
+            analysisType: 'comprehensive',
+            score: analysis.score || 0
+          }
+        })
+      })
+      
+      if (usageResponse.ok) {
+        console.log('✅ Usage tracked for Sales Analyst upload')
+      } else {
+        console.warn('⚠️ Failed to track usage:', await usageResponse.text())
+      }
+    } catch (usageError) {
+      console.warn('⚠️ Usage tracking error (non-critical):', usageError)
+    }
+
     return NextResponse.json({
       success: true,
       analysisId: data.id,

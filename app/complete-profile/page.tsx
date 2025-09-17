@@ -9,8 +9,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase, upsertUserProfile } from '@/lib/supabase'
+import { useToast } from '@/hooks/use-toast'
 
 export default function CompleteProfilePage() {
   const [formData, setFormData] = useState({
@@ -45,8 +47,10 @@ export default function CompleteProfilePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState<string>('')
+  const [successMessage, setSuccessMessage] = useState<string>('')
   const router = useRouter()
   const { user } = useAuth()
+  const { toast } = useToast()
 
   const businessModels = [
     'B2B',
@@ -130,6 +134,15 @@ export default function CompleteProfilePage() {
     }
 
     setIsLoading(true)
+    setError('')
+    setSuccessMessage('')
+    
+    // Show initial loading toast
+    toast({
+      title: "A processar informações...",
+      description: "A validar e guardar o teu perfil de negócio.",
+      duration: 3000,
+    })
     
     // Test database connection first
     try {
@@ -225,6 +238,15 @@ export default function CompleteProfilePage() {
         
         console.log('✅ Profile saved successfully!', savedProfile)
         
+        // Show success message
+        setSuccessMessage('Perfil guardado com sucesso!')
+        
+        toast({
+          title: "Perfil criado com sucesso! 🎉",
+          description: "As tuas informações foram guardadas. A redirecionar para o dashboard...",
+          duration: 5000,
+        })
+        
         // Verify the profile was saved with all required fields
         const requiredFields = ['first_name', 'last_name', 'company_name', 'business_product_service', 'ideal_customer', 'problem_solved', 'business_model']
         const missingFields = requiredFields.filter(field => !savedProfile[field])
@@ -260,6 +282,8 @@ export default function CompleteProfilePage() {
       
       // Try to get more specific error information
       let errorMessage = 'Erro desconhecido'
+      let errorTitle = 'Erro ao guardar perfil'
+      
       if (error?.message) {
         errorMessage = error.message
       } else if (error?.details) {
@@ -270,7 +294,29 @@ export default function CompleteProfilePage() {
         errorMessage = error
       }
       
+      // Enhanced error handling with specific messages
+      if (error?.message?.includes('duplicate key')) {
+        errorTitle = 'Perfil já existe'
+        errorMessage = 'Já existe um perfil para este utilizador. A tentar atualizar...'
+      } else if (error?.message?.includes('permission denied')) {
+        errorTitle = 'Erro de permissão'
+        errorMessage = 'Não tens permissão para guardar o perfil. Contacta o suporte.'
+      } else if (error?.message?.includes('network')) {
+        errorTitle = 'Erro de rede'
+        errorMessage = 'Problema de ligação. Verifica a tua internet e tenta novamente.'
+      } else if (error?.message?.includes('timeout')) {
+        errorTitle = 'Timeout'
+        errorMessage = 'A operação demorou demasiado tempo. Tenta novamente.'
+      }
+      
       setError(`Erro ao guardar perfil: ${errorMessage}`)
+      
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+        duration: 6000,
+      })
     } finally {
       setIsLoading(false)
     }
@@ -285,6 +331,12 @@ export default function CompleteProfilePage() {
       }
 
       console.log('⏭️ User skipping onboarding, marking as completed...')
+      
+      toast({
+        title: "A saltar onboarding...",
+        description: "A marcar como concluído e a redirecionar.",
+        duration: 3000,
+      })
       
       // Mark the user as having completed onboarding by setting basic required fields
       // This will prevent them from seeing the form again
@@ -306,9 +358,20 @@ export default function CompleteProfilePage() {
 
       if (error) {
         console.error('❌ Error marking user as completed:', error)
+        toast({
+          title: "Aviso",
+          description: "Houve um problema ao marcar como concluído, mas vamos continuar.",
+          variant: "destructive",
+          duration: 4000,
+        })
         // Still redirect even if there's an error
       } else {
         console.log('✅ User marked as completed onboarding')
+        toast({
+          title: "Onboarding saltado",
+          description: "Podes completar o teu perfil mais tarde nas definições.",
+          duration: 4000,
+        })
       }
       
       // Force a hard navigation to ensure the useFirstTimeUser hook re-evaluates
@@ -341,7 +404,7 @@ export default function CompleteProfilePage() {
       {/* Background */}
       <div className="fixed inset-0 z-0">
         <Image
-          src="/images/brand-background.png"
+          src="/images/background-4.jpg"
           alt="Background"
           fill
           className="object-cover opacity-80"
@@ -376,10 +439,30 @@ export default function CompleteProfilePage() {
           <CardContent>
               <form onSubmit={handleSubmit} className="space-y-8">
                 
+                {/* Success Message */}
+                {successMessage && (
+                  <div className="p-4 bg-green-500/20 border border-green-500/50 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-4 w-4 text-green-400" />
+                      <p className="text-green-200 text-sm font-medium">{successMessage}</p>
+                    </div>
+                    <p className="text-green-300 text-xs mt-2">
+                      A redirecionar para o dashboard...
+                    </p>
+                  </div>
+                )}
+
                 {/* Error Display */}
                 {error && (
                   <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
-                    <p className="text-red-200 text-sm">{error}</p>
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle className="h-4 w-4 text-red-400" />
+                      <p className="text-red-200 text-sm font-medium">Erro ao guardar perfil</p>
+                    </div>
+                    <p className="text-red-300 text-sm mt-1">{error}</p>
+                    <p className="text-red-300 text-xs mt-2">
+                      <strong>Dica:</strong> Verifica se todos os campos obrigatórios estão preenchidos e tenta novamente.
+                    </p>
                   </div>
                 )}
                 
@@ -721,7 +804,14 @@ export default function CompleteProfilePage() {
                   disabled={isLoading}
                     className="flex-1 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white"
                 >
-                    {isLoading ? 'A guardar...' : 'Completar Onboarding'}
+                    {isLoading ? (
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>A guardar perfil...</span>
+                      </div>
+                    ) : (
+                      'Completar Onboarding'
+                    )}
                 </Button>
               </div>
             </form>

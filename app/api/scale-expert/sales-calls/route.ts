@@ -41,11 +41,12 @@ export async function GET(request: NextRequest) {
 
     console.log('📊 Fetching sales calls for user:', userId)
 
-    // Fetch sales calls for the user
+    // Fetch sales calls for the user from sales_call_analyses table
     const { data: salesCalls, error: fetchError } = await supabase
-      .from('sales_calls')
+      .from('sales_call_analyses')
       .select('*')
       .eq('user_id', userId)
+      .eq('status', 'completed')
       .order('created_at', { ascending: false })
 
     if (fetchError) {

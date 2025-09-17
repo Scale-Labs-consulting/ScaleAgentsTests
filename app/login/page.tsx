@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFirstTimeUser } from '@/hooks/useFirstTimeUser'
 import { supabase } from '@/lib/supabase'
+import { useToast } from '@/hooks/use-toast'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -20,9 +21,11 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
   const { signIn, signInWithGoogle } = useAuth()
   const { isFirstTime } = useFirstTimeUser()
+  const { toast } = useToast()
 
   // Check for OAuth callback errors
   useEffect(() => {
@@ -72,6 +75,7 @@ export default function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
     setError('')
+    setSuccessMessage('')
     
     console.log('🔐 Attempting to sign in with email:', email)
     
@@ -79,56 +83,49 @@ export default function LoginPage() {
       const result = await signIn(email, password)
       console.log('✅ Sign in successful:', result)
       
-      // Check if we need to redirect to a specific page
-      const urlParams = new URLSearchParams(window.location.search)
-      const redirectTo = urlParams.get('redirectTo')
-      
-      // Verify session before redirecting
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          // Check if this is a first-time user
-          if (isFirstTime) {
-            router.push('/complete-profile')
-          } else {
-            router.push(redirectTo || '/dashboard')
-          }
-        } else {
-          // Force a small delay to allow auth state to update
-          setTimeout(() => {
-            if (isFirstTime) {
-              router.push('/complete-profile')
-            } else {
-              router.push(redirectTo || '/dashboard')
-            }
-          }, 1000)
-        }
-      } catch (error) {
-        setTimeout(() => {
-          if (isFirstTime) {
-            router.push('/complete-profile')
-          } else {
-            router.push(redirectTo || '/dashboard')
-          }
-        }, 1000)
-      }
+      // Redirect to loading page immediately
+      router.push('/loading')
     } catch (error: any) {
       console.error('❌ Login error:', error)
       
-      // Provide more specific error messages
+      // Enhanced error messages with specific guidance
       let errorMessage = 'Falha ao iniciar sessão. Por favor, verifique as suas credenciais.'
+      let errorTitle = 'Erro ao iniciar sessão'
+      let showResetLink = false
+      let showRegisterLink = false
       
       if (error.message?.includes('Invalid login credentials')) {
-        errorMessage = 'Email ou palavra-passe inválidos. Por favor, tente novamente.'
+        errorTitle = 'Credenciais inválidas'
+        errorMessage = 'Email ou palavra-passe incorretos. Verifique os seus dados e tente novamente.'
+        showResetLink = true
       } else if (error.message?.includes('Email not confirmed')) {
-        errorMessage = 'Por favor, verifique o seu email e confirme a sua conta antes de iniciar sessão.'
+        errorTitle = 'Email não confirmado'
+        errorMessage = 'Por favor, verifique o seu email e clique no link de confirmação antes de iniciar sessão.'
       } else if (error.message?.includes('Too many requests')) {
-        errorMessage = 'Demasiadas tentativas de login. Por favor, aguarde um momento antes de tentar novamente.'
+        errorTitle = 'Demasiadas tentativas'
+        errorMessage = 'Demasiadas tentativas de login. Por favor, aguarde 15 minutos antes de tentar novamente.'
+      } else if (error.message?.includes('User not found')) {
+        errorTitle = 'Conta não encontrada'
+        errorMessage = 'Não existe uma conta com este email. Verifique o email ou registe-se.'
+        showRegisterLink = true
+      } else if (error.message?.includes('Invalid email')) {
+        errorTitle = 'Email inválido'
+        errorMessage = 'Por favor, introduza um endereço de email válido.'
+      } else if (error.message?.includes('Password should be at least')) {
+        errorTitle = 'Palavra-passe inválida'
+        errorMessage = 'A palavra-passe deve ter pelo menos 8 caracteres.'
       } else if (error.message) {
         errorMessage = error.message
       }
       
       setError(errorMessage)
+      
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+        duration: 6000,
+      })
     } finally {
       setIsLoading(false)
     }
@@ -137,33 +134,52 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
     setError('')
+    setSuccessMessage('')
     
     try {
       await signInWithGoogle()
+      
       // The redirect will be handled by Supabase OAuth
+      // After OAuth callback, user will be redirected to /loading
     } catch (error: any) {
       console.error('❌ Google sign in error:', error)
       
-      // Provide more specific error messages
+      // Enhanced error messages for Google sign in
       let errorMessage = 'Falha ao iniciar sessão com Google. Por favor, tente novamente.'
+      let errorTitle = 'Erro no login com Google'
+      let showRegisterLink = false
       
       if (error.message?.includes('Invalid Refresh Token')) {
+        errorTitle = 'Erro de autenticação'
         errorMessage = 'Erro de autenticação. Por favor, tente novamente ou contacte o suporte.'
       } else if (error.message?.includes('both auth code and code verifier should be non-empty')) {
+        errorTitle = 'Erro de cache'
         errorMessage = 'Erro de autenticação. Por favor, limpe o cache do navegador e tente novamente.'
       } else if (error.message?.includes('Invalid redirect URI')) {
+        errorTitle = 'Erro de configuração'
         errorMessage = 'Erro de configuração OAuth. Contacte o administrador.'
       } else if (error.message?.includes('OAuth provider not enabled')) {
+        errorTitle = 'Google Auth desativado'
         errorMessage = 'Autenticação Google não está ativada. Contacte o administrador.'
       } else if (error.message?.includes('User not found')) {
+        errorTitle = 'Conta Google não encontrada'
         errorMessage = 'Conta Google não encontrada. Tente registar-se primeiro.'
+        showRegisterLink = true
       } else if (error.message?.includes('Invalid login credentials')) {
+        errorTitle = 'Credenciais inválidas'
         errorMessage = 'Credenciais inválidas. Verifique se a sua conta Google está correta.'
       } else if (error.message) {
-        errorMessage = `Erro: ${error.message}`
+        errorMessage = error.message
       }
       
       setError(errorMessage)
+      
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+        duration: 6000,
+      })
     } finally {
       setIsGoogleLoading(false)
     }
@@ -174,7 +190,7 @@ export default function LoginPage() {
       {/* Background */}
       <div className="fixed inset-0 z-0">
         <Image
-          src="/images/brand-background.png"
+          src="/images/background-4.jpg"
           alt="Background"
           fill
           className="object-cover opacity-80"
@@ -219,26 +235,6 @@ export default function LoginPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {error && (
-                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
-                  <p className="text-red-400 text-sm">{error}</p>
-                  {error.includes('não encontrada') && (
-                    <div className="mt-2">
-                      <Link href="/register" className="text-purple-400 hover:text-purple-300 text-sm underline">
-                        Ir para Registar-se →
-                      </Link>
-                    </div>
-                  )}
-                  {error.includes('limpe o cache do navegador') && (
-                    <div className="mt-2">
-                      <p className="text-red-300 text-xs">
-                        <strong>Como limpar o cache:</strong> Pressione Ctrl+Shift+Delete (Windows) ou Cmd+Shift+Delete (Mac), 
-                        selecione "Cookies e dados do site" e "Imagens e ficheiros em cache", depois clique em "Limpar dados".
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Email Input */}
               <div className="space-y-2">
@@ -288,8 +284,33 @@ export default function LoginPage() {
                 disabled={isLoading}
                 className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white h-12 text-base font-medium"
               >
-                {isLoading ? 'A iniciar sessão...' : 'Iniciar Sessão'}
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>A iniciar sessão...</span>
+                  </div>
+                ) : (
+                  'Iniciar Sessão'
+                )}
               </Button>
+
+              {/* Forgot Password Link */}
+              <div className="text-center">
+                <Link 
+                  href="#" 
+                  className="text-purple-400 hover:text-purple-300 text-sm underline"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    toast({
+                      title: "Funcionalidade em desenvolvimento",
+                      description: "A funcionalidade de recuperação de palavra-passe estará disponível em breve. Contacte o suporte se precisar de ajuda.",
+                      duration: 5000,
+                    })
+                  }}
+                >
+                  Esqueceu-se da palavra-passe?
+                </Link>
+              </div>
 
               {/* Divider */}
               <div className="relative">
@@ -310,7 +331,7 @@ export default function LoginPage() {
                 {isGoogleLoading ? (
                   <div className="flex items-center space-x-2">
                     <div className="w-4 h-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin"></div>
-                    <span>A iniciar sessão...</span>
+                    <span>A redirecionar...</span>
                   </div>
                 ) : (
                   <div className="flex items-center space-x-3">

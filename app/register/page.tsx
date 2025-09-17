@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useFirstTimeUser } from '@/hooks/useFirstTimeUser'
+import { useToast } from '@/hooks/use-toast'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -24,9 +25,11 @@ export default function RegisterPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [generalError, setGeneralError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
   const { signUp, signInWithGoogle } = useAuth()
   const { isFirstTime } = useFirstTimeUser()
+  const { toast } = useToast()
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -62,14 +65,66 @@ export default function RegisterPage() {
 
     setIsLoading(true)
     setGeneralError('')
+    setSuccessMessage('')
     
     try {
-      await signUp(formData.email, formData.password)
-      // Redirect to dashboard - first-time user check will be handled there
-      router.push('/dashboard')
+      const result = await signUp(formData.email, formData.password)
+      
+      // Show success message with email verification instructions
+      setSuccessMessage('Conta criada com sucesso!')
+      
+      toast({
+        title: "Conta criada com sucesso! 🎉",
+        description: "Por favor, verifique o seu email e clique no link de confirmação para ativar a sua conta. Depois podes iniciar sessão.",
+        duration: 8000,
+      })
+      
+      // Show additional instructions
+      setTimeout(() => {
+        toast({
+          title: "Verificação de email necessária",
+          description: "Verifique a sua caixa de entrada (e spam) para o email de confirmação. Clique no link para ativar a sua conta.",
+          duration: 10000,
+        })
+      }, 2000)
+      
+      // Don't redirect immediately - let user see the success message
+      // They can manually go to dashboard or login after confirming email
+      
     } catch (error: any) {
       console.error('Registration error:', error)
-      setGeneralError(error.message || 'Falha ao criar conta. Por favor, tente novamente.')
+      
+      // Enhanced error messages
+      let errorMessage = 'Falha ao criar conta. Por favor, tente novamente.'
+      let errorTitle = 'Erro ao criar conta'
+      
+      if (error.message?.includes('User already registered') || error.message?.includes('Email already registered')) {
+        errorTitle = 'Email já registado'
+        errorMessage = 'Este email já está registado. Por favor, use "Iniciar Sessão" em vez de "Registar-se".'
+      } else if (error.message?.includes('Password should be at least')) {
+        errorTitle = 'Palavra-passe muito fraca'
+        errorMessage = 'A palavra-passe deve ter pelo menos 8 caracteres e incluir letras e números.'
+      } else if (error.message?.includes('Invalid email')) {
+        errorTitle = 'Email inválido'
+        errorMessage = 'Por favor, introduza um endereço de email válido.'
+      } else if (error.message?.includes('Signup requires a valid password')) {
+        errorTitle = 'Palavra-passe inválida'
+        errorMessage = 'Por favor, introduza uma palavra-passe válida com pelo menos 8 caracteres.'
+      } else if (error.message?.includes('Rate limit exceeded')) {
+        errorTitle = 'Demasiadas tentativas'
+        errorMessage = 'Demasiadas tentativas de registo. Por favor, aguarde alguns minutos antes de tentar novamente.'
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      setGeneralError(errorMessage)
+      
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+        duration: 6000,
+      })
     } finally {
       setIsLoading(false)
     }
@@ -78,31 +133,56 @@ export default function RegisterPage() {
   const handleGoogleSignUp = async () => {
     setIsGoogleLoading(true)
     setGeneralError('')
+    setSuccessMessage('')
     
     try {
       await signInWithGoogle()
+      
+      // Show success message for Google sign up
+      toast({
+        title: "A iniciar sessão com Google... 🔐",
+        description: "A redirecionar para o Google para completar o registo.",
+        duration: 5000,
+      })
+      
       // The redirect will be handled by Supabase OAuth
     } catch (error: any) {
       console.error('❌ Google sign up error:', error)
       
-      // Provide more specific error messages
+      // Enhanced error messages for Google sign up
       let errorMessage = 'Falha ao registar-se com Google. Por favor, tente novamente.'
+      let errorTitle = 'Erro no registo com Google'
       
       if (error.message?.includes('Invalid Refresh Token')) {
+        errorTitle = 'Conta Google já registada'
         errorMessage = 'Esta conta Google já está registada. Por favor, use "Iniciar Sessão" em vez de "Registar-se".'
       } else if (error.message?.includes('User already registered')) {
+        errorTitle = 'Conta Google já registada'
         errorMessage = 'Esta conta Google já está registada. Por favor, use "Iniciar Sessão" em vez de "Registar-se".'
       } else if (error.message?.includes('Email already registered')) {
+        errorTitle = 'Email já registado'
         errorMessage = 'Este email já está registado. Por favor, use "Iniciar Sessão" em vez de "Registar-se".'
       } else if (error.message?.includes('Invalid redirect URI')) {
+        errorTitle = 'Erro de configuração'
         errorMessage = 'Erro de configuração OAuth. Contacte o administrador.'
       } else if (error.message?.includes('OAuth provider not enabled')) {
+        errorTitle = 'Google Auth desativado'
         errorMessage = 'Autenticação Google não está ativada. Contacte o administrador.'
+      } else if (error.message?.includes('both auth code and code verifier should be non-empty')) {
+        errorTitle = 'Erro de autenticação'
+        errorMessage = 'Erro de autenticação. Por favor, limpe o cache do navegador e tente novamente.'
       } else if (error.message) {
-        errorMessage = `Erro: ${error.message}`
+        errorMessage = error.message
       }
       
       setGeneralError(errorMessage)
+      
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+        duration: 6000,
+      })
     } finally {
       setIsGoogleLoading(false)
     }
@@ -121,7 +201,7 @@ export default function RegisterPage() {
       {/* Background */}
       <div className="fixed inset-0 z-0">
         <Image
-          src="/images/brand-background.png"
+          src="/images/background-4.jpg"
           alt="Background"
           fill
           className="object-cover opacity-80"
@@ -166,14 +246,43 @@ export default function RegisterPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
+              {successMessage && (
+                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-md">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                    <p className="text-green-400 text-sm font-medium">{successMessage}</p>
+                  </div>
+                  <p className="text-green-300 text-xs mt-2">
+                    Verifique o seu email e clique no link de confirmação para ativar a sua conta.
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <Link href="/login" className="text-purple-400 hover:text-purple-300 text-sm underline">
+                      Ir para Iniciar Sessão →
+                    </Link>
+                    <span className="text-green-300 text-xs">(após confirmar o email)</span>
+                  </div>
+                </div>
+              )}
+              
               {generalError && (
                 <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
-                  <p className="text-red-400 text-sm">{generalError}</p>
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="h-4 w-4 text-red-400" />
+                    <p className="text-red-400 text-sm">{generalError}</p>
+                  </div>
                   {generalError.includes('já está registada') && (
                     <div className="mt-2">
                       <Link href="/login" className="text-purple-400 hover:text-purple-300 text-sm underline">
                         Ir para Iniciar Sessão →
                       </Link>
+                    </div>
+                  )}
+                  {generalError.includes('limpe o cache do navegador') && (
+                    <div className="mt-2">
+                      <p className="text-red-300 text-xs">
+                        <strong>Como limpar o cache:</strong> Pressione Ctrl+Shift+Delete (Windows) ou Cmd+Shift+Delete (Mac), 
+                        selecione "Cookies e dados do site" e "Imagens e ficheiros em cache", depois clique em "Limpar dados".
+                      </p>
                     </div>
                   )}
                 </div>
@@ -266,7 +375,14 @@ export default function RegisterPage() {
                 disabled={isLoading}
                 className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white h-12 text-base font-medium"
               >
-                {isLoading ? 'A continuar...' : 'Continuar com Email'}
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>A criar conta...</span>
+                  </div>
+                ) : (
+                  'Criar Conta com Email'
+                )}
               </Button>
 
               {/* Divider */}
@@ -288,7 +404,7 @@ export default function RegisterPage() {
                 {isGoogleLoading ? (
                   <div className="flex items-center space-x-2">
                     <div className="w-4 h-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin"></div>
-                    <span>A continuar...</span>
+                    <span>A redirecionar...</span>
                   </div>
                 ) : (
                   <div className="flex items-center space-x-3">
@@ -298,7 +414,7 @@ export default function RegisterPage() {
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                     </svg>
-                    <span>Continuar com Google</span>
+                    <span>Criar Conta com Google</span>
                   </div>
                 )}
               </Button>

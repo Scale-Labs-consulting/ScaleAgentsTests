@@ -30,12 +30,13 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    // Get the latest sales call for this user and blob URL
+    // Get the latest sales call for this user and blob URL from sales_call_analyses table
     const { data: salesCall, error } = await supabase
-      .from('sales_calls')
+      .from('sales_call_analyses')
       .select('*')
       .eq('user_id', userId)
       .eq('file_url', blobUrl)
+      .eq('status', 'completed')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()

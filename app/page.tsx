@@ -178,7 +178,7 @@ export default function HomePage() {
       {/* Background */}
       <div className="fixed inset-0 z-0">
         <Image
-          src="/images/background-4.jpg"
+          src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/background-4.jpg"
           alt="Background"
           fill
           className="object-cover opacity-20 dark:opacity-80"
@@ -204,14 +204,14 @@ export default function HomePage() {
               {/* Logo - Always visible */}
               <div className="flex items-center space-x-4">
                 <Image
-                  src="/images/logo-black.png"
+                  src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/logo-black.png"
                   alt="Scale Labs"
                   width={200}
                   height={60}
                   className="h-8 w-auto dark:hidden"
                 />
                 <Image
-                  src="/images/logo-white.png"
+                  src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/logo-white.png"
                   alt="Scale Labs"
                   width={200}
                   height={60}
@@ -309,7 +309,7 @@ export default function HomePage() {
               >
                 <div className="flex items-center justify-center space-x-3">
                   <Image
-                    src="/trustFactor.png"
+                    src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/trustFactor.png"
                     alt="Como a Scale Labs Gera €10M+ para Clientes - Descobre o sistema exato por trás de 170+ departamentos otimizados"
                     width={300}
                     height={100}
@@ -394,7 +394,7 @@ export default function HomePage() {
                       ].map((logo, index) => (
                         <div key={`first-${index}`} className="flex items-center justify-center h-16 w-28 flex-shrink-0 mx-4">
                           <Image
-                            src={`/caseStudies/${logo}`}
+                            src={`https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/caseStudies/${encodeURIComponent(logo)}`}
                             alt={logo.replace('.png', '')}
                             width={100}
                             height={50}
@@ -420,7 +420,7 @@ export default function HomePage() {
                       ].map((logo, index) => (
                         <div key={`second-${index}`} className="flex items-center justify-center h-16 w-28 flex-shrink-0 mx-4">
                           <Image
-                            src={`/caseStudies/${logo}`}
+                            src={`https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/caseStudies/${encodeURIComponent(logo)}`}
                             alt={logo.replace('.png', '')}
                             width={100}
                             height={50}
@@ -1951,14 +1951,14 @@ export default function HomePage() {
             <div className="flex flex-col md:flex-row justify-between items-center">
               <div className="flex items-center space-x-4 mb-4 md:mb-0">
                 <Image
-                  src="/images/logo-black.png"
+                  src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/logo-black.png"
                   alt="Scale Labs"
                   width={150}
                   height={45}
                   className="h-6 w-auto dark:hidden"
                 />
                 <Image
-                  src="/images/logo-white.png"
+                  src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/logo-white.png"
                   alt="Scale Labs"
                   width={150}
                   height={45}

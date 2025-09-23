@@ -47,32 +47,71 @@ export async function extractTextFromPDF(
            const fieldsContent = pdfParser.getAllFieldsTypes()
            console.log(`📄 getAllFieldsTypes(): ${Object.keys(fieldsContent).length} fields`)
            
-           // Method 3: Manual extraction from PDF structure
-           let manualText = ''
-           if (pdfData.Pages && pdfData.Pages.length > 0) {
-             for (let i = 0; i < pdfData.Pages.length; i++) {
-               const page = pdfData.Pages[i]
-               console.log(`📄 Page ${i + 1}:`, {
-                 texts: page.Texts?.length || 0,
-                 images: page.Images?.length || 0,
-                 fills: page.Fills?.length || 0
-               })
-               
-               if (page.Texts) {
-                 for (let j = 0; j < page.Texts.length; j++) {
-                   const text = page.Texts[j]
-                   if (text.R && text.R.length > 0) {
-                     for (let k = 0; k < text.R.length; k++) {
-                       const run = text.R[k]
-                       if (run.T) {
-                         manualText += run.T
+               // Method 3: Enhanced manual extraction from PDF structure
+               let manualText = ''
+               if (pdfData.Pages && pdfData.Pages.length > 0) {
+                 for (let i = 0; i < pdfData.Pages.length; i++) {
+                   const page = pdfData.Pages[i]
+                   console.log(`📄 Page ${i + 1}:`, {
+                     texts: page.Texts?.length || 0,
+                     images: page.Images?.length || 0,
+                     fills: page.Fills?.length || 0
+                   })
+                   
+                   if (page.Texts) {
+                     // Sort texts by Y position (top to bottom) and X position (left to right)
+                     const sortedTexts = page.Texts.sort((a, b) => {
+                       const aY = a.y || 0
+                       const bY = b.y || 0
+                       if (Math.abs(aY - bY) < 5) { // Same line
+                         return (a.x || 0) - (b.x || 0) // Sort by X position
                        }
+                       return bY - aY // Sort by Y position (top to bottom)
+                     })
+                     
+                     let currentLine = ''
+                     let lastY = -1
+                     
+                     for (let j = 0; j < sortedTexts.length; j++) {
+                       const text = sortedTexts[j]
+                       const currentY = text.y || 0
+                       
+                       if (text.R && text.R.length > 0) {
+                         let textContent = ''
+                         for (let k = 0; k < text.R.length; k++) {
+                           const run = text.R[k]
+                           if (run.T) {
+                             // Decode URL-encoded text
+                             try {
+                               textContent += decodeURIComponent(run.T)
+                             } catch (e) {
+                               textContent += run.T
+                             }
+                           }
+                         }
+                         
+                         // Check if this is a new line (different Y position)
+                         if (Math.abs(currentY - lastY) > 5) {
+                           if (currentLine.trim()) {
+                             manualText += currentLine.trim() + '\n'
+                           }
+                           currentLine = textContent
+                         } else {
+                           // Same line, append with space
+                           currentLine += (currentLine ? ' ' : '') + textContent
+                         }
+                         
+                         lastY = currentY
+                       }
+                     }
+                     
+                     // Add the last line
+                     if (currentLine.trim()) {
+                       manualText += currentLine.trim() + '\n'
                      }
                    }
                  }
                }
-             }
-           }
            
            console.log(`📄 Manual extraction: ${manualText.length} characters`)
            

@@ -1,4 +1,6 @@
 // Comprehensive prompts for the ScaleAgents sales analysis system
+import { getCallTypeKnowledge, type CallTypeKnowledge } from './call-type-knowledge'
+import { getKnowledgeForCallType } from './sales-analyst-knowledge'
 
 // 1. Resumos Momentos Fortes e Fracos do Comercial
 export const MOMENTOS_FORTES_FRACOS_PROMPT = `És um assistente especializado em análise de calls de vendas. A tua única função é analisar a transcrição da call e identificar os momentos de maior e menor desempenho do comercial.
@@ -137,6 +139,12 @@ REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FORTES:
    - Estrutura clara e controlo da reunião
    - Fechamento eficaz com próximos passos claros
 
+3. CONSISTÊNCIA CRÍTICA:
+   - Identifica APENAS momentos onde o comercial demonstrou competência genuína
+   - NÃO uses o mesmo momento/timestamp para pontos fortes e fracos
+   - Se um momento não é claramente um ponto forte, NÃO o incluas
+   - Foca em momentos onde o comercial EXCELSEU, não apenas "fez bem"
+
 O feedback deve ser objetivo, conciso (máx. 140 palavras) e focado na melhoria contínua.  
 Deve responder sempre em português de Lisboa.  
 Cada ponto forte deve ter um Momento exato (Timestamp) e uma Citação Direta da transcrição.  
@@ -157,15 +165,15 @@ Todas as tuas respostas devem ser exclusivamente em português de Portugal (espe
 
 Estrutura da Resposta (formato de lista com bullets):
 
-- **Boa Abordagem Inicial**: Momento em que a introdução foi clara, envolvente e estabeleceu rapport com o cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+- **Boa Abordagem Inicial**: Momento em que a introdução foi clara, envolvente e estabeleceu rapport com o cliente. Timestamp: [MM:SS] "[Frase completa do comercial - não apenas palavras soltas, mas a frase inteira que demonstra o ponto forte]"
 
-- **Identificação Eficaz de Necessidades**: Quando o comercial fez perguntas relevantes que ajudaram a entender as necessidades do cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+- **Identificação Eficaz de Necessidades**: Quando o comercial fez perguntas relevantes que ajudaram a entender as necessidades do cliente. Timestamp: [MM:SS] "[Frase completa do comercial - a pergunta inteira que demonstra a estratégia de descoberta]"
 
-- **Apresentação Clara de Soluções**: Onde o comercial explicou de forma convincente como o produto ou serviço resolve o problema do cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+- **Apresentação Clara de Soluções**: Onde o comercial explicou de forma convincente como o produto ou serviço resolve o problema do cliente. Timestamp: [MM:SS] "[Frase completa do comercial - a explicação inteira que demonstra a entrega de valor]"
 
-- **Gestão de Objeções**: Situações em que o comercial lidou bem com dúvidas ou hesitações do cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+- **Gestão de Objeções**: Situações em que o comercial lidou bem com dúvidas ou hesitações do cliente. Timestamp: [MM:SS] "[Frase completa do comercial - a resposta inteira que demonstra a gestão eficaz da objeção]"
 
-- **Conclusão Positiva**: Momentos em que o comercial avançou eficazmente para o próximo passo ou para o fecho da venda. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+- **Conclusão Positiva**: Momentos em que o comercial avançou eficazmente para o próximo passo ou para o fecho da venda. Timestamp: [MM:SS] "[Frase completa do comercial - a frase inteira que demonstra o fechamento eficaz]"
 
 Instruções Críticas:
 - USA markdown para criar a lista com bullets (formato: - **Título**: texto...)
@@ -173,6 +181,10 @@ Instruções Críticas:
 - Inclui citação direta do transcript para cada ponto forte, com o timestamp exato.
 - USA APENAS o formato de bullet list especificado acima.
 - NÃO incluas títulos como "Pontos Fortes da Reunião" - começa diretamente com os pontos individuais em formato de lista.
+- **IMPORTANTE**: As citações devem ser FRASES COMPLETAS, não apenas palavras soltas. Extrai a frase inteira que demonstra o ponto forte.
+- **TIMESTAMP**: Usa formato MM:SS (ex: 2:34, 15:42) para indicar o momento exato da frase.
+- **CITAÇÃO**: Extrai a frase completa do comercial que demonstra o ponto forte, não apenas fragmentos.
+- **CONSISTÊNCIA**: NÃO uses o mesmo timestamp/momento que será usado para pontos fracos. Cada momento deve ser claramente forte OU fraco, nunca ambos.
 
 Transcrição para análise:
 {transcription}`
@@ -267,6 +279,12 @@ REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FRACOS:
    - Não criar sentido de urgência quando apropriado
    - Falta de follow-up ou próximos passos claros
 
+3. CONSISTÊNCIA CRÍTICA:
+   - Identifica APENAS momentos onde o comercial demonstrou falhas genuínas
+   - NÃO uses o mesmo momento/timestamp para pontos fortes e fracos
+   - Se um momento não é claramente um ponto fraco, NÃO o incluas
+   - Foca em momentos onde o comercial FALHOU, não apenas "poderia ter feito melhor"
+
 O feedback deve ser objetivo, conciso (máx. 140 palavras) e focado na melhoria contínua.  
 Deve responder sempre em português de Lisboa.  
 Cada ponto fraco deve ter um Momento exato (Timestamp) e uma Citação Direta da transcrição.  
@@ -287,15 +305,15 @@ Todas as tuas respostas devem ser exclusivamente em português de Portugal (espe
 
 Estrutura da Resposta (formato de lista com bullets):
 
-- **Falta de Rapport Inicial**: Momento em que a introdução não foi clara, envolvente ou não conseguiu estabelecer conexão com o cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+- **Falta de Rapport Inicial**: Momento em que a introdução não foi clara, envolvente ou não conseguiu estabelecer conexão com o cliente. Timestamp: [MM:SS] "[Frase completa do comercial - a frase inteira que demonstra a falta de rapport ou introdução inadequada]"
 
-- **Má Identificação de Necessidades**: Quando o comercial não fez perguntas relevantes ou deixou de compreender as necessidades do cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+- **Má Identificação de Necessidades**: Quando o comercial não fez perguntas relevantes ou deixou de compreender as necessidades do cliente. Timestamp: [MM:SS] "[Frase completa do comercial - a pergunta inadequada ou momento em que não explorou as necessidades]"
 
-- **Explicação Fraca de Soluções**: Quando o comercial não conseguiu apresentar de forma convincente como o produto ou serviço resolve o problema do cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+- **Explicação Fraca de Soluções**: Quando o comercial não conseguiu apresentar de forma convincente como o produto ou serviço resolve o problema do cliente. Timestamp: [MM:SS] "[Frase completa do comercial - a explicação inadequada que demonstra a falta de clareza]"
 
-- **Má Gestão de Objeções**: Momentos em que o comercial teve dificuldades em responder a dúvidas ou hesitações do cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+- **Má Gestão de Objeções**: Momentos em que o comercial teve dificuldades em responder a dúvidas ou hesitações do cliente. Timestamp: [MM:SS] "[Frase completa do comercial - a resposta inadequada que demonstra a má gestão da objeção]"
 
-- **Fecho Ineficaz**: Quando o comercial não avançou de forma clara para os próximos passos ou para o fecho da venda. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+- **Fecho Ineficaz**: Quando o comercial não avançou de forma clara para os próximos passos ou para o fecho da venda. Timestamp: [MM:SS] "[Frase completa do comercial - a frase que demonstra o fecho inadequado ou falta de próximos passos]"
 
 Instruções Críticas:
 - USA markdown para criar a lista com bullets (formato: - **Título**: texto...)
@@ -303,6 +321,10 @@ Instruções Críticas:
 - Inclui citação direta do transcript para cada ponto fraco, com o timestamp exato.
 - USA APENAS o formato de bullet list especificado acima.
 - NÃO incluas títulos como "Pontos Fracos da Reunião" - começa diretamente com os pontos individuais em formato de lista.
+- **IMPORTANTE**: As citações devem ser FRASES COMPLETAS, não apenas palavras soltas. Extrai a frase inteira que demonstra o ponto fraco.
+- **TIMESTAMP**: Usa formato MM:SS (ex: 2:34, 15:42) para indicar o momento exato da frase.
+- **CITAÇÃO**: Extrai a frase completa do comercial que demonstra o ponto fraco, não apenas fragmentos.
+- **CONSISTÊNCIA**: NÃO uses o mesmo timestamp/momento que será usado para pontos fortes. Cada momento deve ser claramente forte OU fraco, nunca ambos.
 
 Transcrição para análise:
 {transcription}`
@@ -606,25 +628,59 @@ Texto HTML para processar:
 {htmlContent}`
 
 // 10. Type of Call
-export const TIPO_CALL_PROMPT = `Analisa a seguinte transcrição de conversa e classifica-a numa das seguintes categorias:
+// Note: Call type classification has been removed as users now select call type before upload
 
-1 - Chamada Fria: Primeiro contacto com um potencial cliente que não foi previamente contactado. Características típicas incluem: apresentação inicial da empresa/produto, introdução do comercial, identificação inicial de necessidades, e tentativa de agendar uma reunião de descoberta.
+// 9. General Tips and Recommendations
+export const DICAS_GERAIS_PROMPT = `Analisa a seguinte transcrição de uma reunião de vendas e fornece dicas gerais e recomendações para melhorar o desempenho do comercial.
 
-2 - Chamada de Agendamento: Conversa focada em marcar uma reunião ou call específica. Características típicas incluem: discussão de disponibilidade, confirmação de horários, envio de convites, e preparação para a reunião.
+IMPORTANTE: Devolve APENAS uma lista simples de dicas, sem títulos, subtítulos, introduções ou formatação complexa. Cada item deve ser uma frase clara e direta.
 
-3 - Reunião de Descoberta: Conversa profunda para entender as necessidades, desafios e objetivos do cliente. Características típicas incluem: perguntas detalhadas sobre a empresa/negócio, identificação de problemas específicos, exploração da situação atual, e questões sobre orçamento, autoridade de decisão, cronograma ou necessidades específicas.
+CRÍTICO: 
+- NÃO incluas introduções como "Após analisar a transcrição..."
+- NÃO uses numeração (1., 2., 3.)
+- NÃO uses subtítulos como "Técnicas de Comunicação:"
+- NÃO uses formatação markdown
+- APENAS uma lista simples com bullet points
 
-4 - Reunião de Fecho: Conversa focada em finalizar uma venda ou acordo. Características típicas incluem: discussão de preços finais, negociação de termos, apresentação de propostas finais, e tentativa de obter um compromisso ou assinatura.
+Formato de resposta:
+- Dica 1
+- Dica 2  
+- Dica 3
+- Dica 4
+- Dica 5
 
-5 - Reunião de Esclarecimento de Dúvidas: Conversa focada em responder perguntas específicas do cliente sobre o produto/serviço. Características típicas incluem: muitas perguntas técnicas ou de implementação, esclarecimentos sobre funcionalidades específicas, e poucos elementos de descoberta ou fecho.
+Transcrição:
+{transcription}`
 
-6 - Reunião de One Call Close: Conversa que combina descoberta e fecho numa única reunião. Características típicas incluem: identificação rápida de necessidades, apresentação de solução personalizada, e tentativa de fecho imediato.
+// 10. Focus for Next Calls
+export const FOCO_PROXIMAS_CALLS_PROMPT = `Analisa a seguinte transcrição de uma reunião de vendas e identifica as áreas específicas em que o comercial deve focar-se nas próximas chamadas, com base nos "Momentos Fracos do Comercial" identificados.
 
-Analisa apenas os primeiros 5-10 minutos da transcrição para fazer tua determinação, pois essa parte geralmente contém os elementos mais importantes para a classificação.
+IMPORTANTE: Devolve APENAS uma lista simples, sem títulos, subtítulos ou formatação complexa. Cada item deve ser uma frase clara e direta que explique como melhorar baseado nos pontos fracos identificados.
 
-Após analisar, responde APENAS com o número 1, 2, 3, 4, 5 ou 6 que melhor classifica a transcrição. Não incluas explicações ou texto adicional.
+Foca-te especificamente em:
+- Como melhorar os "Momentos Fracos do Comercial" identificados na análise
+- Ações práticas para transformar pontos fracos em pontos fortes
+- Técnicas específicas para superar as dificuldades identificadas
+- Preparação necessária para evitar repetir os mesmos erros
+- Estratégias de follow-up que abordem as áreas de melhoria
 
-Transcrição para análise:
+Formato de resposta:
+- Item 1
+- Item 2
+- Item 3
+- Item 4
+- Item 5
+
+NÃO uses:
+- Títulos como "Pontos Fracos Identificados" ou "Oportunidades de Follow-Up"
+- Numeração (1., 2., 3.)
+- Subtítulos ou seções
+- Formatação markdown
+- Blocos de código
+
+Cada item deve ser uma ação prática e específica que o comercial pode implementar para melhorar baseado nos pontos fracos identificados.
+
+Transcrição:
 {transcription}`
 
 // System prompts for each analysis type
@@ -638,7 +694,8 @@ export const SYSTEM_PROMPTS = {
   ANALISE_QUANTITATIVA_COMPLETA: 'És um analista de vendas especializado em análise quantitativa e qualitativa.',
   EXPLICACAO_PONTUACAO: 'És um analista de vendas experiente especializado em justificações de pontuação.',
   JUSTIFICACAO_GS: 'És um processador de texto especializado em limpeza de HTML.',
-  TIPO_CALL: 'És um classificador especializado em tipos de chamadas de vendas.'
+  DICAS_GERAIS: 'És um consultor de vendas especializado em fornecer dicas práticas e acionáveis.',
+  FOCO_PROXIMAS_CALLS: 'És um coach de vendas especializado em planos de ação para melhorias futuras.'
 }
 
 // Function to replace placeholders in prompts
@@ -687,10 +744,120 @@ export function getJustificacaoGSPrompt(htmlContent: string): string {
   return formatPrompt(JUSTIFICACAO_GS_PROMPT, { htmlContent })
 }
 
-export function getTipoCallPrompt(transcription: string): string {
-  return formatPrompt(TIPO_CALL_PROMPT, { transcription })
-}
+// Note: getTipoCallPrompt has been removed as call type is now selected by user
 
 export function getJustificativaAvaliacaoPrompt(transcription: string, scoring: string): string {
   return formatPrompt(JUSTIFICATIVA_AVALIACAO_PROMPT, { transcription, scoring })
+}
+
+// Function to enhance prompts with call type specific knowledge
+export async function enhancePromptWithCallTypeKnowledge(basePrompt: string, callType: string): Promise<string> {
+  console.log(`\n🧠 ===== PROMPT ENHANCEMENT START =====`)
+  console.log(`📋 Call Type: ${callType}`)
+  console.log(`📝 Base Prompt Length: ${basePrompt.length} characters`)
+  
+  // First, try to get knowledge from blob storage
+  const blobKnowledge = await getKnowledgeForCallType(callType)
+  
+  // Fallback to local knowledge if blob storage fails
+  const localKnowledge = getCallTypeKnowledge(callType)
+  
+  let callTypeContext = ''
+  let knowledgeSource = 'none'
+  
+  if (blobKnowledge && blobKnowledge.trim().length > 0) {
+    // Use knowledge from blob storage
+    callTypeContext = `
+CONHECIMENTO ESPECÍFICO PARA ${callType.toUpperCase()}:
+${blobKnowledge}
+
+---
+
+INSTRUÇÕES ESPECIAIS PARA ${callType.toUpperCase()}:
+Ao analisar esta transcrição, presta especial atenção ao conhecimento específico fornecido acima.
+Aplica este conhecimento para avaliar se o comercial seguiu as melhores práticas e técnicas adequadas para este tipo de chamada.
+
+`
+    knowledgeSource = 'blob-storage'
+    console.log(`✅ Using blob storage knowledge for ${callType}`)
+    console.log(`📊 Blob knowledge length: ${blobKnowledge.length} characters`)
+  } else if (localKnowledge) {
+    // Fallback to local knowledge
+    callTypeContext = `
+CONTEXTO ESPECÍFICO PARA ${localKnowledge.name.toUpperCase()}:
+
+DESCRIÇÃO: ${localKnowledge.description}
+
+OBJETIVOS PRINCIPAIS:
+${localKnowledge.objectives.map(obj => `- ${obj}`).join('\n')}
+
+TÉCNICAS-CHAVE ESPERADAS:
+${localKnowledge.keyTechniques.map(tech => `- ${tech}`).join('\n')}
+
+MELHORES PRÁTICAS:
+${localKnowledge.bestPractices.map(practice => `- ${practice}`).join('\n')}
+
+ERROS COMUNS A IDENTIFICAR:
+${localKnowledge.commonMistakes.map(mistake => `- ${mistake}`).join('\n')}
+
+MÉTRICAS DE SUCESSO:
+${localKnowledge.successMetrics.map(metric => `- ${metric}`).join('\n')}
+
+DESAFIOS TÍPICOS:
+${localKnowledge.commonChallenges.map(challenge => `- ${challenge}`).join('\n')}
+
+PERGUNTAS ESPECÍFICAS PARA AVALIAR:
+${localKnowledge.specificPrompts.map(prompt => `- ${prompt}`).join('\n')}
+
+---
+
+INSTRUÇÕES ESPECIAIS PARA ${localKnowledge.name.toUpperCase()}:
+Ao analisar esta transcrição, presta especial atenção aos objetivos, técnicas e melhores práticas listados acima. 
+Identifica se o comercial aplicou as técnicas adequadas para este tipo de chamada e se evitou os erros comuns.
+Avalia o desempenho considerando os desafios típicos e métricas de sucesso específicas para ${localKnowledge.name}.
+
+`
+    knowledgeSource = 'local-fallback'
+    console.log(`⚠️ Using fallback local knowledge for ${callType}`)
+  } else {
+    console.log(`⚠️ No knowledge available for call type: ${callType}`)
+  }
+  
+  const enhancedPrompt = callTypeContext + basePrompt
+  
+  console.log(`\n🧠 PROMPT ENHANCEMENT RESULT:`)
+  console.log(`   📋 Call Type: ${callType}`)
+  console.log(`   📚 Knowledge Source: ${knowledgeSource}`)
+  console.log(`   📝 Context Length: ${callTypeContext.length} characters`)
+  console.log(`   📝 Enhanced Prompt Length: ${enhancedPrompt.length} characters`)
+  console.log(`   📊 Enhancement Ratio: ${enhancedPrompt.length / basePrompt.length}x`)
+  console.log(`🧠 ===== PROMPT ENHANCEMENT END =====\n`)
+  
+  return enhancedPrompt
+}
+
+// Enhanced versions of key prompts with call type knowledge
+export async function getEnhancedMomentosFortesPrompt(transcription: string, callType: string): Promise<string> {
+  const enhancedPrompt = await enhancePromptWithCallTypeKnowledge(MOMENTOS_FORTES_FRACOS_PROMPT, callType)
+  return formatPrompt(enhancedPrompt, { transcription })
+}
+
+export async function getEnhancedPontosFortesPrompt(transcription: string, callType: string): Promise<string> {
+  const enhancedPrompt = await enhancePromptWithCallTypeKnowledge(PONTOS_FORTES_PROMPT, callType)
+  return formatPrompt(enhancedPrompt, { transcription })
+}
+
+export async function getEnhancedPontosFracosPrompt(transcription: string, callType: string): Promise<string> {
+  const enhancedPrompt = await enhancePromptWithCallTypeKnowledge(PONTOS_FRACOS_PROMPT, callType)
+  return formatPrompt(enhancedPrompt, { transcription })
+}
+
+export async function getEnhancedDicasGeraisPrompt(transcription: string, callType: string): Promise<string> {
+  const enhancedPrompt = await enhancePromptWithCallTypeKnowledge(DICAS_GERAIS_PROMPT, callType)
+  return formatPrompt(enhancedPrompt, { transcription })
+}
+
+export async function getEnhancedFocoProximasCallsPrompt(transcription: string, callType: string): Promise<string> {
+  const enhancedPrompt = await enhancePromptWithCallTypeKnowledge(FOCO_PROXIMAS_CALLS_PROMPT, callType)
+  return formatPrompt(enhancedPrompt, { transcription })
 }

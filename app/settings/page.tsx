@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { 
   User, 
   Shield, 
@@ -15,10 +16,21 @@ import {
   EyeOff,
   Key,
   Smartphone,
-  ArrowLeft
+  ArrowLeft,
+  Crown,
+  Calendar,
+  ExternalLink,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  RefreshCw
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
+import { getPlanById } from '@/lib/subscription-plans'
+import type { Database } from '@/types/database'
+import Image from 'next/image'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -147,7 +159,14 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-black text-white">
       {/* Background */}
       <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-black via-purple-900/20 to-black" />
+        <Image
+          src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/background-4.jpg"
+          alt="Background"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-purple-900/30 to-black/80" />
       </div>
 
       {/* Content */}
@@ -208,7 +227,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Tab Content */}
-        <div className="bg-white/5 border border-white/10 rounded-lg backdrop-blur-sm">
+        <div className="bg-white/10 border border-white/20 rounded-lg backdrop-blur-md shadow-2xl">
           {activeTab === 'profile' && (
             <div className="p-6">
               <CardHeader className="px-0 pt-0">
@@ -371,7 +390,7 @@ export default function SettingsPage() {
               </CardHeader>
               
               <CardContent className="px-0 space-y-6">
-                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                <div className="bg-white/10 border border-white/20 rounded-lg p-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-medium text-white">Plano Atual</h3>
@@ -387,32 +406,25 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">Método de Pagamento</label>
-                    <div className="flex items-center space-x-3 p-3 border border-white/10 rounded-lg bg-white/5">
-                      <CreditCard className="w-5 h-5 text-white/40" />
-                      <span className="text-sm text-white/70">Nenhum método de pagamento registado</span>
+                <div className="bg-white/10 border border-white/20 rounded-lg p-6 backdrop-blur-sm">
+                  <div className="text-center space-y-4">
+                    <div className="flex items-center justify-center w-12 h-12 bg-purple-100/20 rounded-full mx-auto">
+                      <CreditCard className="w-6 h-6 text-purple-400" />
                     </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">Endereço de Faturação</label>
-                    <div className="text-sm text-white/70">
-                      Nenhum endereço de faturação registado
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-2">Gerir Faturação</h3>
+                      <p className="text-sm text-white/70 mb-4">
+                        Aceda ao portal Stripe para gerir a sua subscrição, métodos de pagamento e faturas.
+                      </p>
                     </div>
+                    <Button 
+                      onClick={() => window.open('https://billing.stripe.com/p/login/test_dRm6oAbMK0Ko8BS1u6bo400', '_blank')}
+                      className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Gerir Faturação
+                    </Button>
                   </div>
-                </div>
-                
-                <div className="flex justify-end pt-4">
-                  <Button 
-                    variant="outline"
-                    onClick={() => router.push('/pricing')}
-                    className="border-white/20 text-white hover:bg-white/10 bg-white/5"
-                  >
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Gerir Faturação
-                  </Button>
                 </div>
               </CardContent>
             </div>

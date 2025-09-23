@@ -32,36 +32,46 @@ function CheckoutContent() {
       return
     }
 
-    // Get the plan and use the appropriate Stripe checkout URL
-    const getCheckoutUrl = async () => {
+    // Create checkout session via API
+    const createCheckoutSession = async () => {
       try {
-        // Import the subscription plans to get the correct URL
-        const { SUBSCRIPTION_PLANS } = await import('@/lib/subscription-plans')
-        const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId)
+        setLoading(true)
         
-        if (!plan) {
-          setError('Plano não encontrado')
-          setLoading(false)
-          return
+        const response = await fetch('/api/stripe/create-checkout-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            planId,
+            userId: user.id,
+            billingPeriod
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to create checkout session')
         }
 
-        // Use the appropriate checkout URL based on billing period
-        const url = billingPeriod === 'yearly' ? plan.stripeYearlyCheckoutUrl : plan.stripeCheckoutUrl
+        setCheckoutUrl(data.url)
         
-        setCheckoutUrl(url)
         // Auto-redirect after showing the page briefly
         setTimeout(() => {
-          window.location.href = url
+          if (data.url) {
+            window.location.href = data.url
+          }
         }, 2000)
       } catch (error) {
-        console.error('Error getting checkout URL:', error)
-        setError('Erro ao obter URL de checkout')
+        console.error('Error creating checkout session:', error)
+        setError(error instanceof Error ? error.message : 'Erro ao criar sessão de checkout')
       } finally {
         setLoading(false)
       }
     }
 
-    getCheckoutUrl()
+    createCheckoutSession()
   }, [user, planId, billingPeriod, router])
 
   const handleGoBack = () => {

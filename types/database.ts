@@ -30,6 +30,11 @@ export interface Database {
           growth_bottleneck: string | null
           funnel_drop_off: string | null
           onboarding_completed: boolean
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_status: 'active' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'trialing' | 'unpaid' | null
+          subscription_plan: string | null
+          subscription_current_period_end: string | null
           created_at: string
           updated_at: string
         }
@@ -58,6 +63,11 @@ export interface Database {
           growth_bottleneck?: string | null
           funnel_drop_off?: string | null
           onboarding_completed?: boolean
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: 'active' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'trialing' | 'unpaid' | null
+          subscription_plan?: string | null
+          subscription_current_period_end?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -86,6 +96,11 @@ export interface Database {
           growth_bottleneck?: string | null
           funnel_drop_off?: string | null
           onboarding_completed?: boolean
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: 'active' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'trialing' | 'unpaid' | null
+          subscription_plan?: string | null
+          subscription_current_period_end?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -196,6 +211,7 @@ export interface Database {
           file_size: number | null
           duration_seconds: number | null
           status: 'uploaded' | 'processing' | 'completed' | 'failed'
+          call_type: string | null
           analysis: Record<string, any>
           feedback: string | null
           score: number | null
@@ -212,6 +228,7 @@ export interface Database {
           file_size?: number | null
           duration_seconds?: number | null
           status?: 'uploaded' | 'processing' | 'completed' | 'failed'
+          call_type?: string | null
           analysis?: Record<string, any>
           feedback?: string | null
           score?: number | null
@@ -228,6 +245,7 @@ export interface Database {
           file_size?: number | null
           duration_seconds?: number | null
           status?: 'uploaded' | 'processing' | 'completed' | 'failed'
+          call_type?: string | null
           analysis?: Record<string, any>
           feedback?: string | null
           score?: number | null
@@ -291,6 +309,53 @@ export interface Database {
           prompt_id?: string
           feedback?: string
           score?: number | null
+          created_at?: string
+        }
+      }
+      sales_call_analyses: {
+        Row: {
+          id: string
+          sales_call_id: string | null
+          user_id: string
+          title: string | null
+          status: 'processing' | 'completed' | 'failed'
+          call_type: string | null
+          feedback: string
+          score: number
+          analysis: Record<string, any>
+          analysis_metadata: Record<string, any>
+          transcription: string | null
+          custom_prompts: string[]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          sales_call_id?: string | null
+          user_id: string
+          title?: string | null
+          status?: 'processing' | 'completed' | 'failed'
+          call_type?: string | null
+          feedback: string
+          score: number
+          analysis: Record<string, any>
+          analysis_metadata?: Record<string, any>
+          transcription?: string | null
+          custom_prompts?: string[]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          sales_call_id?: string | null
+          user_id?: string
+          title?: string | null
+          status?: 'processing' | 'completed' | 'failed'
+          call_type?: string | null
+          feedback?: string
+          score?: number
+          analysis?: Record<string, any>
+          analysis_metadata?: Record<string, any>
+          transcription?: string | null
+          custom_prompts?: string[]
           created_at?: string
         }
       }
@@ -556,6 +621,7 @@ export type Message = Database['public']['Tables']['messages']['Row']
 export type SalesCall = Database['public']['Tables']['sales_calls']['Row']
 export type SalesFeedbackPrompt = Database['public']['Tables']['sales_feedback_prompts']['Row']
 export type SalesCallFeedback = Database['public']['Tables']['sales_call_feedback']['Row']
+export type SalesCallAnalysis = Database['public']['Tables']['sales_call_analyses']['Row']
 export type HRCandidate = Database['public']['Tables']['hr_candidates']['Row']
 export type HREvaluationCriteria = Database['public']['Tables']['hr_evaluation_criteria']['Row']
 export type HRCandidateEvaluation = Database['public']['Tables']['hr_candidate_evaluations']['Row']
@@ -577,6 +643,7 @@ export type AgentInsert = Database['public']['Tables']['agents']['Insert']
 export type ConversationInsert = Database['public']['Tables']['conversations']['Insert']
 export type MessageInsert = Database['public']['Tables']['messages']['Insert']
 export type SalesCallInsert = Database['public']['Tables']['sales_calls']['Insert']
+export type SalesCallAnalysisInsert = Database['public']['Tables']['sales_call_analyses']['Insert']
 export type HRCandidateInsert = Database['public']['Tables']['hr_candidates']['Insert']
 
 // Update types
@@ -584,4 +651,5 @@ export type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 export type AgentUpdate = Database['public']['Tables']['agents']['Update']
 export type ConversationUpdate = Database['public']['Tables']['conversations']['Update']
 export type SalesCallUpdate = Database['public']['Tables']['sales_calls']['Update']
+export type SalesCallAnalysisUpdate = Database['public']['Tables']['sales_call_analyses']['Update']
 export type HRCandidateUpdate = Database['public']['Tables']['hr_candidates']['Update']

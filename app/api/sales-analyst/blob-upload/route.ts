@@ -11,13 +11,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         // Extract user information from the request
-        let payload: { userId: string; accessToken: string; originalFileName?: string }
+        let payload: { userId: string; accessToken: string; originalFileName?: string; callType?: string }
         
         try {
           if (typeof clientPayload === 'string') {
             payload = JSON.parse(clientPayload)
           } else {
-            payload = clientPayload as unknown as { userId: string; accessToken: string; originalFileName?: string }
+            payload = clientPayload as unknown as { userId: string; accessToken: string; originalFileName?: string; callType?: string }
           }
         } catch (error) {
           throw new Error('Invalid client payload format')
@@ -53,7 +53,8 @@ export async function POST(request: Request): Promise<NextResponse> {
           tokenPayload: JSON.stringify({
             userId: payload.userId,
             accessToken: payload.accessToken,
-            originalFileName: payload.originalFileName || (pathname || 'unknown')
+            originalFileName: payload.originalFileName || (pathname || 'unknown'),
+            callType: payload.callType || 'Chamada Fria'
           }),
         }
       },
@@ -64,7 +65,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           if (!tokenPayload) {
             throw new Error('No token payload received')
           }
-          const { userId, accessToken, originalFileName } = JSON.parse(tokenPayload)
+          const { userId, accessToken, originalFileName, callType } = JSON.parse(tokenPayload)
 
           // Create authenticated Supabase client
           const supabase = createClient(

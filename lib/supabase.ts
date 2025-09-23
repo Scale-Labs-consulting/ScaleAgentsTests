@@ -129,7 +129,20 @@ export const upsertUserProfile = async (userId: string, profileData: Partial<Dat
 // Helper function to check if session is valid
 export const isSessionValid = async () => {
   try {
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    // Handle invalid refresh token error specifically
+    if (error && error.message?.includes('Invalid Refresh Token')) {
+      console.log('🔄 Invalid refresh token detected, clearing storage...')
+      await forceLogout()
+      return false
+    }
+    
+    if (error) {
+      console.error('Session validation error:', error)
+      return false
+    }
+    
     return !!session
   } catch (error) {
     console.error('Session validation error:', error)
@@ -146,6 +159,33 @@ export const refreshSession = async () => {
   } catch (error) {
     console.error('Session refresh error:', error)
     return null
+  }
+}
+
+// Helper function to clear invalid auth tokens specifically
+export const clearInvalidTokens = () => {
+  if (typeof window === 'undefined') return
+  
+  try {
+    console.log('🧹 Clearing invalid auth tokens...')
+    
+    // Clear the main auth storage key
+    localStorage.removeItem('scaleagents-auth')
+    
+    // Clear any Supabase-generated keys (they follow a pattern)
+    const supabaseKey = `sb-${supabaseUrl.split('//')[1]?.split('.')[0]}-auth-token`
+    localStorage.removeItem(supabaseKey)
+    
+    // Clear any other auth-related keys
+    Object.keys(localStorage).forEach(key => {
+      if (key.includes('supabase') || key.includes('auth') || key.includes('sb-')) {
+        localStorage.removeItem(key)
+      }
+    })
+    
+    console.log('✅ Invalid tokens cleared')
+  } catch (error) {
+    console.error('❌ Error clearing invalid tokens:', error)
   }
 }
 

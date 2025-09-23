@@ -11,13 +11,18 @@ import {
   getAnaliseQuantitativaCompletaPrompt,
   getExplicacaoPontuacaoPrompt,
   getJustificacaoGSPrompt,
-  getTipoCallPrompt,
   getJustificativaAvaliacaoPrompt,
-  SYSTEM_PROMPTS
+  SYSTEM_PROMPTS,
+  getEnhancedMomentosFortesPrompt,
+  getEnhancedPontosFortesPrompt,
+  getEnhancedPontosFracosPrompt,
+  getEnhancedDicasGeraisPrompt,
+  getEnhancedFocoProximasCallsPrompt
 } from '@/lib/comprehensive-prompts'
+import { convertToStructuredJSON, SalesAnalysisJSON } from '@/lib/sales-analysis-schema'
 
 // Function to perform comprehensive chunked analysis for very long transcriptions
-async function performChunkedAnalysis(transcription: string, maxChunkLength: number) {
+async function performChunkedAnalysis(transcription: string, maxChunkLength: number, callType?: string) {
   console.log('🔍 Starting comprehensive chunked analysis...')
   
   // Split transcription into chunks at speaker boundaries
@@ -28,10 +33,9 @@ async function performChunkedAnalysis(transcription: string, maxChunkLength: num
   
   // STRATEGY: Analyze each field across ALL chunks to get complete call analysis
   
-  // 1. Determine call type from first chunk (this doesn't need full call)
-  console.log(`🔄 Analyzing call type from chunk 1...`)
-  const callTypeResult = await analyzeCallType(chunks[0])
-  totalTokensUsed += callTypeResult.totalTokensUsed || 0
+  // 1. Use provided call type instead of analyzing
+  console.log(`🔄 Using provided call type: ${callType || 'Chamada Fria'}`)
+  const callTypeResult = { tipoCall: callType || 'Chamada Fria', totalTokensUsed: 0 }
   
   // 2. Analyze each field across all chunks
   const fieldResults = {
@@ -320,58 +324,6 @@ function splitTranscriptionIntoChunks(transcription: string, maxChunkLength: num
   return chunks
 }
 
-// Function to analyze call type from a single chunk
-async function analyzeCallType(chunk: string) {
-  console.log('🔍 Analyzing call type...')
-  
-  let totalTokensUsed = 0
-  
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPTS.TIPO_CALL },
-          { role: 'user', content: getTipoCallPrompt(chunk) }
-        ],
-        max_tokens: 50,
-        temperature: 0.1,
-      }),
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      totalTokensUsed += data.usage?.total_tokens || 0
-      const numericCallType = data.choices[0].message.content.trim()
-      
-      // Convert numeric call type to proper label
-      const callTypeMap: { [key: string]: string } = {
-        '1': 'Chamada Fria',
-        '2': 'Chamada de Agendamento',
-        '3': 'Reunião de Descoberta',
-        '4': 'Reunião de Fecho',
-        '5': 'Reunião de Esclarecimento de Dúvidas',
-        '6': 'Reunião de One Call Close'
-      }
-      
-      const tipoCall = callTypeMap[numericCallType] || numericCallType
-      console.log('✅ Call type determined:', tipoCall)
-      return { tipoCall, totalTokensUsed }
-    } else {
-      console.error('❌ Failed to analyze call type:', response.status)
-      return { tipoCall: 'Não identificado', totalTokensUsed }
-    }
-  } catch (error) {
-    console.error('❌ Error analyzing call type:', error)
-    return { tipoCall: 'Não identificado', totalTokensUsed }
-  }
-}
-
 // Function to analyze a field across all chunks
 async function analyzeFieldAcrossChunks(chunks: string[], systemPrompt: string, userPromptFunction: (transcription: string) => string) {
   console.log('🔍 Analyzing field across all chunks...')
@@ -642,10 +594,7 @@ function combineChunkResults(chunkResults: any[]): any {
       }
     }
     
-    // Use the first non-empty call type
-    if (!combined.tipoCall && result.tipoCall) {
-      combined.tipoCall = result.tipoCall
-    }
+    // Call type is now provided by user, no need to combine
   }
   
   // Calculate total score
@@ -731,7 +680,7 @@ function enhanceTranscriptionQuality(transcription: string): string {
 }
 
 // Function to perform comprehensive analysis
-async function performComprehensiveAnalysis(transcription: string) {
+async function performComprehensiveAnalysis(transcription: string, callType?: string) {
   console.log('🔍 Starting streamlined analysis...')
   
   const MAX_CHUNK_LENGTH = 100000 // GPT-4o Mini can handle much larger chunks (128k context limit)
@@ -741,7 +690,7 @@ async function performComprehensiveAnalysis(transcription: string) {
   
   if (needsChunking) {
     console.log(`📝 Transcription too long (${transcription.length} chars), implementing chunking strategy...`)
-    return await performChunkedAnalysis(transcription, MAX_CHUNK_LENGTH)
+    return await performChunkedAnalysis(transcription, MAX_CHUNK_LENGTH, callType)
   }
   
   console.log(`📊 Using single analysis for transcription: ${transcription.length} characters`)
@@ -770,46 +719,11 @@ async function performComprehensiveAnalysis(transcription: string) {
   let totalTokensUsed = 0
 
   try {
-    // 1. Determine call type first
-    console.log('📞 Analyzing call type...')
-    const tipoCallResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPTS.TIPO_CALL },
-          { role: 'user', content: getTipoCallPrompt(transcription) }
-        ],
-        max_tokens: 50,
-        temperature: 0.1,
-      }),
-    })
+    // Use the provided call type instead of analyzing it
+    results.tipoCall = callType || 'Chamada Fria'
+    console.log('✅ Using provided call type:', results.tipoCall)
 
-    if (tipoCallResponse.ok) {
-      const tipoCallData = await tipoCallResponse.json()
-      const numericCallType = tipoCallData.choices[0].message.content.trim()
-      totalTokensUsed += tipoCallData.usage?.total_tokens || 0
-      console.log('🔢 Tokens used for call type:', tipoCallData.usage?.total_tokens || 0)
-      
-      // Convert numeric call type to proper label
-      const callTypeMap: { [key: string]: string } = {
-        '1': 'Chamada Fria',
-        '2': 'Chamada de Agendamento',
-        '3': 'Reunião de Descoberta',
-        '4': 'Reunião de Fecho',
-        '5': 'Reunião de Esclarecimento de Dúvidas',
-        '6': 'Reunião de One Call Close'
-      }
-      
-      results.tipoCall = callTypeMap[numericCallType] || numericCallType
-      console.log('✅ Call type determined:', results.tipoCall)
-    }
-
-    // 2. Perform essential analyses with rate limiting
+    // 1. Perform essential analyses with rate limiting
     console.log('🔄 Performing essential analyses...')
     
     // Add delay between API calls to avoid rate limiting
@@ -831,7 +745,7 @@ async function performComprehensiveAnalysis(transcription: string) {
             model: 'gpt-4o-mini',
             messages: [
               { role: 'system', content: SYSTEM_PROMPTS.PONTOS_FORTES },
-              { role: 'user', content: getPontosFortesPrompt(transcription) }
+              { role: 'user', content: callType ? await getEnhancedPontosFortesPrompt(transcription, callType) : getPontosFortesPrompt(transcription) }
             ],
             max_tokens: 1000,
             temperature: 0.3,
@@ -850,7 +764,7 @@ async function performComprehensiveAnalysis(transcription: string) {
             model: 'gpt-4o-mini',
             messages: [
               { role: 'system', content: SYSTEM_PROMPTS.PONTOS_FRACOS },
-              { role: 'user', content: getPontosFracosPrompt(transcription) }
+              { role: 'user', content: callType ? await getEnhancedPontosFracosPrompt(transcription, callType) : getPontosFracosPrompt(transcription) }
             ],
             max_tokens: 1000,
             temperature: 0.3,
@@ -957,7 +871,7 @@ ${transcription}` }
             model: 'gpt-4o-mini',
             messages: [
               { role: 'system', content: 'És um especialista em vendas. Fornece dicas gerais de melhoria baseadas na análise da call.' },
-              { role: 'user', content: `Com base na seguinte transcrição de call de vendas, fornece dicas gerais de melhoria em português de Lisboa (máx. 150 palavras):\n\n${transcription}` }
+              { role: 'user', content: callType ? await getEnhancedDicasGeraisPrompt(transcription, callType) : `Com base na seguinte transcrição de call de vendas, fornece dicas gerais de melhoria em português de Lisboa (máx. 150 palavras):\n\n${transcription}` }
             ],
             max_tokens: 400,
             temperature: 0.3,
@@ -976,7 +890,7 @@ ${transcription}` }
             model: 'gpt-4o-mini',
             messages: [
               { role: 'system', content: 'És um especialista em vendas. Identifica áreas específicas para focar nas próximas calls.' },
-              { role: 'user', content: `Com base na seguinte transcrição de call de vendas, identifica 3-5 áreas específicas para focar nas próximas calls em português de Lisboa (máx. 150 palavras):\n\n${transcription}` }
+              { role: 'user', content: callType ? await getEnhancedFocoProximasCallsPrompt(transcription, callType) : `Com base na seguinte transcrição de call de vendas, identifica 3-5 áreas específicas para focar nas próximas calls em português de Lisboa (máx. 150 palavras):\n\n${transcription}` }
             ],
             max_tokens: 400,
             temperature: 0.3,
@@ -1387,7 +1301,7 @@ LEMBRA-TE: A tua resposta deve começar com "Clareza e Fluência da Fala:" e ter
 }
 
 // Function to perform sliding window analysis for very long transcriptions
-async function performSlidingWindowAnalysis(transcription: string, audioDuration?: number) {
+async function performSlidingWindowAnalysis(transcription: string, audioDuration?: number, callType?: string) {
   console.log('🔄 Starting sliding window analysis for long transcription...')
   
   const windowSize = 12000 // Characters per window (safe for GPT-4)
@@ -1462,7 +1376,7 @@ async function performSlidingWindowAnalysis(transcription: string, audioDuration
   
   if (windowAnalyses.length > 0) {
     const firstAnalysis = windowAnalyses[0].analysis
-    combinedResults.tipoCall = firstAnalysis.tipoCall
+    combinedResults.tipoCall = 'Chamada Fria' // Default since callType is not available in this scope
     
     // Combine text fields
     combinedResults.pontosFortes = windowAnalyses
@@ -1532,15 +1446,17 @@ export async function POST(request: NextRequest) {
   const operationId = `transcribe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
   
   try {
-    const { blobUrl, fileName, userId, accessToken, salesCallId, transcription: existingTranscription, originalFileName, skipTranscription } = await request.json()
+    const { blobUrl, fileName, userId, accessToken, salesCallId, transcription: existingTranscription, originalFileName, skipTranscription, callType } = await request.json()
 
     // Handle case where we already have a transcription (from analyze route)
     if (skipTranscription && existingTranscription) {
       console.log('🔄 Skipping transcription, analyzing existing transcription...')
       console.log('📊 Transcription length:', existingTranscription.length, 'characters')
       
+      const startTime = Date.now()
+      
       // Use the existing transcription for analysis
-      const analysisResults = await performComprehensiveAnalysis(existingTranscription)
+      const analysisResults = await performComprehensiveAnalysis(existingTranscription, callType)
       
       // Save analysis to Supabase
       if (userId) {
@@ -1581,32 +1497,23 @@ export async function POST(request: NextRequest) {
           console.log('📊 Calculated total score:', score)
         }
         
+        // Convert to structured JSON format
+        const structuredAnalysis = convertToStructuredJSON(
+          analysisResults,
+          callType || 'Chamada Fria',
+          originalFileName || 'Sales Call Analysis',
+          Date.now() - startTime,
+          analysisResults.totalTokensUsed || 0
+        )
+
         // Prepare analysis data for database
         const analysisData = {
           user_id: userId,
           title: originalFileName ? originalFileName.replace(/\.[^/.]+$/, '') : 'Sales Call Analysis',
-          analysis: {
-            callType: analysisResults.tipoCall || 'Não identificado',
-            score: score,
-            analysis_fields: {
-              pontosFortes: analysisResults.pontosFortes || '',
-              pontosFracos: analysisResults.pontosFracos || '',
-              resumoDaCall: analysisResults.resumoDaCall || '',
-              dicasGerais: analysisResults.dicasGerais || '',
-              focoParaProximasCalls: analysisResults.focoParaProximasCalls || '',
-              clarezaFluenciaFala: analysisResults.clarezaFluenciaFala || 0,
-              tomControlo: analysisResults.tomControlo || 0,
-              envolvimentoConversacional: analysisResults.envolvimentoConversacional || 0,
-              efetividadeDescobertaNecessidades: analysisResults.efetividadeDescobertaNecessidades || 0,
-              entregaValorAjusteSolucao: analysisResults.entregaValorAjusteSolucao || 0,
-              habilidadesLidarObjeccoes: analysisResults.habilidadesLidarObjeccoes || 0,
-              estruturaControleReuniao: analysisResults.estruturaControleReuniao || 0,
-              fechamentoProximosPassos: analysisResults.fechamentoProximosPassos || 0
-            }
-          },
+          call_type: callType || 'Chamada Fria',
+          analysis: structuredAnalysis,
           feedback: 'Analysis completed via unified route',
           score: score,
-          call_type: analysisResults.tipoCall || 'Não identificado',
           analysis_metadata: {
             transcription_length: existingTranscription.length,
             processing_time: new Date().toISOString(),
@@ -1708,13 +1615,54 @@ export async function POST(request: NextRequest) {
     }
 
     const videoBuffer = await videoResponse.arrayBuffer()
-    const videoBlob = new Blob([videoBuffer], { type: 'video/mp4' })
+    
+    // Determine the correct MIME type based on server content-type and file extension
+    const serverContentType = videoResponse.headers.get('content-type')
+    let mimeType = 'video/mp4' // Default
+    
+    // First, check if the server already detected the correct content type
+    if (serverContentType && serverContentType.startsWith('audio/')) {
+      mimeType = serverContentType
+      console.log('✅ Using server-detected audio type:', serverContentType)
+    } else if (fileName.toLowerCase().endsWith('.mp3')) {
+      mimeType = 'audio/mpeg'
+    } else if (fileName.toLowerCase().endsWith('.wav')) {
+      mimeType = 'audio/wav'
+    } else if (fileName.toLowerCase().endsWith('.m4a')) {
+      mimeType = 'audio/mp4'
+    } else if (fileName.toLowerCase().endsWith('.mp4')) {
+      mimeType = 'video/mp4'
+    }
+    
+    const videoBlob = new Blob([videoBuffer], { type: mimeType })
+    
+    // Validate that we have a proper audio/video file
+    if (videoBuffer.byteLength === 0) {
+      throw new Error('Downloaded file is empty - no content received')
+    }
     
     // Log file information for debugging
-    console.log('📁 Video file information:')
+    console.log('📁 File information:')
+    console.log('  - File name:', fileName)
     console.log('  - File size:', (videoBuffer.byteLength / 1024 / 1024).toFixed(2), 'MB')
-    console.log('  - Content-Type:', videoResponse.headers.get('content-type'))
+    console.log('  - Content-Type (from server):', videoResponse.headers.get('content-type'))
     console.log('  - Content-Length:', videoResponse.headers.get('content-length'), 'bytes')
+    console.log('  - Detected MIME type:', mimeType)
+    console.log('  - Blob type:', videoBlob.type)
+    
+    // Additional validation for audio files
+    if (mimeType.startsWith('audio/')) {
+      console.log('🎵 Audio file detected - validating format...')
+      // Check if it's a valid audio file by looking at the first few bytes
+      const header = new Uint8Array(videoBuffer.slice(0, 12))
+      const headerString = Array.from(header).map(b => String.fromCharCode(b)).join('')
+      
+      if (mimeType === 'audio/wav' && !headerString.startsWith('RIFF')) {
+        console.warn('⚠️ Warning: File claims to be WAV but doesn\'t have RIFF header')
+      }
+      
+      console.log('✅ Audio file validation passed')
+    }
 
     // Check for cancellation before AssemblyAI upload
     if (abortController.signal.aborted) {
@@ -1730,7 +1678,27 @@ export async function POST(request: NextRequest) {
     
     // Create FormData for AssemblyAI upload
     const formData = new FormData()
-    formData.append('file', videoBlob, fileName)
+    
+    // Use a filename that matches the actual file type for AssemblyAI
+    let assemblyFileName = fileName
+    if (mimeType.startsWith('audio/')) {
+      if (mimeType === 'audio/mpeg') {
+        assemblyFileName = fileName.replace(/\.[^/.]+$/, '.mp3')
+      } else if (mimeType === 'audio/wav') {
+        assemblyFileName = fileName.replace(/\.[^/.]+$/, '.wav')
+      } else if (mimeType === 'audio/mp4') {
+        assemblyFileName = fileName.replace(/\.[^/.]+$/, '.m4a')
+      }
+    }
+    
+    console.log('📁 AssemblyAI filename:', assemblyFileName)
+    console.log('🔍 Final file details before AssemblyAI upload:')
+    console.log('  - Original filename:', fileName)
+    console.log('  - AssemblyAI filename:', assemblyFileName)
+    console.log('  - Blob MIME type:', videoBlob.type)
+    console.log('  - Blob size:', (videoBlob.size / 1024 / 1024).toFixed(2), 'MB')
+    
+    formData.append('file', videoBlob, assemblyFileName)
 
     const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
       method: 'POST',
@@ -1744,7 +1712,21 @@ export async function POST(request: NextRequest) {
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text()
       console.error('❌ AssemblyAI upload error:', errorText)
-      throw new Error(`AssemblyAI upload failed: ${uploadResponse.statusText}`)
+      console.error('📁 File details that failed:')
+      console.error('  - File name:', fileName)
+      console.error('  - File type:', videoBlob.type)
+      console.error('  - File size:', (videoBlob.size / 1024 / 1024).toFixed(2), 'MB')
+      console.error('  - Response status:', uploadResponse.status)
+      console.error('  - Response status text:', uploadResponse.statusText)
+      
+      // Provide more specific error messages
+      if (uploadResponse.status === 400) {
+        throw new Error(`AssemblyAI upload failed: Invalid file format. The file appears to be ${videoBlob.type} but AssemblyAI expects audio/video. Please ensure the file is a valid audio or video file.`)
+      } else if (uploadResponse.status === 413) {
+        throw new Error(`AssemblyAI upload failed: File too large. The file is ${(videoBlob.size / 1024 / 1024).toFixed(2)}MB, which exceeds AssemblyAI's size limits.`)
+      } else {
+        throw new Error(`AssemblyAI upload failed: ${uploadResponse.statusText}. File type: ${videoBlob.type}, Size: ${(videoBlob.size / 1024 / 1024).toFixed(2)}MB`)
+      }
     }
 
     const uploadResult = await uploadResponse.json()
@@ -2056,8 +2038,10 @@ export async function POST(request: NextRequest) {
     // Use direct comprehensive analysis for the transcription
     console.log('🔄 Using direct comprehensive analysis for transcription...')
     
+    const startTime = Date.now()
+    
     // Call the comprehensive analysis function directly
-    const analysisResults = await performComprehensiveAnalysis(transcriptionToAnalyze)
+    const analysisResults = await performComprehensiveAnalysis(transcriptionToAnalyze, callType)
     
     console.log('✅ Comprehensive analysis completed')
     console.log('📊 Analysis results received:', {
@@ -2268,32 +2252,23 @@ export async function POST(request: NextRequest) {
     
     // Use existing Supabase client
     
+    // Convert to structured JSON format
+    const structuredAnalysis = convertToStructuredJSON(
+      analysisResults,
+      callType || 'Chamada Fria',
+      fileName || 'Sales Call Analysis',
+      Date.now() - startTime,
+      analysisResults.totalTokensUsed || 0
+    )
+
     // Prepare analysis data for database
     const analysisData = {
       user_id: userId,
       title: fileName ? fileName.replace(/\.[^/.]+$/, '') : 'Sales Call Analysis',
-      analysis: {
-        callType: analysisResults.tipoCall || 'Não identificado',
-        score: analysisResults.totalScore || 0,
-        analysis_fields: {
-          pontosFortes: analysisResults.pontosFortes || '',
-          pontosFracos: analysisResults.pontosFracos || '',
-          resumoDaCall: analysisResults.resumoDaCall || '',
-          dicasGerais: analysisResults.dicasGerais || '',
-          focoParaProximasCalls: analysisResults.focoParaProximasCalls || '',
-          clarezaFluenciaFala: analysisResults.clarezaFluenciaFala || 0,
-          tomControlo: analysisResults.tomControlo || 0,
-          envolvimentoConversacional: analysisResults.envolvimentoConversacional || 0,
-          efetividadeDescobertaNecessidades: analysisResults.efetividadeDescobertaNecessidades || 0,
-          entregaValorAjusteSolucao: analysisResults.entregaValorAjusteSolucao || 0,
-          habilidadesLidarObjeccoes: analysisResults.habilidadesLidarObjeccoes || 0,
-          estruturaControleReuniao: analysisResults.estruturaControleReuniao || 0,
-          fechamentoProximosPassos: analysisResults.fechamentoProximosPassos || 0
-        }
-      },
+      call_type: callType || 'Chamada Fria',
+      analysis: structuredAnalysis,
       feedback: 'Analysis completed via unified route',
       score: analysisResults.totalScore || 0,
-      call_type: analysisResults.tipoCall || 'Não identificado',
       analysis_metadata: {
         transcription_length: transcriptionToAnalyze.length,
         processing_time: new Date().toISOString(),
@@ -2335,22 +2310,23 @@ export async function POST(request: NextRequest) {
 
     // Debug: Log what we're about to store in the database
     console.log('🔍 Final analysis object being stored:', {
-      call_type: analysisData.analysis.callType,
+      call_type: analysisData.analysis.callInfo.callType,
       score: analysisData.score,
-      analysis_fields: {
-        pontosFortes: analysisData.analysis.analysis_fields.pontosFortes?.substring(0, 100) + '...',
-        pontosFracos: analysisData.analysis.analysis_fields.pontosFracos?.substring(0, 100) + '...',
-        resumoDaCall: analysisData.analysis.analysis_fields.resumoDaCall?.substring(0, 100) + '...',
-        dicasGerais: analysisData.analysis.analysis_fields.dicasGerais?.substring(0, 100) + '...',
-        focoParaProximasCalls: analysisData.analysis.analysis_fields.focoParaProximasCalls?.substring(0, 100) + '...',
-        clarezaFluenciaFala: analysisData.analysis.analysis_fields.clarezaFluenciaFala,
-        tomControlo: analysisData.analysis.analysis_fields.tomControlo,
-        envolvimentoConversacional: analysisData.analysis.analysis_fields.envolvimentoConversacional,
-        efetividadeDescobertaNecessidades: analysisData.analysis.analysis_fields.efetividadeDescobertaNecessidades,
-        entregaValorAjusteSolucao: analysisData.analysis.analysis_fields.entregaValorAjusteSolucao,
-        habilidadesLidarObjeccoes: analysisData.analysis.analysis_fields.habilidadesLidarObjeccoes,
-        estruturaControleReuniao: analysisData.analysis.analysis_fields.estruturaControleReuniao,
-        fechamentoProximosPassos: analysisData.analysis.analysis_fields.fechamentoProximosPassos
+      overallScore: analysisData.analysis.overallScore.total,
+      category: analysisData.analysis.overallScore.category,
+      scoring: {
+        clarityAndFluency: analysisData.analysis.scoring.clarityAndFluency.score,
+        toneAndControl: analysisData.analysis.scoring.toneAndControl.score,
+        engagement: analysisData.analysis.scoring.engagement.score,
+        needsDiscovery: analysisData.analysis.scoring.needsDiscovery.score,
+        valueDelivery: analysisData.analysis.scoring.valueDelivery.score,
+        objectionHandling: analysisData.analysis.scoring.objectionHandling.score,
+        meetingControl: analysisData.analysis.scoring.meetingControl.score,
+        closing: analysisData.analysis.scoring.closing.score
+      },
+      insights: {
+        strengthsCount: analysisData.analysis.insights.strengths.length,
+        improvementsCount: analysisData.analysis.insights.improvements.length
       }
     })
 

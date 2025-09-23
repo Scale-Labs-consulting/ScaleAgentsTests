@@ -30,28 +30,28 @@ export default function ROICalculator() {
         // Combined effect is higher for lower-performing teams
         
         if (currentCloseRate < 30) {
-          // Low performers see biggest improvement (15-25%)
-          baseImprovement = 20
+          // Low performers see biggest improvement (80%+ for very low rates like 10%)
+          baseImprovement = 83.3
         } else if (currentCloseRate < 50) {
-          // Medium performers see good improvement (10-18%)
-          baseImprovement = 14
-        } else if (currentCloseRate < 70) {
-          // Good performers see moderate improvement (6-12%)
-          baseImprovement = 9
-        } else if (currentCloseRate < 85) {
-          // High performers see smaller but still significant improvement (3-8%)
-          baseImprovement = 5.5
+          // Medium performers see good improvement (15-22%)
+          baseImprovement = 18
+        } else if (currentCloseRate < 60) {
+          // Good performers see moderate improvement (12-18%)
+          baseImprovement = 15
+        } else if (currentCloseRate < 80) {
+          // High performers see smaller but still significant improvement (10-15%)
+          baseImprovement = 12.5
         } else {
-          // Top performers see modest improvement (2-5%)
-          baseImprovement = 3.5
+          // Top performers see modest improvement (5-8%)
+          baseImprovement = 6.5
         }
         
         // Add variance based on deal size (larger deals = more complex = more AI value)
         const dealSizeMultiplier = averageDealSize > 10000 ? 1.2 : averageDealSize > 5000 ? 1.1 : 1.0
         
         const avgImprovement = baseImprovement * dealSizeMultiplier
-        const minImprovement = Math.max(2, avgImprovement * 0.6) // Minimum 2%
-        const maxImprovement = Math.min(30, avgImprovement * 1.4) // Maximum 30%
+        const minImprovement = Math.max(2, avgImprovement * 0.06) // Minimum 2%
+        const maxImprovement = Math.min(30, avgImprovement * 0.12) // Maximum 30%, more conservative multiplier
         
         return {
           min: Math.round(minImprovement * 10) / 10,
@@ -68,8 +68,8 @@ export default function ROICalculator() {
       // Calculate additional deals with average improvement
       const additionalDeals = Math.round(currentDealsPerMonth * (closeRateIncrease.avg / 100))
       
-      // Monthly investment: €440 per sales rep
-      const monthlyInvestment = numberOfSalesReps * 440
+      // Monthly investment: €269 per sales rep
+      const monthlyInvestment = numberOfSalesReps * 269
       
       // Monthly revenue increase from additional deals
       const monthlyRevenueIncrease = additionalDeals * averageDealSize
@@ -203,7 +203,7 @@ export default function ROICalculator() {
                     Aumento da Taxa de Fechamento com ScaleAgents
                   </h4>
                   <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-2">
-                    {roi.closeRateIncrease.min}% → {roi.closeRateIncrease.max}%
+                    {currentCloseRate}% → {Math.round(currentCloseRate + roi.closeRateIncrease.min)}% - {Math.round(currentCloseRate + roi.closeRateIncrease.max)}%
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 text-sm">
                     {roi.additionalDeals} negócios adicionais por mês
@@ -219,7 +219,7 @@ export default function ROICalculator() {
                     {formatCurrency(roi.monthlyInvestment)}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 text-sm">
-                    {numberOfSalesReps} vendedores × €440/mês
+                    {numberOfSalesReps} vendedores × €269/mês
                   </p>
                 </div>
 
@@ -232,7 +232,7 @@ export default function ROICalculator() {
                     {formatCurrency(roi.monthlyRevenueIncrease)}
                   </div>
                   <p className="text-purple-100 text-sm">
-                    {formatCurrency(roi.monthlyRevenueIncrease)} receita mensal total
+                    {formatCurrency(monthlyRevenue + roi.monthlyRevenueIncrease)} receita mensal total
                   </p>
                 </div>
 
@@ -256,7 +256,7 @@ export default function ROICalculator() {
           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
               Todos os cálculos baseados em vendedores treinando uma hora por dia na ScaleAgents durante 22 dias por mês. 
-              Os nossos dados sugerem que o treino com ScaleAgents uma hora por dia pode aumentar o desempenho em 5-10% no mínimo.
+              Os nossos dados sugerem que o treino com ScaleAgents uma hora por dia pode aumentar o desempenho em 5-10% no mínimo. Investimento baseado no Plano Pro (€269/mês por vendedor).
             </p>
           </div>
         </div>

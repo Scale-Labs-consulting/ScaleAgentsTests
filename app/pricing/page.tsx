@@ -51,11 +51,11 @@ export default function PricingPage() {
     setLoading(plan.id)
     
     try {
-      // Use the appropriate checkout URL based on billing period
-      const checkoutUrl = isYearly ? plan.stripeYearlyCheckoutUrl : plan.stripeCheckoutUrl
+      // Redirect to custom branded checkout
+      const billingPeriod = isYearly ? 'yearly' : 'monthly'
+      const checkoutUrl = `/checkout-custom?plan=${plan.id}&billing=${billingPeriod}`
       
-      // Redirect directly to Stripe checkout
-      window.location.href = checkoutUrl
+      router.push(checkoutUrl)
     } catch (error) {
       console.error('Error redirecting to checkout:', error)
       toast({

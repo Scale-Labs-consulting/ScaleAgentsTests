@@ -70,7 +70,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Histórico de análises'
     ],
     stripeProductId: 'prod_SzaQSOBw40d82a',
-    stripePriceId: 'price_base_monthly', // Monthly price ID
+    stripePriceId: 'price_1S7YT92cuDLLRqcPYvJvQMhw', // Monthly price ID
     stripeYearlyPriceId: 'price_1S7YUC2cuDLLRqcPouPsZAeP', // Yearly price ID
     stripeCheckoutUrl: 'https://buy.stripe.com/test_7sY6oA6sqakYdWcfkWbo401',
     stripeYearlyCheckoutUrl: 'https://buy.stripe.com/test_cNicMY9ECct67xO8Wybo406',
@@ -98,7 +98,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Análise de tendências'
     ],
     stripeProductId: 'prod_SzaQ0Rm5hs2psP',
-    stripePriceId: 'price_pro_monthly', // Monthly price ID
+    stripePriceId: 'price_1S7Z5J2cuDLLRqcPkdwXnYzf', // Monthly price ID
     stripeYearlyPriceId: 'price_1S7Z5a2cuDLLRqcPQN2Ky9hU', // Yearly price ID
     stripeCheckoutUrl: 'https://buy.stripe.com/test_cNi7sE04278M05m6Oqbo402',
     stripeYearlyCheckoutUrl: 'https://buy.stripe.com/test_eVqdR2cQO64IdWcdcObo407',
@@ -129,7 +129,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'White-label options'
     ],
     stripeProductId: 'prod_SzaQRovKIXLDGr',
-    stripePriceId: 'price_enterprise_monthly', // Monthly price ID
+    stripePriceId: 'price_1S7YQO2cuDLLRqcPBH2rRMhj', // Monthly price ID
     stripeYearlyPriceId: 'price_1S7YQw2cuDLLRqcPHszvueiT', // Yearly price ID
     stripeCheckoutUrl: 'https://buy.stripe.com/test_eVqbIU0429gUaK0fkWbo403',
     stripeYearlyCheckoutUrl: 'https://buy.stripe.com/test_bJe4gs9EC8cQg4kb4Gbo404',

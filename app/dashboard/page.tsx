@@ -55,6 +55,7 @@ export default function DashboardPage() {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState('scale-expert')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [isRedirecting, setIsRedirecting] = useState(false)
   const modalRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const { user, signOut, loading, initialized } = useAuth()
@@ -78,12 +79,19 @@ export default function DashboardPage() {
   
   // Sales Analyst specific state
   const [salesUploadedFile, setSalesUploadedFile] = useState<File | null>(null)
+  const [salesCallType, setSalesCallType] = useState<string>('Chamada Fria')
   const [salesIsUploading, setSalesIsUploading] = useState(false)
   const [salesUploadProgress, setSalesUploadProgress] = useState(0)
   const [salesUploadStatus, setSalesUploadStatus] = useState('')
   const [salesAnalysisResult, setSalesAnalysisResult] = useState<any>(null)
   const [isFileSelectionInProgress, setIsFileSelectionInProgress] = useState(false)
   const [salesIsAnalyzing, setSalesIsAnalyzing] = useState(false)
+  
+  // Enhanced upload progress state
+  const [uploadStartTime, setUploadStartTime] = useState<number | null>(null)
+  const [currentProgressPhrase, setCurrentProgressPhrase] = useState('')
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<string>('')
+  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0)
   
   // Date filter state
   const [dateFilter, setDateFilter] = useState<'1D' | '7D' | '14D' | '30D' | 'custom'>('1D')
@@ -159,6 +167,25 @@ export default function DashboardPage() {
   // AbortController for cancelling upload operations
   const salesAbortControllerRef = useRef<AbortController | null>(null)
   
+  // Cycling progress phrases that alternate continuously
+  const progressPhrases = [
+    'A preparar gravação para transcrição...',
+    'A validar ficheiro e preparar processamento...',
+    'A fazer upload para o servidor...',
+    'A converter vídeo para áudio (se necessário)...',
+    'A processar ficheiro e iniciar transcrição...',
+    'A transcrever áudio com IA...',
+    'A analisar conteúdo da chamada...',
+    'A gerar relatório de análise...',
+    'A finalizar processamento...',
+    'A otimizar qualidade do áudio...',
+    'A extrair metadados do ficheiro...',
+    'A preparar dados para análise...',
+    'A processar com algoritmos avançados...',
+    'A gerar insights personalizados...',
+    'A criar relatório detalhado...'
+  ]
+  
   // Cleanup effect to abort operations when component unmounts
   useEffect(() => {
     return () => {
@@ -170,26 +197,40 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // Update progress phrases and ETA in real-time
+  useEffect(() => {
+    if (salesIsUploading && uploadStartTime) {
+      const eta = calculateETA(salesUploadProgress, uploadStartTime)
+      setEstimatedTimeRemaining(eta)
+    }
+  }, [salesUploadProgress, salesIsUploading, uploadStartTime])
+
+  // Cycle through progress phrases continuously
+  useEffect(() => {
+    if (!salesIsUploading) return
+
+    const interval = setInterval(() => {
+      setCurrentPhraseIndex((prevIndex) => (prevIndex + 1) % progressPhrases.length)
+    }, 2000) // Change phrase every 2 seconds
+
+    return () => clearInterval(interval)
+  }, [salesIsUploading, progressPhrases.length])
+
   // Handle Stripe checkout success/cancel
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const success = urlParams.get('success')
     const canceled = urlParams.get('canceled')
     const sessionId = urlParams.get('session_id')
+    const paymentIntent = urlParams.get('payment_intent')
+    const redirectStatus = urlParams.get('redirect_status')
     
-    // Handle Stripe checkout success
-    if (success === 'true' && sessionId) {
-      toast({
-        title: "Pagamento realizado com sucesso! 🎉",
-        description: "A sua subscrição foi ativada. Bem-vindo ao ScaleAgents!",
-        duration: 5000,
-      })
-      
-      // Clear URL parameters
-      const newUrl = new URL(window.location.href)
-      newUrl.searchParams.delete('success')
-      newUrl.searchParams.delete('session_id')
-      window.history.replaceState({}, '', newUrl.toString())
+    // Handle Stripe checkout success (both session and payment intent flows)
+    if (success === 'true' && (sessionId || (paymentIntent && redirectStatus === 'succeeded'))) {
+      // Set redirecting state and redirect to payment success page immediately
+      setIsRedirecting(true)
+      router.replace('/payment-success')
+      return
     }
     
     // Handle Stripe checkout cancellation
@@ -286,6 +327,7 @@ export default function DashboardPage() {
   const [selectedAnalyses, setSelectedAnalyses] = useState<Set<string>>(new Set())
   const [selectAll, setSelectAll] = useState(false)
   const [showAnalysisDeleteConfirmation, setShowAnalysisDeleteConfirmation] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [analysisToDelete, setAnalysisToDelete] = useState<any>(null)
 
   // Function to check if content is available for sending messages
@@ -541,6 +583,9 @@ export default function DashboardPage() {
     setSalesUploadProgress(0)
     setSalesUploadStatus('A preparar o carregamento...')
     setSalesAnalysisResult(null)
+    setUploadStartTime(Date.now())
+    setCurrentPhraseIndex(0)
+    setEstimatedTimeRemaining('')
     
     console.log('📁 File state set, starting upload process...')
     console.log('📁 Current salesUploadedFile state:', file.name)
@@ -595,7 +640,7 @@ export default function DashboardPage() {
       // Use client-side upload approach
       console.log('🚀 Starting client-side upload...')
       setSalesUploadStatus('A fazer upload do ficheiro...')
-      await uploadSalesFileClientSide(file, accessToken)
+      await uploadSalesFileClientSide(file, accessToken, salesCallType)
     
     } catch (error) {
       // Check if this was a cancellation
@@ -694,7 +739,7 @@ export default function DashboardPage() {
       // Use client-side upload approach
       console.log('🚀 Starting client-side upload...')
       setSalesUploadStatus('A fazer upload do ficheiro...')
-      await uploadSalesFileClientSide(salesUploadedFile, accessToken)
+      await uploadSalesFileClientSide(salesUploadedFile, accessToken, salesCallType)
     
     } catch (error) {
       // Check if this was a cancellation
@@ -731,6 +776,26 @@ export default function DashboardPage() {
     }
   }
 
+  const getCurrentProgressPhrase = (): string => {
+    return progressPhrases[currentPhraseIndex] || progressPhrases[0]
+  }
+
+  // Calculate ETA based on progress and elapsed time
+  const calculateETA = (progress: number, startTime: number): string => {
+    if (progress <= 0 || !startTime) return ''
+    
+    const elapsed = Date.now() - startTime
+    const rate = progress / elapsed // progress per millisecond
+    const remaining = (100 - progress) / rate
+    
+    if (remaining < 1000) return 'Quase pronto...'
+    if (remaining < 10000) return `${Math.round(remaining / 1000)}s restantes`
+    if (remaining < 60000) return `${Math.round(remaining / 1000)}s restantes`
+    
+    const minutes = Math.round(remaining / 60000)
+    return `${minutes}min restantes`
+  }
+
   // Function to cancel sales analyst upload and reset to initial state
   const cancelSalesUpload = () => {
     console.log('🚫 Cancelling sales analyst upload...')
@@ -750,6 +815,9 @@ export default function DashboardPage() {
     setSalesAnalysisResult(null)
     setUploadError(null)
     setFilePreview(null)
+    setUploadStartTime(null)
+    setCurrentPhraseIndex(0)
+    setEstimatedTimeRemaining('')
     
     // Clear file input
     if (salesFileInputRef.current) {
@@ -769,7 +837,7 @@ export default function DashboardPage() {
     console.log('✅ Sales analyst reset to initial state')
   }
 
-  const uploadSalesFileClientSide = async (file: File, accessToken: string) => {
+  const uploadSalesFileClientSide = async (file: File, accessToken: string, callType: string) => {
     // Create new AbortController for this upload operation
     const abortController = new AbortController()
     salesAbortControllerRef.current = abortController
@@ -780,38 +848,103 @@ export default function DashboardPage() {
       let isConverted = false
       
       if (shouldConvertVideo(file)) {
-        try {
-          setSalesUploadStatus('A converter vídeo para áudio...')
-          setSalesUploadProgress(5)
+        // For very large files (>500MB), use a more aggressive conversion approach
+        if (file.size > 500 * 1024 * 1024) {
+          console.log('📁 Large file detected - using optimized conversion approach')
+          setSalesUploadStatus('A converter ficheiro grande (pode demorar alguns minutos)...')
+          setSalesUploadProgress(30)
           
-          // Check if operation was cancelled
-          if (abortController.signal.aborted) {
-            throw new Error('Operation cancelled')
+          try {
+            // Use a more aggressive timeout for large files
+            const conversionTimeout = 600000 // 10 minutes for very large files
+            console.log(`⏱️ Extended timeout set to ${conversionTimeout / 1000}s for ${(file.size / (1024 * 1024)).toFixed(1)}MB file`)
+            
+            const conversionPromise = convertVideoToAudio(file)
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Video conversion timeout')), conversionTimeout)
+            )
+            
+            fileToUpload = await Promise.race([conversionPromise, timeoutPromise]) as File
+            isConverted = true
+            
+            console.log('✅ Large file converted to audio:', {
+              originalSize: `${(file.size / (1024 * 1024)).toFixed(1)}MB`,
+              convertedSize: `${(fileToUpload.size / (1024 * 1024)).toFixed(1)}MB`,
+              reduction: `${((1 - fileToUpload.size / file.size) * 100).toFixed(1)}%`
+            })
+            
+            setSalesUploadProgress(15)
+          } catch (error) {
+            if (abortController.signal.aborted) {
+              throw new Error('Operation cancelled')
+            }
+            console.error('❌ Large file conversion failed:', error)
+            
+            // For large files, if conversion fails, we need to inform the user
+            const isTimeoutError = error instanceof Error && error.message.includes('timeout')
+            const errorMessage = isTimeoutError 
+              ? `Conversão de ficheiro grande demorou muito tempo (${(file.size / (1024 * 1024)).toFixed(1)}MB). Tenta com um ficheiro menor ou contacta o suporte.`
+              : `Falha ao converter ficheiro grande (${(file.size / (1024 * 1024)).toFixed(1)}MB). Tenta com um ficheiro menor.`
+            
+            toast({
+              title: "Erro na conversão de ficheiro grande",
+              description: errorMessage,
+              variant: "destructive",
+            })
+            
+            throw error // Don't continue with original file for large files
           }
-          
-          console.log('🎵 Converting video to audio for better processing...')
-          fileToUpload = await convertVideoToAudio(file)
-          isConverted = true
-          
-          console.log('✅ Video converted to audio:', {
-            originalSize: `${(file.size / (1024 * 1024)).toFixed(1)}MB`,
-            convertedSize: `${(fileToUpload.size / (1024 * 1024)).toFixed(1)}MB`,
-            reduction: `${((1 - fileToUpload.size / file.size) * 100).toFixed(1)}%`
-          })
-          
-          setSalesUploadProgress(15)
-        } catch (error) {
+        } else {
+          try {
+            setSalesUploadStatus('A converter vídeo para áudio...')
+            setSalesUploadProgress(30)
+            
+            // Check if operation was cancelled
+            if (abortController.signal.aborted) {
+              throw new Error('Operation cancelled')
+            }
+            
+            console.log('🎵 Converting video to audio for better processing...')
+            
+            // Add timeout for large files
+            const conversionTimeout = file.size > 200 * 1024 * 1024 ? 300000 : 60000 // 5min for large files, 1min for smaller
+            console.log(`⏱️ Conversion timeout set to ${conversionTimeout / 1000}s for ${(file.size / (1024 * 1024)).toFixed(1)}MB file`)
+            
+            const conversionPromise = convertVideoToAudio(file)
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Video conversion timeout')), conversionTimeout)
+            )
+            
+            fileToUpload = await Promise.race([conversionPromise, timeoutPromise]) as File
+            isConverted = true
+            
+            console.log('✅ Video converted to audio:', {
+              originalSize: `${(file.size / (1024 * 1024)).toFixed(1)}MB`,
+              convertedSize: `${(fileToUpload.size / (1024 * 1024)).toFixed(1)}MB`,
+              reduction: `${((1 - fileToUpload.size / file.size) * 100).toFixed(1)}%`
+            })
+            
+            setSalesUploadProgress(15)
+          } catch (error) {
           if (abortController.signal.aborted) {
             throw new Error('Operation cancelled')
           }
           console.error('❌ Video conversion failed:', error)
+          
+          // Check if it's a timeout error
+          const isTimeoutError = error instanceof Error && error.message.includes('timeout')
+          const errorMessage = isTimeoutError 
+            ? `Conversão de vídeo demorou muito tempo (${(file.size / (1024 * 1024)).toFixed(1)}MB). Tentando upload original...`
+            : "Falha ao converter vídeo para áudio. Tentando upload original..."
+          
           toast({
-            title: "Erro na conversão",
-            description: "Falha ao converter vídeo para áudio. Tentando upload original...",
+            title: isTimeoutError ? "Conversão muito lenta" : "Erro na conversão",
+            description: errorMessage,
             variant: "destructive",
           })
           // Continue with original file if conversion fails
           fileToUpload = file
+          }
         }
       }
 
@@ -844,7 +977,8 @@ export default function DashboardPage() {
           userId: user!.id,
           accessToken: accessToken,
           originalFileName: file.name,
-          isConverted: isConverted
+          isConverted: isConverted,
+          callType: callType
         })
       })
 
@@ -859,8 +993,8 @@ export default function DashboardPage() {
       const tempSalesCallId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
       // Step 3: Start transcription and analysis
-      setSalesUploadStatus('A processar vídeo e iniciar transcrição...')
-      setSalesUploadProgress(60)
+      setSalesUploadStatus('A transcrever áudio com IA...')
+      setSalesUploadProgress(70)
 
       // Check if operation was cancelled
       if (abortController.signal.aborted) {
@@ -878,7 +1012,8 @@ export default function DashboardPage() {
             fileName: file.name,
             userId: user!.id,
             accessToken: accessToken,
-            salesCallId: tempSalesCallId
+            salesCallId: tempSalesCallId,
+            callType: callType
           }),
           signal: abortController.signal // Add abort signal to the fetch request
         })
@@ -1005,7 +1140,8 @@ export default function DashboardPage() {
             feedback: analysis.feedback || '',
             score: analysis.score || 0,
             callType: analysis.call_type || 'N/A',
-            analysis: analysis.analysis || {}
+            analysis: analysis.analysis || {},
+            transcription: analysis.transcription || ''
           }
         })
         
@@ -1028,6 +1164,25 @@ export default function DashboardPage() {
       })
     } finally {
       setLoadingAnalyses(false)
+    }
+  }
+
+  // Refresh analyses with loading state
+  const refreshAnalyses = async () => {
+    setIsRefreshing(true)
+    try {
+      await fetchAnalyses()
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  // Handle analyses tab click - fetch data if not already loaded
+  const handleAnalysesTabClick = () => {
+    setActiveTab('analyses')
+    // Only fetch if we don't have analyses loaded yet
+    if (analyses.length === 0 && user && selectedAgent === 'sales-analyst' && !loadingAnalyses) {
+      fetchAnalyses()
     }
   }
 
@@ -1209,12 +1364,12 @@ export default function DashboardPage() {
     initializeChatService()
   }, [user, selectedAgent])
 
-  // Fetch analyses when sales analyst is selected
+  // Fetch analyses only when user explicitly navigates to analyses tab
   useEffect(() => {
-    if (user && selectedAgent === 'sales-analyst') {
+    if (user && selectedAgent === 'sales-analyst' && activeTab === 'analyses' && analyses.length === 0) {
       fetchAnalyses()
     }
-  }, [user, selectedAgent])
+  }, [user, selectedAgent, activeTab, analyses.length])
 
   // Reset selections when analyses change
   useEffect(() => {
@@ -2233,6 +2388,18 @@ export default function DashboardPage() {
     )
   }
 
+  // Show loading screen when redirecting to payment success
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-white/70">A redirecionar para a página de confirmação...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!user) {
     return null
   }
@@ -3098,7 +3265,7 @@ export default function DashboardPage() {
                             Carregar Ficheiro
                           </button>
                           <button
-                            onClick={() => setActiveTab('analyses')}
+                            onClick={handleAnalysesTabClick}
                             className={`px-6 py-3 rounded-md text-sm font-medium transition-colors ${
                               activeTab === 'analyses' 
                                 ? 'bg-purple-600 text-white shadow-lg' 
@@ -3481,7 +3648,7 @@ export default function DashboardPage() {
                                               <span className="text-white/70 text-sm">Clareza e Fluência</span>
                                               <span className="text-white font-medium">
                                                 {Math.round(filtered.reduce((sum: number, analysis: any) => 
-                                                  sum + (analysis.analysis?.analysis_fields?.clarezaFluenciaFala || 0), 0) / filtered.length
+                                                  sum + (analysis.analysis?.scoring?.clarityAndFluency?.score || analysis.analysis?.analysis_fields?.clarezaFluenciaFala || 0), 0) / filtered.length
                                                 )}/5
                                               </span>
                                             </div>
@@ -3489,7 +3656,7 @@ export default function DashboardPage() {
                                               <span className="text-white/70 text-sm">Tom e Controlo</span>
                                               <span className="text-white font-medium">
                                                 {Math.round(filtered.reduce((sum: number, analysis: any) => 
-                                                  sum + (analysis.analysis?.analysis_fields?.tomControlo || 0), 0) / filtered.length
+                                                  sum + (analysis.analysis?.scoring?.toneAndControl?.score || analysis.analysis?.analysis_fields?.tomControlo || 0), 0) / filtered.length
                                                 )}/5
                                               </span>
                                             </div>
@@ -3497,7 +3664,7 @@ export default function DashboardPage() {
                                               <span className="text-white/70 text-sm">Envolvimento</span>
                                               <span className="text-white font-medium">
                                                 {Math.round(filtered.reduce((sum: number, analysis: any) => 
-                                                  sum + (analysis.analysis?.analysis_fields?.envolvimentoConversacional || 0), 0) / filtered.length
+                                                  sum + (analysis.analysis?.scoring?.engagement?.score || analysis.analysis?.analysis_fields?.envolvimentoConversacional || 0), 0) / filtered.length
                                                 )}/5
                                               </span>
                                             </div>
@@ -3517,7 +3684,7 @@ export default function DashboardPage() {
                                               <span className="text-white/70 text-sm">Descoberta de Necessidades</span>
                                               <span className="text-white font-medium">
                                                 {Math.round(filtered.reduce((sum: number, analysis: any) => 
-                                                  sum + (analysis.analysis?.analysis_fields?.efetividadeDescobertaNecessidades || 0), 0) / filtered.length
+                                                  sum + (analysis.analysis?.scoring?.needsDiscovery?.score || analysis.analysis?.analysis_fields?.efetividadeDescobertaNecessidades || 0), 0) / filtered.length
                                                 )}/5
                                               </span>
                                             </div>
@@ -3525,7 +3692,7 @@ export default function DashboardPage() {
                                               <span className="text-white/70 text-sm">Lidar com Objeções</span>
                                               <span className="text-white font-medium">
                                                 {Math.round(filtered.reduce((sum: number, analysis: any) => 
-                                                  sum + (analysis.analysis?.analysis_fields?.habilidadesLidarObjeccoes || 0), 0) / filtered.length
+                                                  sum + (analysis.analysis?.scoring?.objectionHandling?.score || analysis.analysis?.analysis_fields?.habilidadesLidarObjeccoes || 0), 0) / filtered.length
                                                 )}/5
                                               </span>
                                             </div>
@@ -3533,7 +3700,7 @@ export default function DashboardPage() {
                                               <span className="text-white/70 text-sm">Fechamento</span>
                                               <span className="text-white font-medium">
                                                 {Math.round(filtered.reduce((sum: number, analysis: any) => 
-                                                  sum + (analysis.analysis?.analysis_fields?.fechamentoProximosPassos || 0), 0) / filtered.length
+                                                  sum + (analysis.analysis?.scoring?.closing?.score || analysis.analysis?.analysis_fields?.fechamentoProximosPassos || 0), 0) / filtered.length
                                                 )}/5
                                               </span>
                                             </div>
@@ -3652,12 +3819,48 @@ export default function DashboardPage() {
                                   </p>
                                   <p className="text-white/60 mb-2">
                                     Tamanho: {(salesUploadedFile.size / (1024 * 1024)).toFixed(1)} MB
+                                    {salesUploadedFile.size > 50 * 1024 * 1024 && (
+                                      <span className="text-yellow-400 ml-2">(Processamento pode demorar mais tempo)</span>
+                                    )}
                                   </p>
                                   <p className="text-white/60 mb-2">
                                     Tipo: {salesUploadedFile.type}
                                   </p>
                                 </>
                               )}
+                              
+                              {/* Call Type Selection */}
+                              <div className="mb-6">
+                                <Label htmlFor="call-type" className="block text-sm font-medium text-white/80 mb-2">
+                                  Tipo de Chamada
+                                </Label>
+                                <Select value={salesCallType} onValueChange={setSalesCallType}>
+                                  <SelectTrigger className="w-full bg-white/5 border-white/20 text-white">
+                                    <SelectValue placeholder="Selecione o tipo de chamada" />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-gray-900 border-white/20">
+                                    <SelectItem value="Chamada Fria" className="text-white hover:bg-white/10">
+                                      Chamada Fria
+                                    </SelectItem>
+                                    <SelectItem value="Chamada de Agendamento" className="text-white hover:bg-white/10">
+                                      Chamada de Agendamento
+                                    </SelectItem>
+                                    <SelectItem value="Reunião de Descoberta" className="text-white hover:bg-white/10">
+                                      Reunião de Descoberta
+                                    </SelectItem>
+                                    <SelectItem value="Reunião de Fecho" className="text-white hover:bg-white/10">
+                                      Reunião de Fecho
+                                    </SelectItem>
+                                    <SelectItem value="Reunião de Esclarecimento de Dúvidas" className="text-white hover:bg-white/10">
+                                      Reunião de Esclarecimento de Dúvidas
+                                    </SelectItem>
+                                    <SelectItem value="Reunião de One Call Close" className="text-white hover:bg-white/10">
+                                      Reunião de One Call Close
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
                               <div className="flex justify-center space-x-2 mt-4">
                                 {salesIsUploading ? (
                                   // Show only Cancel button during upload
@@ -3726,30 +3929,63 @@ export default function DashboardPage() {
                               </div>
                             )}
 
-                            {/* Upload Progress */}
+                            {/* Enhanced Upload Progress */}
                             {salesIsUploading && (
-                              <div className="space-y-3">
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-white/70 font-medium">{salesUploadStatus}</span>
-                                  <span className="text-white/70 bg-white/10 px-2 py-1 rounded-full text-xs">
+                              <div className="space-y-4">
+                                {/* Progress Header */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-3">
+                                    {/* Loading Spinner */}
+                                    <div className="relative">
+                                      <div className="w-6 h-6 border-2 border-white/20 rounded-full"></div>
+                                      <div className="absolute top-0 left-0 w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                    <div>
+                                      <div className="text-white font-medium text-sm transition-all duration-500 ease-in-out">
+                                        {getCurrentProgressPhrase()}
+                                      </div>
+                                      {estimatedTimeRemaining && (
+                                        <div className="text-white/60 text-xs">
+                                          {estimatedTimeRemaining}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-white font-semibold text-lg">
                                     {salesUploadProgress}%
-                                  </span>
                                 </div>
-                                <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden">
+                                    <div className="text-white/60 text-xs">
+                                      {salesUploadProgress < 100 ? 'A processar...' : 'Concluído!'}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Progress Bar */}
+                                <div className="w-full bg-white/10 rounded-full h-4 overflow-hidden relative">
                                   <div 
-                                    className="bg-gradient-to-r from-purple-500 to-violet-500 h-3 rounded-full transition-all duration-500 ease-out relative"
+                                    className="bg-gradient-to-r from-purple-500 to-violet-500 h-4 rounded-full transition-all duration-700 ease-out relative"
                                     style={{ width: `${salesUploadProgress}%` }}
                                   >
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                                    {/* Animated shine effect */}
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
+                                    {/* Progress glow */}
+                                    <div className="absolute inset-0 bg-gradient-to-r from-purple-400/50 to-violet-400/50 blur-sm"></div>
                                   </div>
                                 </div>
-                                {salesUploadProgress > 0 && salesUploadProgress < 100 && (
-                                  <div className="flex items-center justify-center space-x-2 text-xs text-white/50">
-                                    <div className="w-1 h-1 bg-purple-400 rounded-full animate-bounce"></div>
-                                    <div className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                                    <div className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+
+                                {/* Progress Details */}
+                                <div className="flex items-center justify-between text-xs text-white/50">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                                    <span>Processamento em curso</span>
+                                  </div>
+                                  {uploadStartTime && (
+                                    <div>
+                                      {Math.round((Date.now() - uploadStartTime) / 1000)}s decorridos
                                   </div>
                                 )}
+                                </div>
                               </div>
                             )}
                             
@@ -3769,6 +4005,7 @@ export default function DashboardPage() {
                         </div>
                       )}
 
+
                       {/* Analyses Tab */}
                       {activeTab === 'analyses' && (
                         <div className="space-y-6">
@@ -3786,6 +4023,17 @@ export default function DashboardPage() {
                               </div>
                             </div>
                             <div className="flex items-center space-x-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={refreshAnalyses}
+                                disabled={isRefreshing}
+                                className="bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-50"
+                              >
+                                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {isRefreshing ? 'A atualizar...' : 'Atualizar'}
+                              </Button>
+                              
                               <div className="flex items-center space-x-2">
                                 <Checkbox
                                   checked={selectAll}
@@ -3986,9 +4234,79 @@ export default function DashboardPage() {
                       Transcrição da Chamada
                     </h3>
                     <div className="max-h-96 overflow-y-auto">
+                      {(() => {
+                        const transcription = selectedAnalysis.transcription || selectedAnalysis.analysis?.transcription || ''
+                        
+                        if (!transcription) {
+                          return <p className="text-white/60 text-sm">Transcrição não disponível</p>
+                        }
+                        
+                        // Check if transcription has speaker diarization (contains "Speaker" or similar patterns)
+                        const hasSpeakerDiarization = transcription.includes('Speaker') || 
+                          transcription.includes('speaker') || 
+                          transcription.match(/Speaker \d+/i)
+                        
+                        if (hasSpeakerDiarization) {
+                          // Format with speaker diarization
+                          const lines = transcription.split('\n')
+                          return (
+                            <div className="space-y-3">
+                              {lines.map((line: string, index: number) => {
+                                if (line.trim() === '') return null
+                                
+                                // Check if line contains speaker information
+                                const speakerMatch = line.match(/^(Speaker \d+)/i)
+                                if (speakerMatch) {
+                                  const speaker = speakerMatch[1]
+                                  const text = line.replace(/^Speaker \d+/i, '').trim()
+                                  const isEven = index % 2 === 0
+                                  
+                                  return (
+                                    <div key={index} className="p-3 rounded-lg border bg-gray-500/10 border-gray-500/20">
+                                      <div className="flex items-start space-x-3">
+                                        <div className={`px-2 py-1 rounded text-xs font-medium ${
+                                          isEven ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'
+                                        }`}>
+                                          {speaker}
+                                        </div>
+                                        <p className="text-white/90 text-sm leading-relaxed flex-1">
+                                          {text}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )
+                                } else {
+                                  // Regular text without speaker identification
+                                  return (
+                                    <p key={index} className="text-white/80 text-sm leading-relaxed">
+                                      {line}
+                                    </p>
+                                  )
+                                }
+                              })}
+                            </div>
+                          )
+                        } else {
+                          // No speaker diarization - show as plain text
+                          return (
+                            <>
+                              <div className="p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg mb-4">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <AlertCircle className="w-4 h-4 text-yellow-400" />
+                                  <span className="text-yellow-300 text-sm font-medium">Sem Identificação de Orador</span>
+                                </div>
+                                <p className="text-yellow-200/80 text-xs">
+                                  Esta transcrição não possui identificação de oradores. Para uma melhor análise, 
+                                  certifique-se de que o speaker diarization está ativado.
+                                </p>
+                              </div>
                       <p className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">
-                        {selectedAnalysis.transcription || selectedAnalysis.analysis?.transcription || 'Transcrição não disponível'}
+                                {transcription}
                       </p>
+                            </>
+                          )
+                        }
+                      })()}
                     </div>
                   </div>
                 )}
@@ -4005,7 +4323,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="bg-white/5 p-4 rounded-lg">
                   <span className="text-white/60 block">Tipo de Chamada:</span>
-                  <p className="text-white font-medium">{selectedAnalysis.analysis?.callType || selectedAnalysis.analysis?.call_type || selectedAnalysis.call_type || 'N/A'}</p>
+                  <p className="text-white font-medium">{selectedAnalysis.analysis?.callInfo?.callType || selectedAnalysis.analysis?.callType || selectedAnalysis.analysis?.call_type || selectedAnalysis.call_type || 'N/A'}</p>
                 </div>
                 {selectedAnalysis.score > 0 && (
                   <div className="bg-white/5 p-4 rounded-lg">
@@ -4023,136 +4341,380 @@ export default function DashboardPage() {
                 <div className="space-y-4">
                   
                   {/* Pontos Fortes */}
-                  {(selectedAnalysis.analysis?.analysis_fields?.pontosFortes || selectedAnalysis.analysis?.analysis?.pontosFortes || selectedAnalysis.analysis?.pontosFortes) && (
+                  {selectedAnalysis.analysis?.insights?.strengths && selectedAnalysis.analysis.insights.strengths.length > 0 && (
                     <div className="bg-white/5 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold text-white mb-2">Pontos Fortes</h3>
+                      <h3 className="text-lg font-semibold text-white mb-3">
+                        Pontos Fortes
+                      </h3>
+                      <div className="space-y-3">
+                        {selectedAnalysis.analysis.insights.strengths.map((strength: any, index: number) => {
+                          // Parse the strength description to extract title, analysis, and quote
+                          const parseStrength = (text: string) => {
+                            // Enhanced pattern for full phrases with MM:SS timestamps
+                            const titleMatch = text.match(/^- \*\*(.*?)\*\*:\s*(.*?)\s*Timestamp:\s*\[([^\]]+)\]\s*"([^"]+)"/);
+                            
+                            if (titleMatch) {
+                              return {
+                                title: titleMatch[1],
+                                analysis: titleMatch[2].trim(),
+                                quote: titleMatch[4],
+                                timestamp: titleMatch[3]
+                              };
+                            }
+                            
+                            // Enhanced fallback: try to extract components separately with better regex
+                            const titleMatch2 = text.match(/^- \*\*(.*?)\*\*:/);
+                            const quoteMatch = text.match(/"([^"]{10,})"/); // Require at least 10 characters for full phrases
+                            const timestampMatch = text.match(/Timestamp:\s*\[([^\]]+)\]/);
+                            
+                            if (titleMatch2 && quoteMatch) {
+                              // Extract analysis text between title and timestamp
+                              const titleEnd = titleMatch2[0].length;
+                              const timestampStart = text.indexOf('Timestamp:');
+                              const analysis = timestampStart > titleEnd ? 
+                                text.substring(titleEnd, timestampStart).trim() : '';
+                              
+                              return {
+                                title: titleMatch2[1],
+                                analysis: analysis,
+                                quote: quoteMatch[1],
+                                timestamp: timestampMatch ? timestampMatch[1] : null
+                              };
+                            }
+                            
+                            // If no structured format found, return the whole text
+                            return {
+                              title: 'Ponto Forte',
+                              analysis: text,
+                              quote: '',
+                              timestamp: null
+                            };
+                          };
+                          
+                          const parsed = parseStrength(strength.description);
+                          
+                          return (
+                            <div key={index} className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-3">
                       <div className="text-white/90 text-sm leading-relaxed">
-                        <ReactMarkdown 
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            h1: ({children}) => <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>,
-                            h2: ({children}) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
-                            h3: ({children}) => <h3 className="text-sm font-semibold mb-2 text-white">{children}</h3>,
-                            p: ({children}) => <p className="mb-3 text-white/90 leading-relaxed">{children}</p>,
-                            ul: ({children}) => <ul className="list-disc list-outside mb-3 space-y-2 text-white/90 pl-4">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal list-outside mb-3 space-y-2 text-white/90 pl-4">{children}</ol>,
-                            li: ({children}) => <li className="mb-2 text-white/90 leading-relaxed">{children}</li>,
-                            strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
-                            em: ({children}) => <em className="italic text-white/80">{children}</em>,
-                            code: ({children}) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>,
-                            blockquote: ({children}) => <blockquote className="border-l-4 border-green-500 pl-3 italic text-white/80 mb-3">{children}</blockquote>,
-                          }}
-                        >
-                          {selectedAnalysis.analysis?.analysis_fields?.pontosFortes || selectedAnalysis.analysis?.analysis?.pontosFortes || selectedAnalysis.analysis?.pontosFortes}
-                        </ReactMarkdown>
+                                <div className="flex items-start space-x-2">
+                                  <span className="text-white text-lg leading-none">•</span>
+                                  <div className="flex-1">
+                                    <em className="text-white font-medium">{parsed.title}</em>
+                                    {parsed.timestamp && (
+                                      <span className="text-white/60 text-xs ml-2 bg-white/10 px-2 py-1 rounded">
+                                        {parsed.timestamp}
+                                      </span>
+                                    )}
+                                    {parsed.analysis && (
+                                      <div className="mt-1 text-white/90 text-sm">
+                                        {parsed.analysis}
+                                      </div>
+                                    )}
+                                    {parsed.quote && (
+                                      <div className="mt-1 text-white/80 italic">
+                                        "{parsed.quote}"
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
                   
                   {/* Pontos de Melhoria */}
-                  {(selectedAnalysis.analysis?.analysis_fields?.pontosFracos || selectedAnalysis.analysis?.analysis?.pontosFracos || selectedAnalysis.analysis?.pontosFracos) && (
+                  {selectedAnalysis.analysis?.insights?.improvements && selectedAnalysis.analysis.insights.improvements.length > 0 && (
                     <div className="bg-white/5 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold text-white mb-2">Pontos de Melhoria</h3>
+                      <h3 className="text-lg font-semibold text-white mb-3">
+                        Pontos de Melhoria
+                      </h3>
+                      <div className="space-y-3">
+                        {selectedAnalysis.analysis.insights.improvements.map((improvement: any, index: number) => {
+                          // Parse the improvement description to extract title, analysis, and quote
+                          const parseImprovement = (text: string) => {
+                            // Enhanced pattern for full phrases with MM:SS timestamps
+                            const titleMatch = text.match(/^- \*\*(.*?)\*\*:\s*(.*?)\s*Timestamp:\s*\[([^\]]+)\]\s*"([^"]+)"/);
+                            
+                            if (titleMatch) {
+                              return {
+                                title: titleMatch[1],
+                                analysis: titleMatch[2].trim(),
+                                quote: titleMatch[4],
+                                timestamp: titleMatch[3]
+                              };
+                            }
+                            
+                            // Enhanced fallback: try to extract components separately with better regex
+                            const titleMatch2 = text.match(/^- \*\*(.*?)\*\*:/);
+                            const quoteMatch = text.match(/"([^"]{10,})"/); // Require at least 10 characters for full phrases
+                            const timestampMatch = text.match(/Timestamp:\s*\[([^\]]+)\]/);
+                            
+                            if (titleMatch2 && quoteMatch) {
+                              // Extract analysis text between title and timestamp
+                              const titleEnd = titleMatch2[0].length;
+                              const timestampStart = text.indexOf('Timestamp:');
+                              const analysis = timestampStart > titleEnd ? 
+                                text.substring(titleEnd, timestampStart).trim() : '';
+                              
+                              return {
+                                title: titleMatch2[1],
+                                analysis: analysis,
+                                quote: quoteMatch[1],
+                                timestamp: timestampMatch ? timestampMatch[1] : null
+                              };
+                            }
+                            
+                            // If no structured format found, return the whole text
+                            return {
+                              title: 'Ponto de Melhoria',
+                              analysis: text,
+                              quote: '',
+                              timestamp: null
+                            };
+                          };
+                          
+                          const parsed = parseImprovement(improvement.description);
+                          
+                          return (
+                            <div key={index} className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-3">
                       <div className="text-white/90 text-sm leading-relaxed">
-                        <ReactMarkdown 
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            h1: ({children}) => <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>,
-                            h2: ({children}) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
-                            h3: ({children}) => <h3 className="text-sm font-semibold mb-2 text-white">{children}</h3>,
-                            p: ({children}) => <p className="mb-3 text-white/90 leading-relaxed">{children}</p>,
-                            ul: ({children}) => <ul className="list-disc list-outside mb-3 space-y-2 text-white/90 pl-4">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal list-outside mb-3 space-y-2 text-white/90 pl-4">{children}</ol>,
-                            li: ({children}) => <li className="mb-2 text-white/90 leading-relaxed">{children}</li>,
-                            strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
-                            em: ({children}) => <em className="italic text-white/80">{children}</em>,
-                            code: ({children}) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>,
-                            blockquote: ({children}) => <blockquote className="border-l-4 border-red-500 pl-3 italic text-white/80 mb-3">{children}</blockquote>,
-                          }}
-                        >
-                          {selectedAnalysis.analysis?.analysis_fields?.pontosFracos || selectedAnalysis.analysis?.analysis?.pontosFracos || selectedAnalysis.analysis?.pontosFracos}
-                        </ReactMarkdown>
+                                <div className="flex items-start space-x-2">
+                                  <span className="text-white text-lg leading-none">•</span>
+                                  <div className="flex-1">
+                                    <em className="text-white font-medium">{parsed.title}</em>
+                                    {parsed.timestamp && (
+                                      <span className="text-white/60 text-xs ml-2 bg-white/10 px-2 py-1 rounded">
+                                        {parsed.timestamp}
+                                      </span>
+                                    )}
+                                    {parsed.analysis && (
+                                      <div className="mt-1 text-white/90 text-sm">
+                                        {parsed.analysis}
+                                      </div>
+                                    )}
+                                    {parsed.quote && (
+                                      <div className="mt-1 text-white/80 italic">
+                                        "{parsed.quote}"
+                                      </div>
+                                    )}
+                                    {improvement.actionableSteps && improvement.actionableSteps.length > 0 && (
+                                      <div className="mt-2">
+                                        <h4 className="text-xs font-semibold text-white/80 mb-1">Passos Acionáveis:</h4>
+                                        <ul className="text-xs text-white/70 space-y-1">
+                                          {improvement.actionableSteps.map((step: string, stepIndex: number) => (
+                                            <li key={stepIndex} className="flex items-start space-x-1">
+                                              <span className="text-orange-400 mt-0.5">•</span>
+                                              <span>{step}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
                   
                   {/* Resumo da Chamada */}
-                  {(selectedAnalysis.analysis?.analysis_fields?.resumoDaCall || selectedAnalysis.analysis?.analysis?.resumoDaCall || selectedAnalysis.analysis?.resumoDaCall) && (
+                  {selectedAnalysis.analysis?.summary?.keyTakeaways && selectedAnalysis.analysis.summary.keyTakeaways.length > 0 && (
                     <div className="bg-white/5 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold text-white mb-2">Resumo da Chamada</h3>
-                      <div className="text-white/90 text-sm leading-relaxed">
-                        <ReactMarkdown 
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            h1: ({children}) => <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>,
-                            h2: ({children}) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
-                            h3: ({children}) => <h3 className="text-sm font-semibold mb-2 text-white">{children}</h3>,
-                            p: ({children}) => <p className="mb-3 text-white/90 leading-relaxed">{children}</p>,
-                            ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-1 text-white/90">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal list-outside mb-3 space-y-1 text-white/90 pl-4">{children}</ol>,
-                            li: ({children}) => <li className="mb-1 text-white/90">{children}</li>,
-                            strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
-                            em: ({children}) => <em className="italic text-white/80">{children}</em>,
-                            code: ({children}) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>,
-                            blockquote: ({children}) => <blockquote className="border-l-4 border-purple-500 pl-3 italic text-white/80 mb-3">{children}</blockquote>,
-                          }}
-                        >
-                          {selectedAnalysis.analysis?.analysis_fields?.resumoDaCall || selectedAnalysis.analysis?.analysis?.resumoDaCall || selectedAnalysis.analysis?.resumoDaCall}
-                        </ReactMarkdown>
+                      <h3 className="text-lg font-semibold text-white mb-4">
+                        Resumo da Chamada
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Momentos Fortes do Comercial */}
+                        <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4">
+                          <h4 className="text-base font-semibold text-white mb-3 flex items-center">
+                            <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                            Momentos Fortes do Comercial
+                          </h4>
+                          <div className="space-y-2">
+                            {(() => {
+                              // Get content from resumoDaCall field
+                              const resumoContent = selectedAnalysis.analysis.resumoDaCall || ''
+                              
+                              // Extract strong points from the resumoDaCall content
+                              const strongPointsMatch = resumoContent.match(/Momentos Fortes do Comercial:\s*([\s\S]*?)(?=\n\nMomentos Fracos do Comercial:|$)/)
+                              
+                              if (strongPointsMatch) {
+                                const strongPointsText = strongPointsMatch[1].trim()
+                                const moments = strongPointsText.split(/(?=Início:|Meio:|Fim:)/).filter((moment: string) => {
+                                  const trimmed = moment.trim()
+                                  return trimmed && 
+                                    !trimmed.includes('Não foi identificado') && 
+                                    !trimmed.includes('não foi identificado') &&
+                                    trimmed.length > 10 // Ensure substantial content
+                                })
+                                
+                                return moments.map((moment: string, index: number) => {
+                                  const cleanMoment = moment.trim()
+                                  
+                                  return (
+                                    <div key={`strong-${index}`} className="text-white/90 text-sm leading-relaxed">
+                                      <div className="flex items-start space-x-2">
+                                        <span className="text-white text-lg leading-none">•</span>
+                                        <div className="flex-1">
+                                          <ReactMarkdown 
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                              strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                                              em: ({children}) => <em className="italic text-white/80">{children}</em>,
+                                            }}
+                                          >
+                                            {cleanMoment}
+                                          </ReactMarkdown>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })
+                              }
+                              
+                              // If no strong points found, show a message
+                              return (
+                                <div className="text-white/60 text-sm italic">
+                                  Nenhum momento forte identificado nesta análise.
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Momentos Fracos do Comercial */}
+                        <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4">
+                          <h4 className="text-base font-semibold text-white mb-3 flex items-center">
+                            <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                            Momentos Fracos do Comercial
+                          </h4>
+                          <div className="space-y-2">
+                            {(() => {
+                              // Get content from resumoDaCall field
+                              const resumoContent = selectedAnalysis.analysis.resumoDaCall || ''
+                              
+                              // Extract weak points from the resumoDaCall content
+                              const weakPointsMatch = resumoContent.match(/Momentos Fracos do Comercial:\s*([\s\S]*?)$/)
+                              
+                              if (weakPointsMatch) {
+                                const weakPointsText = weakPointsMatch[1].trim()
+                                const moments = weakPointsText.split(/(?=Início:|Meio:|Fim:)/).filter((moment: string) => {
+                                  const trimmed = moment.trim()
+                                  return trimmed && 
+                                    !trimmed.includes('Não foi identificado') && 
+                                    !trimmed.includes('não foi identificado') &&
+                                    trimmed.length > 10 // Ensure substantial content
+                                })
+                                
+                                return moments.map((moment: string, index: number) => {
+                                  const cleanMoment = moment.trim()
+                                  
+                                  return (
+                                    <div key={`weak-${index}`} className="text-white/90 text-sm leading-relaxed">
+                                      <div className="flex items-start space-x-2">
+                                        <span className="text-white text-lg leading-none">•</span>
+                                        <div className="flex-1">
+                                          <ReactMarkdown 
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                              strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
+                                              em: ({children}) => <em className="italic text-white/80">{children}</em>,
+                                            }}
+                                          >
+                                            {cleanMoment}
+                                          </ReactMarkdown>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })
+                              }
+                              
+                              // If no weak points found, show a message
+                              return (
+                                <div className="text-white/60 text-sm italic">
+                                  Nenhum momento fraco identificado nesta análise.
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
                   
                   {/* Dicas Gerais */}
-                  {(selectedAnalysis.analysis?.analysis_fields?.dicasGerais || selectedAnalysis.analysis?.analysis?.dicasGerais || selectedAnalysis.analysis?.dicasGerais) && (
+                  {selectedAnalysis.analysis?.summary?.generalTips && selectedAnalysis.analysis.summary.generalTips.length > 0 && (
                     <div className="bg-white/5 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold text-white mb-2">Dicas Gerais</h3>
+                      <h3 className="text-lg font-semibold text-white mb-3">
+                        Dicas Gerais
+                      </h3>
+                      <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4">
                       <div className="text-white/90 text-sm leading-relaxed">
+                          {selectedAnalysis.analysis.summary.generalTips.map((tip: string, index: number) => {
+                            // Clean the tip content by removing introductory text and extracting actual tips
+                            let cleanTip = tip
+                              // Remove common introductory phrases
+                              .replace(/^Após analisar a transcrição da chamada de vendas[^:]*:\s*/i, '')
+                              .replace(/^Aqui estão algumas dicas[^:]*:\s*/i, '')
+                              .replace(/^Com base na análise[^:]*:\s*/i, '')
+                              .replace(/^Para melhorar o desempenho[^:]*:\s*/i, '')
+                              .replace(/^Após analisar a transcrição[^:]*:\s*/i, '')
+                              .replace(/^Com base na transcrição[^:]*:\s*/i, '')
+                              .replace(/^Análise da transcrição[^:]*:\s*/i, '')
+                              .replace(/^Dicas gerais[^:]*:\s*/i, '')
+                              .replace(/^Recomendações[^:]*:\s*/i, '')
+                              .trim()
+                            
+                            return (
+                              <div key={index} className="mb-4 last:mb-0">
                         <ReactMarkdown 
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            h1: ({children}) => <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>,
-                            h2: ({children}) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
-                            h3: ({children}) => <h3 className="text-sm font-semibold mb-2 text-white">{children}</h3>,
-                            p: ({children}) => <p className="mb-3 text-white/90 leading-relaxed">{children}</p>,
-                            ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-1 text-white/90">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal list-outside mb-3 space-y-1 text-white/90 pl-4">{children}</ol>,
-                            li: ({children}) => <li className="mb-1 text-white/90">{children}</li>,
                             strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
                             em: ({children}) => <em className="italic text-white/80">{children}</em>,
-                            code: ({children}) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>,
-                            blockquote: ({children}) => <blockquote className="border-l-4 border-purple-500 pl-3 italic text-white/80 mb-3">{children}</blockquote>,
-                          }}
-                        >
-                          {selectedAnalysis.analysis?.analysis_fields?.dicasGerais || selectedAnalysis.analysis?.analysis?.dicasGerais || selectedAnalysis.analysis?.dicasGerais}
+                                    p: ({children}) => <p className="mb-2 text-white/90 leading-relaxed">{children}</p>,
+                                    ul: ({children}) => <ul className="list-disc list-outside mb-2 space-y-1 text-white/90 pl-4">{children}</ul>,
+                                    ol: ({children}) => <ol className="list-decimal list-outside mb-2 space-y-1 text-white/90 pl-4">{children}</ol>,
+                                    li: ({children}) => <li className="mb-1 text-white/90 leading-relaxed">{children}</li>,
+                                  }}
+                                >
+                                  {cleanTip}
                         </ReactMarkdown>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                     </div>
                   )}
                   
-                  {/* Foco para Próximas Calls */}
-                  {(selectedAnalysis.analysis?.analysis_fields?.focoParaProximasCalls || selectedAnalysis.analysis?.analysis?.focoParaProximasCalls || selectedAnalysis.analysis?.focoParaProximasCalls) && (
+                  {/* Foco para Próximas Chamadas */}
+                  {selectedAnalysis.analysis?.summary?.nextSteps && selectedAnalysis.analysis.summary.nextSteps.length > 0 && (
                     <div className="bg-white/5 p-4 rounded-lg">
-                      <h3 className="text-lg font-semibold text-white mb-2">Foco para Próximas Calls</h3>
-                      <div className="text-white/90 text-sm leading-relaxed">
-                        <ReactMarkdown 
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            h1: ({children}) => <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>,
-                            h2: ({children}) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
-                            h3: ({children}) => <h3 className="text-sm font-semibold mb-2 text-white">{children}</h3>,
-                            p: ({children}) => <p className="mb-3 text-white/90 leading-relaxed">{children}</p>,
-                            ul: ({children}) => <ul className="list-disc list-inside mb-3 space-y-1 text-white/90">{children}</ul>,
-                            ol: ({children}) => <ol className="list-decimal list-outside mb-3 space-y-1 text-white/90 pl-4">{children}</ol>,
-                            li: ({children}) => <li className="mb-1 text-white/90">{children}</li>,
-                            strong: ({children}) => <strong className="font-semibold text-white">{children}</strong>,
-                            em: ({children}) => <em className="italic text-white/80">{children}</em>,
-                            code: ({children}) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>,
-                            blockquote: ({children}) => <blockquote className="border-l-4 border-purple-500 pl-3 italic text-white/80 mb-3">{children}</blockquote>,
-                          }}
-                        >
-                          {selectedAnalysis.analysis?.analysis_fields?.focoParaProximasCalls || selectedAnalysis.analysis?.analysis?.focoParaProximasCalls || selectedAnalysis.analysis?.focoParaProximasCalls}
-                        </ReactMarkdown>
+                      <h3 className="text-lg font-semibold text-white mb-3">
+                        Foco para Próximas Chamadas
+                      </h3>
+                      <div className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-4">
+                        <ul className="space-y-2 text-white/90 text-sm leading-relaxed">
+                          {selectedAnalysis.analysis.summary.nextSteps.map((step: string, index: number) => {
+                            // Remove the "-" from the beginning of each step
+                            const cleanStep = step.replace(/^-\s*/, '').trim()
+                            return (
+                              <li key={index} className="flex items-start space-x-2">
+                                <span className="text-white text-lg leading-none mt-0.5">•</span>
+                                <span>{cleanStep}</span>
+                              </li>
+                            )
+                          })}
+                        </ul>
                       </div>
                     </div>
                   )}
@@ -4165,7 +4727,7 @@ export default function DashboardPage() {
                           <div className="flex justify-between items-start mb-2">
                             <h4 className="text-white font-medium">Clareza e Fluência da Fala</h4>
                             <div className="flex items-center space-x-2">
-                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.clarezaFluenciaFala ?? selectedAnalysis.analysis?.analysis?.clarezaFluenciaFala ?? selectedAnalysis.analysis?.clarezaFluenciaFala ?? 0}</span>
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.scoring?.clarityAndFluency?.score ?? selectedAnalysis.analysis?.analysis_fields?.clarezaFluenciaFala ?? selectedAnalysis.analysis?.analysis?.clarezaFluenciaFala ?? selectedAnalysis.analysis?.clarezaFluenciaFala ?? 0}</span>
                               <span className="text-white/60 text-sm">/5</span>
                             </div>
                           </div>
@@ -4191,7 +4753,7 @@ export default function DashboardPage() {
                           <div className="flex justify-between items-start mb-2">
                             <h4 className="text-white font-medium">Tom e Controlo</h4>
                             <div className="flex items-center space-x-2">
-                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.tomControlo ?? selectedAnalysis.analysis?.analysis?.tomControlo ?? selectedAnalysis.analysis?.tomControlo ?? 0}</span>
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.scoring?.toneAndControl?.score ?? selectedAnalysis.analysis?.analysis_fields?.tomControlo ?? selectedAnalysis.analysis?.analysis?.tomControlo ?? selectedAnalysis.analysis?.tomControlo ?? 0}</span>
                               <span className="text-white/60 text-sm">/5</span>
                             </div>
                           </div>
@@ -4217,7 +4779,7 @@ export default function DashboardPage() {
                           <div className="flex justify-between items-start mb-2">
                             <h4 className="text-white font-medium">Envolvimento Conversacional</h4>
                             <div className="flex items-center space-x-2">
-                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.envolvimentoConversacional ?? selectedAnalysis.analysis?.analysis?.envolvimentoConversacional ?? selectedAnalysis.analysis?.envolvimentoConversacional ?? 0}</span>
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.scoring?.engagement?.score ?? selectedAnalysis.analysis?.analysis_fields?.envolvimentoConversacional ?? selectedAnalysis.analysis?.analysis?.envolvimentoConversacional ?? selectedAnalysis.analysis?.envolvimentoConversacional ?? 0}</span>
                               <span className="text-white/60 text-sm">/5</span>
                             </div>
                           </div>
@@ -4243,7 +4805,7 @@ export default function DashboardPage() {
                           <div className="flex justify-between items-start mb-2">
                             <h4 className="text-white font-medium">Efetividade na Descoberta de Necessidades</h4>
                             <div className="flex items-center space-x-2">
-                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.efetividadeDescobertaNecessidades ?? selectedAnalysis.analysis?.analysis?.efetividadeDescobertaNecessidades ?? selectedAnalysis.analysis?.efetividadeDescobertaNecessidades ?? 0}</span>
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.scoring?.needsDiscovery?.score ?? selectedAnalysis.analysis?.analysis_fields?.efetividadeDescobertaNecessidades ?? selectedAnalysis.analysis?.analysis?.efetividadeDescobertaNecessidades ?? selectedAnalysis.analysis?.efetividadeDescobertaNecessidades ?? 0}</span>
                               <span className="text-white/60 text-sm">/5</span>
                             </div>
                           </div>
@@ -4269,7 +4831,7 @@ export default function DashboardPage() {
                           <div className="flex justify-between items-start mb-2">
                             <h4 className="text-white font-medium">Entrega de Valor e Ajuste da Solução</h4>
                             <div className="flex items-center space-x-2">
-                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.entregaValorAjusteSolucao ?? selectedAnalysis.analysis?.analysis?.entregaValorAjusteSolucao ?? selectedAnalysis.analysis?.entregaValorAjusteSolucao ?? 0}</span>
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.scoring?.valueDelivery?.score ?? selectedAnalysis.analysis?.analysis_fields?.entregaValorAjusteSolucao ?? selectedAnalysis.analysis?.analysis?.entregaValorAjusteSolucao ?? selectedAnalysis.analysis?.entregaValorAjusteSolucao ?? 0}</span>
                               <span className="text-white/60 text-sm">/5</span>
                             </div>
                           </div>
@@ -4295,7 +4857,7 @@ export default function DashboardPage() {
                           <div className="flex justify-between items-start mb-2">
                             <h4 className="text-white font-medium">Habilidades de Lidar com Objeções</h4>
                             <div className="flex items-center space-x-2">
-                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.habilidadesLidarObjeccoes ?? selectedAnalysis.analysis?.analysis?.habilidadesLidarObjeccoes ?? selectedAnalysis.analysis?.habilidadesLidarObjeccoes ?? 0}</span>
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.scoring?.objectionHandling?.score ?? selectedAnalysis.analysis?.analysis_fields?.habilidadesLidarObjeccoes ?? selectedAnalysis.analysis?.analysis?.habilidadesLidarObjeccoes ?? selectedAnalysis.analysis?.habilidadesLidarObjeccoes ?? 0}</span>
                               <span className="text-white/60 text-sm">/5</span>
                             </div>
                           </div>
@@ -4321,7 +4883,7 @@ export default function DashboardPage() {
                           <div className="flex justify-between items-start mb-2">
                             <h4 className="text-white font-medium">Estrutura e Controle da Reunião</h4>
                             <div className="flex items-center space-x-2">
-                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.estruturaControleReuniao ?? selectedAnalysis.analysis?.analysis?.estruturaControleReuniao ?? selectedAnalysis.analysis?.estruturaControleReuniao ?? 0}</span>
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.scoring?.meetingControl?.score ?? selectedAnalysis.analysis?.analysis_fields?.estruturaControleReuniao ?? selectedAnalysis.analysis?.analysis?.estruturaControleReuniao ?? selectedAnalysis.analysis?.estruturaControleReuniao ?? 0}</span>
                               <span className="text-white/60 text-sm">/5</span>
                             </div>
                           </div>
@@ -4347,7 +4909,7 @@ export default function DashboardPage() {
                           <div className="flex justify-between items-start mb-2">
                             <h4 className="text-white font-medium">Fechamento e Próximos Passos</h4>
                             <div className="flex items-center space-x-2">
-                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.analysis_fields?.fechamentoProximosPassos ?? selectedAnalysis.analysis?.analysis?.fechamentoProximosPassos ?? selectedAnalysis.analysis?.fechamentoProximosPassos ?? 0}</span>
+                              <span className="text-2xl font-bold text-white">{selectedAnalysis.analysis?.scoring?.closing?.score ?? selectedAnalysis.analysis?.analysis_fields?.fechamentoProximosPassos ?? selectedAnalysis.analysis?.analysis?.fechamentoProximosPassos ?? selectedAnalysis.analysis?.fechamentoProximosPassos ?? 0}</span>
                               <span className="text-white/60 text-sm">/5</span>
                             </div>
                           </div>

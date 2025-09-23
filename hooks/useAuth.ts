@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { supabase, clearInvalidTokens } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 
 
@@ -32,6 +32,13 @@ export function useAuth() {
       
       if ('error' in result && result.error) {
         console.error('❌ Session error:', result.error)
+        
+        // Handle invalid refresh token specifically
+        if (result.error.message?.includes('Invalid Refresh Token')) {
+          console.log('🔄 Invalid refresh token detected, clearing auth state...')
+          clearInvalidTokens()
+        }
+        
         setUser(null)
       } else if ('data' in result && result.data?.session) {
         console.log('✅ Active session found')
@@ -78,6 +85,14 @@ export function useAuth() {
             
           case 'USER_UPDATED':
             setUser(session?.user ?? null)
+            break
+            
+          default:
+            // Handle any authentication errors silently
+            if (!session) {
+              setUser(null)
+              setLoading(false)
+            }
             break
         }
       }

@@ -30,7 +30,7 @@ export const createCheckoutSession = async (
   
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
-    payment_method_types: ['card'],
+    payment_method_types: ['card'], // Only allow card payments
     line_items: [
       {
         price: priceId,
@@ -46,6 +46,21 @@ export const createCheckoutSession = async (
     subscription_data: {
       metadata: metadata || {},
     },
+    // Custom branding options
+    custom_text: {
+      submit: {
+        message: 'Secure payment powered by ScaleAgents'
+      }
+    },
+    // Add your branding
+    invoice_creation: {
+      enabled: true,
+      invoice_data: {
+        description: `ScaleAgents ${metadata?.plan_name || 'Subscription'}`,
+        metadata: metadata || {},
+        footer: 'Thank you for choosing ScaleAgents!'
+      }
+    }
   })
 
   return session

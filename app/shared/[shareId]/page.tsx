@@ -16,6 +16,7 @@ import {
   Target, 
   Award,
   AlertTriangle,
+  AlertCircle,
   CheckCircle,
   XCircle,
   Download,
@@ -137,9 +138,81 @@ export default function SharedAnalysisPage() {
                   Transcrição da Chamada
                 </h3>
                 <div className="max-h-96 overflow-y-auto">
-                  <p className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">
-                    {analysis.transcription || analysis.analysis?.transcription || 'Transcrição não disponível'}
-                  </p>
+                  {(() => {
+                    const transcription = analysis.transcription || analysis.analysis?.transcription || ''
+                    
+                    if (!transcription) {
+                      return <p className="text-white/60 text-sm">Transcrição não disponível</p>
+                    }
+                    
+                    // Check if transcription has speaker diarization (contains "Speaker" or similar patterns)
+                    const hasSpeakerDiarization = transcription.includes('Speaker') || 
+                      transcription.includes('speaker') || 
+                      transcription.match(/Speaker \d+/i)
+                    
+                    if (hasSpeakerDiarization) {
+                      // Format with speaker diarization
+                      const lines = transcription.split('\n')
+                      return (
+                        <div className="space-y-3">
+                          {lines.map((line: string, index: number) => {
+                            if (line.trim() === '') return null
+                            
+                            // Check if line contains speaker information
+                            const speakerMatch = line.match(/^(Speaker \d+)/i)
+                            if (speakerMatch) {
+                              const speaker = speakerMatch[1]
+                              const text = line.replace(/^Speaker \d+/i, '').trim()
+                              const isEven = index % 2 === 0
+                              
+                              return (
+                                <div key={index} className={`p-3 rounded-lg border ${
+                                  isEven ? 'bg-blue-500/10 border-blue-500/20' : 'bg-green-500/10 border-green-500/20'
+                                }`}>
+                                  <div className="flex items-start space-x-3">
+                                    <div className={`px-2 py-1 rounded text-xs font-medium ${
+                                      isEven ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'
+                                    }`}>
+                                      {speaker}
+                                    </div>
+                                    <p className="text-white/90 text-sm leading-relaxed flex-1">
+                                      {text}
+                                    </p>
+                                  </div>
+                                </div>
+                              )
+                            } else {
+                              // Regular text without speaker identification
+                              return (
+                                <p key={index} className="text-white/80 text-sm leading-relaxed">
+                                  {line}
+                                </p>
+                              )
+                            }
+                          })}
+                        </div>
+                      )
+                    } else {
+                      // No speaker diarization - show as plain text
+                      return (
+                        <>
+                          <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg mb-4">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <AlertCircle className="w-4 h-4 text-yellow-400" />
+                              <span className="text-yellow-300 text-sm font-medium">Sem Identificação de Orador</span>
+                            </div>
+                            <p className="text-yellow-200/80 text-xs">
+                              Esta transcrição não possui identificação de oradores. Para uma melhor análise, 
+                              certifique-se de que o speaker diarization está ativado.
+                            </p>
+                          </div>
+                          <p className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">
+                            {transcription}
+                          </p>
+                        </>
+                      )
+                    }
+                  })()}
                 </div>
               </div>
             )}

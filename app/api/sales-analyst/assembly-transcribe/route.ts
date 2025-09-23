@@ -43,6 +43,9 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         audio_url: upload_url,
         language_code: 'pt', // Portuguese
+        speaker_labels: true,
+        punctuate: true,
+        format_text: true
       }),
     })
 

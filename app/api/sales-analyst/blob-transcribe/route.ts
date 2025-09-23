@@ -17,7 +17,9 @@ import {
   getEnhancedPontosFortesPrompt,
   getEnhancedPontosFracosPrompt,
   getEnhancedDicasGeraisPrompt,
-  getEnhancedFocoProximasCallsPrompt
+  getEnhancedFocoProximasCallsPrompt,
+  getPontosFracosPromptWithContext,
+  getEnhancedPontosFracosPromptWithContext
 } from '@/lib/comprehensive-prompts'
 import { convertToStructuredJSON, SalesAnalysisJSON } from '@/lib/sales-analysis-schema'
 
@@ -1108,11 +1110,56 @@ LEMBRA-TE: A tua resposta deve começar com "Clareza e Fluência da Fala:" e ter
       console.error('❌ Pontos Fortes failed:', analysisResults[0]?.status || 'Unknown error')
     }
 
-    if (analysisResults[1]?.ok) {
+    // Now run Pontos Fracos with access to Pontos Fortes results
+    console.log('🔄 Running Pontos Fracos with Pontos Fortes context...')
+    let pontosFracosResult = null
+    
+    if (analysisResults[0]?.ok && results.pontosFortes) {
+      try {
+        // Create enhanced pontos fracos prompt with pontos fortes context
+        const pontosFracosWithContext = callType 
+          ? await getEnhancedPontosFracosPromptWithContext(transcription, callType, results.pontosFortes)
+          : getPontosFracosPromptWithContext(transcription, results.pontosFortes)
+        
+        const pontosFracosResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPTS.PONTOS_FRACOS },
+              { role: 'user', content: pontosFracosWithContext }
+            ],
+            max_tokens: 1000,
+            temperature: 0.3,
+          }),
+        })
+
+        if (pontosFracosResponse.ok) {
+          const pontosFracosData = await pontosFracosResponse.json()
+          results.pontosFracos = pontosFracosData.choices[0].message.content
+          totalTokensUsed += pontosFracosData.usage?.total_tokens || 0
+          console.log('✅ Pontos Fracos (with context):', results.pontosFracos.length, 'characters')
+          pontosFracosResult = { ok: true, data: pontosFracosData }
+        } else {
+          console.error('❌ Pontos Fracos (with context) failed:', pontosFracosResponse.status)
+          pontosFracosResult = { ok: false, status: pontosFracosResponse.status }
+        }
+      } catch (error) {
+        console.error('❌ Error running Pontos Fracos with context:', error)
+        pontosFracosResult = { ok: false, error: error }
+      }
+    }
+
+    // Fallback to original pontos fracos if context version failed
+    if (!pontosFracosResult?.ok && analysisResults[1]?.ok) {
       const data = analysisResults[1].data
       results.pontosFracos = data.choices[0].message.content
-      console.log('✅ Pontos Fracos:', results.pontosFracos.length, 'characters')
-    } else {
+      console.log('✅ Pontos Fracos (fallback):', results.pontosFracos.length, 'characters')
+    } else if (!pontosFracosResult?.ok) {
       console.error('❌ Pontos Fracos failed:', analysisResults[1]?.status || 'Unknown error')
     }
     

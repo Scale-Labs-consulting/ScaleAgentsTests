@@ -378,9 +378,11 @@ async function fetchKnowledgeFile(fileName: string): Promise<string> {
       console.log(`📄 PDF file detected: ${fileName} - trying Python backend first`)
       
       try {
-        // Try Python backend first (best for PDF parsing)
-        console.log(`🐍 Trying Python PDF parser for ${fileName}`)
-        const pythonResponse = await fetch('http://localhost:5000/extract-pdf', {
+        // Try Python backend (Railway/production URL)
+        const pythonServiceUrl = process.env.PYTHON_PDF_SERVICE_URL || 'http://localhost:5000'
+        console.log(`🐍 Trying Python PDF parser at ${pythonServiceUrl} for ${fileName}`)
+        
+        const pythonResponse = await fetch(`${pythonServiceUrl}/extract-pdf`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

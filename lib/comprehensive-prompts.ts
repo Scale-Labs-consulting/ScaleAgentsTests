@@ -144,6 +144,8 @@ REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FORTES:
    - NÃO uses o mesmo momento/timestamp para pontos fortes e fracos
    - Se um momento não é claramente um ponto forte, NÃO o incluas
    - Foca em momentos onde o comercial EXCELSEU, não apenas "fez bem"
+   - **CRÍTICO**: Se identificares rapport inicial como forte, ele NÃO deve aparecer como fraco
+   - **CRÍTICO**: Cada aspecto da call deve ser avaliado como EITHER forte OU fraco, nunca ambos
 
 O feedback deve ser objetivo, conciso (máx. 140 palavras) e focado na melhoria contínua.  
 Deve responder sempre em português de Lisboa.  
@@ -284,6 +286,8 @@ REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FRACOS:
    - NÃO uses o mesmo momento/timestamp para pontos fortes e fracos
    - Se um momento não é claramente um ponto fraco, NÃO o incluas
    - Foca em momentos onde o comercial FALHOU, não apenas "poderia ter feito melhor"
+   - **CRÍTICO**: Se rapport inicial foi avaliado como forte noutra análise, NÃO o menciones como fraco
+   - **CRÍTICO**: Cada aspecto da call deve ser avaliado como EITHER forte OU fraco, nunca ambos
 
 O feedback deve ser objetivo, conciso (máx. 140 palavras) e focado na melhoria contínua.  
 Deve responder sempre em português de Lisboa.  
@@ -694,8 +698,7 @@ export const SYSTEM_PROMPTS = {
   ANALISE_QUANTITATIVA_COMPLETA: 'És um analista de vendas especializado em análise quantitativa e qualitativa.',
   EXPLICACAO_PONTUACAO: 'És um analista de vendas experiente especializado em justificações de pontuação.',
   JUSTIFICACAO_GS: 'És um processador de texto especializado em limpeza de HTML.',
-  DICAS_GERAIS: 'És um consultor de vendas especializado em fornecer dicas práticas e acionáveis.',
-  FOCO_PROXIMAS_CALLS: 'És um coach de vendas especializado em planos de ação para melhorias futuras.'
+  TIPO_CALL: 'És um classificador especializado em tipos de chamadas de vendas.'
 }
 
 // Function to replace placeholders in prompts
@@ -748,6 +751,117 @@ export function getJustificacaoGSPrompt(htmlContent: string): string {
 
 export function getJustificativaAvaliacaoPrompt(transcription: string, scoring: string): string {
   return formatPrompt(JUSTIFICATIVA_AVALIACAO_PROMPT, { transcription, scoring })
+}
+
+// New functions for pontos fracos with pontos fortes context
+export function getPontosFracosPromptWithContext(transcription: string, pontosFortes: string): string {
+  return `**CRÍTICO**: Antes de tudo, aqui está a análise dos pontos fortes que já foi feita para esta call. VERIFICA esta análise para que não haja discrepâncias de informação:
+
+PONTOS FORTES IDENTIFICADOS:
+${pontosFortes}
+
+**INSTRUÇÕES CRÍTICAS:**
+- Se o rapport inicial foi identificado como ponto forte acima, NÃO o menciones como ponto fraco
+- Se qualquer outro aspecto foi identificado como forte, NÃO o menciones como fraco
+- Foca apenas em pontos fracos que NÃO foram identificados como pontos fortes
+
+Agora identifica e resume os pontos fracos da reunião de vendas com base na transcrição fornecida, tendo em conta os pontos fortes já identificados.
+
+IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDEDOR/COMERCIAL na transcrição. O comercial é normalmente a pessoa que:
+- Apresenta produtos/serviços
+- Faz perguntas sobre necessidades do cliente
+- Tenta fechar a venda
+- Tem um papel ativo de vendas
+
+A tua análise deve focar APENAS no desempenho do VENDEDOR identificado.
+
+CRÍTICO: Na tua resposta, NUNCA uses "Speaker A" ou "Speaker B". Sempre refere-te ao comercial como "o comercial" e ao cliente como "o cliente". NUNCA combines "comercial" com "Speaker A/B" - usa APENAS "o comercial".
+
+REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FRACOS:
+
+1. NÃO consideres como pontos fracos:
+   - Perguntas estratégicas como "Porquê de nos terem contactado?" - estas são intencionais para fazer a lead abrir-se
+   - Linguagem coloquial/informal - pode ser apropriada para criar rapport e proximidade
+   - Validações como "Consegues ver?" - são importantes para confirmar compreensão
+   - Partilha de ecrã - é uma ferramenta essencial, não um ponto fraco
+   - Técnicas de vendas válidas que podem parecer informais mas são estratégicas
+   - **QUALQUER ASPECTO que foi identificado como ponto forte na análise acima**
+
+2. FOCA em pontos fracos reais:
+   - Falta de preparação ou conhecimento do produto/serviço
+   - Não aproveitar oportunidades para aprofundar necessidades
+   - Falar demasiado de funcionalidades em vez de benefícios
+   - Não lidar adequadamente com objeções reais
+   - Falta de estrutura ou controlo da reunião
+   - Não criar sentido de urgência quando apropriado
+   - Falta de follow-up ou próximos passos claros
+
+3. CONSISTÊNCIA CRÍTICA:
+   - Identifica APENAS momentos onde o comercial demonstrou falhas genuínas
+   - NÃO uses o mesmo momento/timestamp para pontos fortes e fracos
+   - Se um momento não é claramente um ponto fraco, NÃO o incluas
+   - Foca em momentos onde o comercial FALHOU, não apenas "poderia ter feito melhor"
+   - **CRÍTICO**: Se rapport inicial foi avaliado como forte na análise acima, NÃO o menciones como fraco
+   - **CRÍTICO**: Cada aspecto da call deve ser avaliado como EITHER forte OU fraco, nunca ambos
+
+O feedback deve ser objetivo, conciso (máx. 140 palavras) e focado na melhoria contínua.  
+Deve responder sempre em português de Lisboa.  
+Cada ponto fraco deve ter um Momento exato (Timestamp) e uma Citação Direta da transcrição.  
+Se uma citação contiver erros gramaticais, palavras truncadas ou frases incompletas, corrige-a para garantir um português fluente e natural, mantendo o significado original.
+
+REGRAS DE COMUNICAÇÃO:
+Todas as tuas respostas devem ser exclusivamente em português de Portugal (especificamente de Lisboa), respeitando as seguintes regras:  
+
+1. Tratamento: Utiliza "tu" em vez de "você" para tratamento informal e "o senhor/a senhora" para tratamento formal.  
+2. Pronomes e Conjugações: Utiliza "tu fazes" em vez de "você faz", "te/ti/contigo" em vez de formas com "você", e a 2ª pessoa do singular nas conjugações verbais.  
+3. Evita gerúndios: Utiliza "estou a fazer" em vez de "estou fazendo", "estamos a analisar" em vez de "estamos analisando".  
+4. Colocação dos pronomes clíticos: Prefere a ênclise na maioria dos contextos ("Disse-me" em vez de "Me disse").  
+5. Preserva os sons e sotaque lisboeta, que tende a reduzir as vogais átonas.  
+6. Utiliza sempre o pretérito perfeito simples em vez do composto em situações de ações concluídas ("Eu comi" em vez de "Eu tenho comido").  
+7. SE FOR O COMERCIAL A FALAR FALA SEMPRE NA TERCEIRA PESSOA DO SINGULAR, POR EXEMPLO: "TU FALASTE", "TU INICIASTE" ETC
+
+É ABSOLUTAMENTE ESSENCIAL que todas as respostas sigam estas regras, sem exceção. Em caso de dúvida, opta sempre pela forma utilizada em Portugal, especificamente em Lisboa.
+
+Estrutura da Resposta (formato de lista com bullets):
+
+- **Falta de Rapport Inicial**: Momento em que a introdução não foi clara, envolvente ou não conseguiu estabelecer conexão com o cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+
+- **Má Identificação de Necessidades**: Quando o comercial não fez perguntas relevantes ou deixou de compreender as necessidades do cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+
+- **Explicação Fraca de Soluções**: Quando o comercial não conseguiu apresentar de forma convincente como o produto ou serviço resolve o problema do cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+
+- **Má Gestão de Objeções**: Momentos em que o comercial teve dificuldades em responder a dúvidas ou hesitações do cliente. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+
+- **Fecho Ineficaz**: Quando o comercial não avançou de forma clara para os próximos passos ou para o fecho da venda. Timestamp: [Momento exato] "[Citação direta retirada da transcrição]"
+
+Instruções Críticas:
+- USA markdown para criar a lista com bullets (formato: - **Título**: texto...)
+- Escreve sempre em português de Lisboa.
+- Inclui citação direta do transcript para cada ponto fraco, com o timestamp exato.
+- USA APENAS o formato de bullet list especificado acima.
+- NÃO incluas títulos como "Pontos Fracos da Reunião" - começa diretamente com os pontos individuais em formato de lista.
+- **IMPORTANTE**: As citações devem ser FRASES COMPLETAS, não apenas palavras soltas. Extrai a frase inteira que demonstra o ponto fraco.
+- **TIMESTAMP**: Usa formato MM:SS (ex: 2:34, 15:42) para indicar o momento exato da frase.
+- **CITAÇÃO**: Extrai a frase completa do comercial que demonstra o ponto fraco, não apenas fragmentos.
+- **CONSISTÊNCIA**: NÃO uses o mesmo timestamp/momento que será usado para pontos fortes. Cada momento deve ser claramente forte OU fraco, nunca ambos.
+
+Transcrição para análise:
+${transcription}`
+}
+
+export async function getEnhancedPontosFracosPromptWithContext(transcription: string, callType: string, pontosFortes: string): Promise<string> {
+  const enhancedPrompt = await enhancePromptWithCallTypeKnowledge(PONTOS_FRACOS_PROMPT, callType)
+  return `**CRÍTICO**: Antes de tudo, aqui está a análise dos pontos fortes que já foi feita para esta call. VERIFICA esta análise para que não haja discrepâncias de informação:
+
+PONTOS FORTES IDENTIFICADOS:
+${pontosFortes}
+
+**INSTRUÇÕES CRÍTICAS:**
+- Se o rapport inicial foi identificado como ponto forte acima, NÃO o menciones como ponto fraco
+- Se qualquer outro aspecto foi identificado como forte, NÃO o menciones como fraco
+- Foca apenas em pontos fracos que NÃO foram identificados como pontos fortes
+
+${formatPrompt(enhancedPrompt, { transcription })}`
 }
 
 // Function to enhance prompts with call type specific knowledge

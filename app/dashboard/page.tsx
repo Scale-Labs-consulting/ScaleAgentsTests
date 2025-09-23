@@ -649,6 +649,7 @@ export default function DashboardPage() {
         setSalesUploadStatus('Upload cancelado')
         setSalesIsUploading(false)
         setSalesUploadProgress(0)
+        setSalesIsAnalyzing(false)
         
         // Don't show error toast for cancellation
         return
@@ -667,6 +668,7 @@ export default function DashboardPage() {
       setSalesUploadStatus('Erro no carregamento')
       setSalesIsUploading(false)
       setSalesUploadProgress(0)
+      setSalesIsAnalyzing(false)
       
       // Reset file input on error
       if (salesFileInputRef.current) {
@@ -748,6 +750,7 @@ export default function DashboardPage() {
         setSalesUploadStatus('Upload cancelado')
         setSalesIsUploading(false)
         setSalesUploadProgress(0)
+        setSalesIsAnalyzing(false)
         
         // Don't show error toast for cancellation
         return
@@ -813,6 +816,7 @@ export default function DashboardPage() {
     setSalesUploadProgress(0)
     setSalesUploadStatus('')
     setSalesAnalysisResult(null)
+    setSalesIsAnalyzing(false)
     setUploadError(null)
     setFilePreview(null)
     setUploadStartTime(null)
@@ -1002,6 +1006,11 @@ export default function DashboardPage() {
       }
 
       try {
+        // Start analysis
+        setSalesIsAnalyzing(true)
+        setSalesUploadStatus('A analisar conteúdo da chamada...')
+        setSalesUploadProgress(75) // Show 75% during analysis phase
+        
         const transcriptionResponse = await fetch('/api/sales-analyst/blob-transcribe', {
           method: 'POST',
           headers: {
@@ -1037,6 +1046,9 @@ export default function DashboardPage() {
           })
         })
 
+        // Analysis completed
+        setSalesIsAnalyzing(false)
+        
         // Show appropriate status message
         if (result.duplicateInfo) {
           setSalesUploadStatus('Análise existente encontrada! (Conteúdo duplicado detectado)')
@@ -3930,40 +3942,11 @@ export default function DashboardPage() {
                             )}
 
                             {/* Enhanced Upload Progress */}
-                            {salesIsUploading && (
-                              <div className="space-y-4">
-                                {/* Progress Header */}
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                    {/* Loading Spinner */}
-                                    <div className="relative">
-                                      <div className="w-6 h-6 border-2 border-white/20 rounded-full"></div>
-                                      <div className="absolute top-0 left-0 w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                                    </div>
-                                    <div>
-                                      <div className="text-white font-medium text-sm transition-all duration-500 ease-in-out">
-                                        {getCurrentProgressPhrase()}
-                                      </div>
-                                      {estimatedTimeRemaining && (
-                                        <div className="text-white/60 text-xs">
-                                          {estimatedTimeRemaining}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-white font-semibold text-lg">
-                                    {salesUploadProgress}%
-                                </div>
-                                    <div className="text-white/60 text-xs">
-                                      {salesUploadProgress < 100 ? 'A processar...' : 'Concluído!'}
-                                    </div>
-                                  </div>
-                                </div>
-
+                            {(salesIsUploading || salesIsAnalyzing) && (
+                              <div className="space-y-4 mt-6">
                                 {/* Progress Bar */}
                                 <div className="w-full bg-white/10 rounded-full h-4 overflow-hidden relative">
-                                  <div 
+                                  <div
                                     className="bg-gradient-to-r from-purple-500 to-violet-500 h-4 rounded-full transition-all duration-700 ease-out relative"
                                     style={{ width: `${salesUploadProgress}%` }}
                                   >
@@ -3983,8 +3966,8 @@ export default function DashboardPage() {
                                   {uploadStartTime && (
                                     <div>
                                       {Math.round((Date.now() - uploadStartTime) / 1000)}s decorridos
-                                  </div>
-                                )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             )}

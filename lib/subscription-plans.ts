@@ -57,8 +57,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'base',
     name: 'Plano Base',
     description: 'Perfeito para começar com análises básicas de vendas',
-    price: 139,
-    yearlyPrice: 116,
+    price: 49,
+    yearlyPrice: 490,
     currency: 'EUR',
     interval: 'month',
     features: [
@@ -83,8 +83,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'pro',
     name: 'Plano Pro',
     description: 'Para equipas que precisam de análises avançadas',
-    price: 269,
-    yearlyPrice: 224,
+    price: 65,
+    yearlyPrice: 650,
     currency: 'EUR',
     interval: 'month',
     features: [
@@ -112,8 +112,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     id: 'enterprise',
     name: 'Plano Enterprise',
     description: 'Para empresas que precisam de análises ilimitadas',
-    price: 450,
-    yearlyPrice: 375,
+    price: 89,
+    yearlyPrice: 890,
     currency: 'EUR',
     interval: 'month',
     features: [

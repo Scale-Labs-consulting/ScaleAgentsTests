@@ -158,7 +158,7 @@ export default function PricingPage() {
                   /mês
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                  €{isYearly ? '1,392' : '1,668'}/ano
+                  €{isYearly ? SUBSCRIPTION_PLANS[1].yearlyPrice : SUBSCRIPTION_PLANS[1].price * 12}/ano
                 </p>
               </div>
 
@@ -222,7 +222,7 @@ export default function PricingPage() {
                   /mês
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                  €{isYearly ? '2,688' : '3,228'}/ano
+                  €{isYearly ? SUBSCRIPTION_PLANS[2].yearlyPrice : SUBSCRIPTION_PLANS[2].price * 12}/ano
                 </p>
               </div>
 
@@ -286,7 +286,7 @@ export default function PricingPage() {
                   /mês
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                  €{isYearly ? '4,500' : '5,400'}/ano
+                  €{isYearly ? SUBSCRIPTION_PLANS[3].yearlyPrice : SUBSCRIPTION_PLANS[3].price * 12}/ano
                 </p>
               </div>
 

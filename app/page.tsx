@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
 import ROICalculator from '@/components/roi-calculator'
+import { SUBSCRIPTION_PLANS } from '@/lib/subscription-plans'
 import { ArrowRight, Bot, TrendingUp, Users, Zap, MessageSquare, BarChart3, UserCheck, ChevronLeft, ChevronRight, Play, ChevronDown, ChevronUp } from 'lucide-react'
 
 export default function HomePage() {
@@ -730,13 +731,13 @@ export default function HomePage() {
                 <div className="text-center mb-8">
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Base</h3>
                   <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
-                    €{isYearly ? '116' : '139'}
+                    €{SUBSCRIPTION_PLANS[1].price}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
                     /mês
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                    €{isYearly ? '1,392' : '1,668'}/ano
+                    €{isYearly ? SUBSCRIPTION_PLANS[1].yearlyPrice : SUBSCRIPTION_PLANS[1].price * 12}/ano
                   </p>
                 </div>
                 
@@ -791,13 +792,13 @@ export default function HomePage() {
                 <div className="text-center mb-8">
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Pro</h3>
                   <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
-                    €{isYearly ? '224' : '269'}
+                    €{SUBSCRIPTION_PLANS[2].price}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
                     /mês
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                    €{isYearly ? '2,688' : '3,228'}/ano
+                    €{isYearly ? SUBSCRIPTION_PLANS[2].yearlyPrice : SUBSCRIPTION_PLANS[2].price * 12}/ano
                   </p>
                 </div>
                 
@@ -858,13 +859,13 @@ export default function HomePage() {
                 <div className="text-center mb-8">
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Enterprise</h3>
                   <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
-                    €{isYearly ? '375' : '450'}
+                    €{SUBSCRIPTION_PLANS[3].price}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
                     /mês
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                    €{isYearly ? '4,500' : '5,400'}/ano
+                    €{isYearly ? SUBSCRIPTION_PLANS[3].yearlyPrice : SUBSCRIPTION_PLANS[3].price * 12}/ano
                   </p>
                 </div>
                 
@@ -1962,13 +1963,13 @@ export default function HomePage() {
               <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-6">
                 <div className="flex space-x-6">
                   <a 
-                    href="/privacy-policy" 
+                    href="/politica-privacidade" 
                     className="text-gray-600 dark:text-white/60 hover:text-purple-600 dark:hover:text-purple-400 text-sm transition-colors duration-200"
                   >
                     Política de Privacidade
                   </a>
                   <a 
-                    href="/terms-conditions" 
+                    href="/termos-condicoes" 
                     className="text-gray-600 dark:text-white/60 hover:text-purple-600 dark:hover:text-purple-400 text-sm transition-colors duration-200"
                   >
                     Termos & Condições

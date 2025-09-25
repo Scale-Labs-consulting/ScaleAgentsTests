@@ -1028,11 +1028,32 @@ export default function DashboardPage() {
         })
 
         if (!transcriptionResponse.ok) {
-          const errorData = await transcriptionResponse.json()
-          throw new Error(errorData.error || 'Transcription failed')
+          let errorMessage = 'Transcription failed'
+          try {
+            const errorData = await transcriptionResponse.json()
+            errorMessage = errorData.error || errorMessage
+          } catch (jsonError) {
+            // If response is not JSON, try to get text
+            try {
+              const errorText = await transcriptionResponse.text()
+              console.error('❌ Non-JSON error response:', errorText)
+              errorMessage = `Server error: ${transcriptionResponse.status} - ${errorText.substring(0, 100)}`
+            } catch (textError) {
+              errorMessage = `Server error: ${transcriptionResponse.status} - ${transcriptionResponse.statusText}`
+            }
+          }
+          throw new Error(errorMessage)
         }
 
-                const result = await transcriptionResponse.json()
+        let result
+        try {
+          result = await transcriptionResponse.json()
+        } catch (jsonError) {
+          console.error('❌ Failed to parse JSON response:', jsonError)
+          const responseText = await transcriptionResponse.text()
+          console.error('❌ Response text:', responseText.substring(0, 200))
+          throw new Error('Invalid response format from server')
+        }
 
         await fetch('/api/log', {
           method: 'POST',
@@ -2128,11 +2149,32 @@ export default function DashboardPage() {
       })
 
       if (!transcriptionResponse.ok) {
-        const errorData = await transcriptionResponse.json()
-        throw new Error(errorData.error || 'Transcription failed')
+        let errorMessage = 'Transcription failed'
+        try {
+          const errorData = await transcriptionResponse.json()
+          errorMessage = errorData.error || errorMessage
+        } catch (jsonError) {
+          // If response is not JSON, try to get text
+          try {
+            const errorText = await transcriptionResponse.text()
+            console.error('❌ Non-JSON error response:', errorText)
+            errorMessage = `Server error: ${transcriptionResponse.status} - ${errorText.substring(0, 100)}`
+          } catch (textError) {
+            errorMessage = `Server error: ${transcriptionResponse.status} - ${transcriptionResponse.statusText}`
+          }
+        }
+        throw new Error(errorMessage)
       }
 
-      const result = await transcriptionResponse.json()
+      let result
+      try {
+        result = await transcriptionResponse.json()
+      } catch (jsonError) {
+        console.error('❌ Failed to parse JSON response:', jsonError)
+        const responseText = await transcriptionResponse.text()
+        console.error('❌ Response text:', responseText.substring(0, 200))
+        throw new Error('Invalid response format from server')
+      }
 
       // Determine file type based on response and file characteristics
       let fileType: 'sales_call' | 'document' | 'data' = 'sales_call'

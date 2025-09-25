@@ -1829,15 +1829,24 @@ export async function POST(request: NextRequest) {
     let transcription = ''
     let audioDuration: number | undefined = undefined
     let attempts = 0
-    const maxAttempts = 120 // 10 minutes with 5-second intervals (increased for longer files)
+    const maxAttempts = 60 // 5 minutes with 5-second intervals (reduced for Vercel timeout)
     
     console.log('⏳ Starting transcription polling (max attempts:', maxAttempts, ')')
 
     while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
+      // Dynamic polling interval: start with 5s, increase to 10s after 2 minutes
+      const pollInterval = attempts > 24 ? 10000 : 5000 // 10s after 2 minutes, 5s before
+      await new Promise(resolve => setTimeout(resolve, pollInterval))
       attempts++
 
-      console.log(`🔄 Polling attempt ${attempts}/${maxAttempts} (${Math.round(attempts * 5 / 60)} minutes elapsed)`)
+      const elapsedMinutes = Math.round(attempts * pollInterval / 60000)
+      console.log(`🔄 Polling attempt ${attempts}/${maxAttempts} (${elapsedMinutes} minutes elapsed)`)
+      
+      // Warning at 4 minutes (240 seconds) - close to Vercel timeout
+      if (elapsedMinutes >= 4 && attempts === Math.floor(240000 / pollInterval)) {
+        console.log('⚠️ WARNING: Approaching Vercel timeout limit (5 minutes)')
+        console.log('⚠️ If transcription takes longer, consider using async processing')
+      }
 
       const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
         headers: {
@@ -1952,7 +1961,81 @@ export async function POST(request: NextRequest) {
     }
 
     if (!transcription) {
-      throw new Error('Transcription timed out')
+      // If transcription times out, save the transcript ID for later processing
+      console.log('⏰ Transcription timed out, saving for async processing...')
+      
+      // Save the incomplete analysis with the transcript ID
+      const incompleteAnalysis = {
+        status: 'processing',
+        callType: callType || 'Chamada Fria',
+        feedback: 'Transcription in progress...',
+        score: 0,
+        analysis: {
+          tipoCall: callType || 'Chamada Fria',
+          totalScore: 0,
+          pontosFortes: [],
+          pontosFracos: [],
+          resumoDaCall: 'Transcription is still processing. Please check back later.',
+          dicasGerais: [],
+          focoParaProximasCalls: [],
+          clarezaFluenciaFala: 0,
+          tomControlo: 0,
+          envolvimentoConversacional: 0,
+          efetividadeDescobertaNecessidades: 0,
+          entregaValorAjusteSolucao: 0,
+          habilidadesLidarObjeccoes: 0,
+          estruturaControleReuniao: 0,
+          fechamentoProximosPassos: 0
+        },
+        analysis_metadata: {
+          transcription_id: transcriptId,
+          processing_timeout: true,
+          processing_started_at: new Date().toISOString(),
+          audio_duration: audioDuration
+        },
+        transcription: '',
+        custom_prompts: ['Transcription Timeout']
+      }
+      
+      // Save to database
+      const { data: analysisData, error: analysisError } = await supabase
+        .from('sales_call_analyses')
+        .insert({
+          sales_call_id: salesCallId,
+          user_id: userId,
+          status: 'processing',
+          call_type: callType || 'Chamada Fria',
+          feedback: 'Transcription is still processing. Please check back later.',
+          score: 0,
+          analysis: incompleteAnalysis,
+          analysis_metadata: {
+            transcription_id: transcriptId,
+            processing_timeout: true,
+            processing_started_at: new Date().toISOString(),
+            audio_duration: audioDuration
+          },
+          transcription: '',
+          custom_prompts: ['Transcription Timeout']
+        })
+        .select()
+        .single()
+      
+      if (analysisError) {
+        console.error('❌ Error saving incomplete analysis:', analysisError)
+        throw new Error('Failed to save incomplete analysis')
+      }
+      
+      console.log('✅ Incomplete analysis saved with transcript ID:', transcriptId)
+      
+      return NextResponse.json({
+        success: true,
+        analysis: incompleteAnalysis,
+        transcription: '',
+        message: 'Transcription is still processing. Please check back in a few minutes.',
+        duplicateInfo: null,
+        timeout: true,
+        transcriptId: transcriptId
+      })
     }
 
     // Analyze with ChatGPT using comprehensive analysis

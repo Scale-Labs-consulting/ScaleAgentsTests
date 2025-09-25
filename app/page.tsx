@@ -705,7 +705,7 @@ export default function HomePage() {
                           ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white' 
                           : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
                       }`}>
-                        Poupe 20%
+                        Poupe 17%
                       </span>
                     </button>
                   </div>
@@ -731,13 +731,16 @@ export default function HomePage() {
                 <div className="text-center mb-8">
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Base</h3>
                   <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
-                    €{SUBSCRIPTION_PLANS[1].price}
+                    €{isYearly ? SUBSCRIPTION_PLANS[1].yearlyMonthlyPrice.toFixed(2) : SUBSCRIPTION_PLANS[1].price}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
                     /mês
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                    €{isYearly ? SUBSCRIPTION_PLANS[1].yearlyPrice : SUBSCRIPTION_PLANS[1].price * 12}/ano
+                    €{isYearly ? SUBSCRIPTION_PLANS[1].yearlyPrice : SUBSCRIPTION_PLANS[1].monthlyYearlyPrice}/ano
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 group-hover:text-white/50 mt-1">
+                    {isYearly ? 'Pago anualmente' : 'Pago mensalmente'}
                   </p>
                 </div>
                 
@@ -746,25 +749,13 @@ export default function HomePage() {
                     <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs">✓</span>
                     </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Scale Expert Agent</span>
+                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Acesso ao agente Scale Expert 24/7</span>
                   </li>
                   <li className="flex items-start space-x-3">
                     <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs">✓</span>
                     </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Análises de crescimento</span>
-                  </li>
-                  <li className="flex items-start space-x-3">
-                    <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Estratégias de escala</span>
-                  </li>
-                  <li className="flex items-start space-x-3">
-                    <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Suporte por email</span>
+                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Todos os frameworks usados pela Scale Labs</span>
                   </li>
                 </ul>
 
@@ -792,13 +783,16 @@ export default function HomePage() {
                 <div className="text-center mb-8">
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Pro</h3>
                   <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
-                    €{SUBSCRIPTION_PLANS[2].price}
+                    €{isYearly ? SUBSCRIPTION_PLANS[2].yearlyMonthlyPrice.toFixed(2) : SUBSCRIPTION_PLANS[2].price}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
                     /mês
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                    €{isYearly ? SUBSCRIPTION_PLANS[2].yearlyPrice : SUBSCRIPTION_PLANS[2].price * 12}/ano
+                    €{isYearly ? SUBSCRIPTION_PLANS[2].yearlyPrice : SUBSCRIPTION_PLANS[2].monthlyYearlyPrice}/ano
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 group-hover:text-white/50 mt-1">
+                    {isYearly ? 'Pago anualmente' : 'Pago mensalmente'}
                   </p>
                 </div>
                 
@@ -807,31 +801,19 @@ export default function HomePage() {
                     <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs">✓</span>
                     </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Sales Analyst Agent</span>
+                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Acesso ao agente Sales Analyst 24/7</span>
                   </li>
                   <li className="flex items-start space-x-3">
                     <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs">✓</span>
                     </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Análise de chamadas de vendas</span>
+                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Analisa as tuas chamadas de vendas</span>
                   </li>
                   <li className="flex items-start space-x-3">
                     <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs">✓</span>
                     </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Otimização de pipeline</span>
-                  </li>
-                  <li className="flex items-start space-x-3">
-                    <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Previsão de receita</span>
-                  </li>
-                  <li className="flex items-start space-x-3">
-                    <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Suporte prioritário</span>
+                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Dá-te os insights necessários para fechares mais</span>
                   </li>
                 </ul>
 
@@ -859,29 +841,20 @@ export default function HomePage() {
                 <div className="text-center mb-8">
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-4">Plano Enterprise</h3>
                   <div className="text-4xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2">
-                    €{SUBSCRIPTION_PLANS[3].price}
+                    €{isYearly ? SUBSCRIPTION_PLANS[3].yearlyMonthlyPrice.toFixed(2) : SUBSCRIPTION_PLANS[3].price}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 group-hover:text-white/80">
                     /mês
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-white/60 mt-1">
-                    €{isYearly ? SUBSCRIPTION_PLANS[3].yearlyPrice : SUBSCRIPTION_PLANS[3].price * 12}/ano
+                    €{isYearly ? SUBSCRIPTION_PLANS[3].yearlyPrice : SUBSCRIPTION_PLANS[3].monthlyYearlyPrice}/ano
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 group-hover:text-white/50 mt-1">
+                    {isYearly ? 'Pago anualmente' : 'Pago mensalmente'}
                   </p>
                 </div>
                 
                 <ul className="space-y-4 mb-8 flex-grow">
-                  <li className="flex items-start space-x-3">
-                    <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Todos os agents atuais</span>
-                  </li>
-                  <li className="flex items-start space-x-3">
-                    <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Agents futuros incluídos</span>
-                  </li>
                   <li className="flex items-start space-x-3">
                     <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs">✓</span>
@@ -898,7 +871,7 @@ export default function HomePage() {
                     <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs">✓</span>
                     </div>
-                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Suporte 24/7</span>
+                    <span className="text-gray-600 dark:text-gray-300 group-hover:text-white/90">Agents futuros incluídos</span>
                   </li>
                 </ul>
 

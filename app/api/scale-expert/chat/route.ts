@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { extractTextFromURL } from '@/lib/pdf-utils'
+import { ChatService } from '@/lib/chat-service'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_KEY,
@@ -39,7 +40,7 @@ async function getAssistantId() {
         type: 'function' as const,
         function: {
           name: 'get_sales_call_analysis',
-          description: 'Get detailed analysis of sales calls including transcriptions, dates, and patterns',
+          description: 'Get detailed analysis of sales calls including transcriptions, dates, and patterns. Only use when the user specifically asks about sales call analysis or performance.',
           parameters: {
             type: 'object',
             properties: {
@@ -56,7 +57,7 @@ async function getAssistantId() {
         type: 'function' as const,
         function: {
           name: 'get_business_metrics',
-          description: 'Get comprehensive business metrics including sales calls, HR candidates, and overall performance KPIs',
+          description: 'Get comprehensive business metrics including sales calls, HR candidates, and overall performance KPIs. Only use when the user asks for business metrics or performance overview.',
           parameters: {
             type: 'object',
             properties: {},
@@ -165,10 +166,12 @@ async function getAssistantId() {
     const assistantName = 'Scale Expert Agent'
     const assistantInstructions = `You are a Scale Expert Agent helping businesses scale efficiently. You have access to the user's business profile, sales calls, and uploaded files.
 
+IMPORTANT: Only reference sales calls or previous data when the user specifically asks about them or when they explicitly mention wanting to analyze their sales performance. Do NOT automatically fetch or reference sales call data at the start of a conversation unless requested.
+
 Key capabilities:
-- Analyze sales patterns and provide actionable insights
+- Analyze sales patterns and provide actionable insights (ONLY when requested)
 - Generate business metrics and scaling recommendations
-- Search sales conversations for specific patterns
+- Search sales conversations for specific patterns (ONLY when requested)
 - Analyze uploaded documents (PDF, Word, Excel, PowerPoint, text files)
 - Analyze uploaded images (PNG, JPEG, GIF, WebP, SVG, BMP, TIFF) for visual content
 - Search through document content for specific information
@@ -644,6 +647,71 @@ Provide personalized recommendations based on their business context.`
 
     console.log('✅ Assistant response retrieved:', responseText.substring(0, 100) + '...')
 
+    // Initialize conversation ID
+    let conversationId = threadId // Use threadId as conversationId for consistency
+
+    // Save conversation and messages to database
+    try {
+      console.log('💾 Saving conversation and messages to database...')
+      
+      // Initialize chat service
+      const chatService = new ChatService(userId, '00000000-0000-0000-0000-000000000001') // Scale Expert agent ID
+      
+      try {
+        // Try to get existing conversation
+        const existingConversation = await chatService.getConversation(conversationId)
+        if (!existingConversation) {
+          // Create new conversation
+          console.log('🆕 Creating new conversation...')
+          const newConversation = await chatService.createConversation('Nova Conversa com Scale Expert')
+          conversationId = newConversation.id
+          console.log('✅ New conversation created:', conversationId)
+        } else {
+          console.log('✅ Using existing conversation:', conversationId)
+        }
+      } catch (conversationError) {
+        console.log('🆕 Creating new conversation (existing not found)...')
+        const newConversation = await chatService.createConversation('Nova Conversa com Scale Expert')
+        conversationId = newConversation.id
+        console.log('✅ New conversation created:', conversationId)
+      }
+      
+      // Save user message
+      console.log('💾 Saving user message...')
+      await chatService.addMessage(conversationId, {
+        role: 'user',
+        content: message,
+        tokens_used: 0,
+        metadata: {
+          threadId: threadId,
+          hasFileAttachments: ((uploadedFile && uploadedFile.url && uploadedFile.name) ? 'true' : 'false'),
+          fileInfo: uploadedFile ? {
+            name: uploadedFile.name,
+            type: uploadedFile.type,
+            fileType: uploadedFile.fileType
+          } : null
+        }
+      })
+      
+      // Save assistant response
+      console.log('💾 Saving assistant response...')
+      await chatService.addMessage(conversationId, {
+        role: 'assistant',
+        content: responseText,
+        tokens_used: 0,
+        metadata: {
+          threadId: threadId,
+          runId: run.id,
+          openaiMessageId: assistantMessage.id
+        }
+      })
+      
+      console.log('✅ Messages saved to database successfully')
+    } catch (dbError) {
+      console.warn('⚠️ Failed to save messages to database (non-critical):', dbError)
+      // Don't fail the request if database saving fails
+    }
+
     // Track usage for free users
     try {
       const usageResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/usage/track`, {
@@ -679,7 +747,8 @@ Provide personalized recommendations based on their business context.`
       response: responseText,
       messageId: assistantMessage.id,
       runId: run.id,
-      threadId: threadId
+      threadId: threadId,
+      conversationId: conversationId
     })
 
   } catch (error) {

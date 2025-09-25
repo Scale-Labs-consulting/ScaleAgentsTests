@@ -4,7 +4,9 @@ export interface SubscriptionPlan {
   name: string
   description: string
   price: number
-  yearlyPrice: number
+  monthlyYearlyPrice: number // Yearly price when paying monthly
+  yearlyPrice: number // Yearly price when paying yearly
+  yearlyMonthlyPrice: number // Monthly price when paying yearly
   currency: string
   interval: 'month' | 'year'
   features: string[]
@@ -30,7 +32,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Plano Gratuito',
     description: 'Experimente as funcionalidades básicas',
     price: 0,
+    monthlyYearlyPrice: 0,
     yearlyPrice: 0,
+    yearlyMonthlyPrice: 0,
     currency: 'EUR',
     interval: 'month',
     features: [
@@ -58,7 +62,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Plano Base',
     description: 'Perfeito para começar com análises básicas de vendas',
     price: 49,
+    monthlyYearlyPrice: 588,
     yearlyPrice: 490,
+    yearlyMonthlyPrice: 40.83,
     currency: 'EUR',
     interval: 'month',
     features: [
@@ -84,7 +90,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Plano Pro',
     description: 'Para equipas que precisam de análises avançadas',
     price: 65,
+    monthlyYearlyPrice: 780,
     yearlyPrice: 650,
+    yearlyMonthlyPrice: 54.17,
     currency: 'EUR',
     interval: 'month',
     features: [
@@ -113,7 +121,9 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     name: 'Plano Enterprise',
     description: 'Para empresas que precisam de análises ilimitadas',
     price: 89,
+    monthlyYearlyPrice: 1068,
     yearlyPrice: 890,
+    yearlyMonthlyPrice: 74.17,
     currency: 'EUR',
     interval: 'month',
     features: [

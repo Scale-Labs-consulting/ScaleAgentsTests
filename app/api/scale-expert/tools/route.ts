@@ -11,7 +11,7 @@ const tools = {
   // Get detailed sales call analysis
   get_sales_call_analysis: async (userId: string, callId?: string) => {
     try {
-      // Try sales_call_analyses table first (this is where the actual data is stored)
+      // Only fetch sales calls when specifically requested
       let query = supabase
         .from('sales_call_analyses')
         .select('*')
@@ -22,7 +22,7 @@ const tools = {
       if (callId) {
         query = query.eq('id', callId)
       } else {
-        query = query.limit(10) // Get last 10 calls for analysis
+        query = query.limit(5) // Limit to last 5 calls to avoid overwhelming context
       }
 
       const { data: salesCalls, error } = await query
@@ -33,7 +33,7 @@ const tools = {
       }
 
       if (!salesCalls || salesCalls.length === 0) {
-        return { message: 'No sales calls found for analysis' }
+        return { message: 'No sales calls found for analysis. Please upload a sales call first to get insights.' }
       }
 
       // Analyze the sales calls data

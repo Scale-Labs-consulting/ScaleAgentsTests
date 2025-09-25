@@ -3826,17 +3826,11 @@ export default function DashboardPage() {
                                       </svg>
                                     </div>
                                   </div>
-                                  <p className="text-lg font-medium text-white mb-2">
-                                    {salesUploadedFile.name}
-                                  </p>
                                   <p className="text-white/60 mb-2">
                                     Tamanho: {(salesUploadedFile.size / (1024 * 1024)).toFixed(1)} MB
                                     {salesUploadedFile.size > 50 * 1024 * 1024 && (
                                       <span className="text-yellow-400 ml-2">(Processamento pode demorar mais tempo)</span>
                                     )}
-                                  </p>
-                                  <p className="text-white/60 mb-2">
-                                    Tipo: {salesUploadedFile.type}
                                   </p>
                                 </>
                               )}
@@ -3980,6 +3974,59 @@ export default function DashboardPage() {
                                   : 'bg-green-500/20 text-green-400 border border-green-500/30'
                               }`}>
                                 {salesUploadStatus}
+                              </div>
+                            )}
+
+                            {/* Knowledge Display Section */}
+                            {salesAnalysisResult?.knowledgeExtraction && (
+                              <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                                <div className="flex items-center space-x-2 mb-3">
+                                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  <h3 className="text-white font-semibold">Conhecimento Extraído</h3>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                  <div className="bg-white/5 rounded-lg p-3">
+                                    <div className="text-white/70 text-sm mb-1">Método de Extração</div>
+                                    <div className="text-white font-medium">
+                                      {salesAnalysisResult.knowledgeExtraction.method === 'python' ? '🐍 Python PyMuPDF' : 
+                                       salesAnalysisResult.knowledgeExtraction.method === 'pdfjs' ? '📄 PDF.js' : 
+                                       salesAnalysisResult.knowledgeExtraction.method || 'N/A'}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="bg-white/5 rounded-lg p-3">
+                                    <div className="text-white/70 text-sm mb-1">Tamanho do Conhecimento</div>
+                                    <div className="text-white font-medium">
+                                      {salesAnalysisResult.knowledgeExtraction.length || 0} caracteres
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="bg-white/5 rounded-lg p-3">
+                                    <div className="text-white/70 text-sm mb-1">Fonte</div>
+                                    <div className="text-white font-medium">
+                                      {salesAnalysisResult.knowledgeExtraction.source || 'N/A'}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="bg-white/5 rounded-lg p-3">
+                                    <div className="text-white/70 text-sm mb-1">Ficheiros Processados</div>
+                                    <div className="text-white font-medium">
+                                      {salesAnalysisResult.knowledgeExtraction.filesProcessed || 0} ficheiros
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {salesAnalysisResult.knowledgeExtraction.preview && (
+                                  <div className="bg-white/5 rounded-lg p-3">
+                                    <div className="text-white/70 text-sm mb-2">Pré-visualização do Conhecimento</div>
+                                    <div className="text-white/80 text-sm max-h-32 overflow-y-auto bg-black/20 rounded p-2">
+                                      {salesAnalysisResult.knowledgeExtraction.preview}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                             </CardContent>
@@ -4333,8 +4380,8 @@ export default function DashboardPage() {
                         {selectedAnalysis.analysis.insights.strengths.map((strength: any, index: number) => {
                           // Parse the strength description to extract title, analysis, and quote
                           const parseStrength = (text: string) => {
-                            // Enhanced pattern for full phrases with MM:SS timestamps
-                            const titleMatch = text.match(/^- \*\*(.*?)\*\*:\s*(.*?)\s*Timestamp:\s*\[([^\]]+)\]\s*"([^"]+)"/);
+                            // Enhanced pattern for full phrases with MM:SS timestamps (without brackets)
+                            const titleMatch = text.match(/^- \*\*(.*?)\*\*:\s*(.*?)\s*Timestamp:\s*([^\s]+)\s*"([^"]+)"/);
                             
                             if (titleMatch) {
                               return {
@@ -4348,7 +4395,7 @@ export default function DashboardPage() {
                             // Enhanced fallback: try to extract components separately with better regex
                             const titleMatch2 = text.match(/^- \*\*(.*?)\*\*:/);
                             const quoteMatch = text.match(/"([^"]{10,})"/); // Require at least 10 characters for full phrases
-                            const timestampMatch = text.match(/Timestamp:\s*\[([^\]]+)\]/);
+                            const timestampMatch = text.match(/Timestamp:\s*([^\s]+)/);
                             
                             if (titleMatch2 && quoteMatch) {
                               // Extract analysis text between title and timestamp
@@ -4382,12 +4429,14 @@ export default function DashboardPage() {
                                 <div className="flex items-start space-x-2">
                                   <span className="text-white text-lg leading-none">•</span>
                                   <div className="flex-1">
-                                    <em className="text-white font-medium">{parsed.title}</em>
-                                    {parsed.timestamp && (
-                                      <span className="text-white/60 text-xs ml-2 bg-white/10 px-2 py-1 rounded">
-                                        {parsed.timestamp}
-                                      </span>
-                                    )}
+                                    <div className="flex items-center justify-between">
+                                      <em className="text-white font-medium">{parsed.title}</em>
+                                      {parsed.timestamp && (
+                                        <span className="text-white/60 text-sm">
+                                          {parsed.timestamp}
+                                        </span>
+                                      )}
+                                    </div>
                                     {parsed.analysis && (
                                       <div className="mt-1 text-white/90 text-sm">
                                         {parsed.analysis}

@@ -404,7 +404,7 @@ export default function CompleteProfilePage() {
       {/* Background */}
       <div className="fixed inset-0 z-0">
         <Image
-          src="/images/background-4.jpg"
+          src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/background-4.jpg"
           alt="Background"
           fill
           className="object-cover opacity-80"
@@ -413,19 +413,21 @@ export default function CompleteProfilePage() {
         <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-purple-900/20 to-black/70" />
       </div>
 
+      {/* Logo - Fixed top left */}
+      <div className="fixed top-4 left-4 z-20">
+        <Image
+          src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/logo-white.png"
+          alt="ScaleAgents Logo"
+          width={120}
+          height={40}
+          className="h-10 w-auto"
+          priority
+        />
+      </div>
+
       {/* Content */}
       <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-4xl">
-          {/* Back Button */}
-          <button 
-            onClick={() => router.push('/dashboard')}
-            className="inline-flex items-center text-white/70 hover:text-white mb-8 transition-colors"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Voltar atrás
-          </button>
           
           <Card className="bg-gradient-to-br from-white/10 to-white/5 border-white/20 backdrop-blur-sm shadow-2xl">
           <CardHeader className="text-center space-y-4">

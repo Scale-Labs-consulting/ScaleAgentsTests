@@ -257,12 +257,6 @@ export default function RegisterPage() {
                   <p className="text-green-300 text-xs mt-2">
                     Verifique o seu email e clique no link de confirmação para ativar a sua conta.
                   </p>
-                  <div className="mt-3 flex gap-2">
-                    <Link href="/login" className="text-purple-400 hover:text-purple-300 text-sm underline">
-                      Ir para Iniciar Sessão →
-                    </Link>
-                    <span className="text-green-300 text-xs">(após confirmar o email)</span>
-                  </div>
                 </div>
               )}
               

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { extractTextFromPDFWithPython } from '@/lib/python-pdf-utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('📄 PDF extraction request:', {
+    console.log('📄 Scale Expert PDF extraction request:', {
       fileName,
       userId,
       blobUrl
@@ -26,23 +27,44 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await response.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // For now, we'll return a placeholder since PDF parsing requires additional libraries
-    // In a real implementation, you'd use a library like pdf-parse or pdf2pic
     console.log('✅ PDF downloaded, size:', buffer.length, 'bytes')
 
-    // Placeholder text extraction
-    const extractedText = `[PDF Content from ${fileName}]\n\nThis is a placeholder for PDF text extraction. In a full implementation, this would contain the actual text extracted from the PDF file.`
+    // Use Python PyMuPDF for superior PDF text extraction
+    console.log('🐍 Using Python PyMuPDF for Scale Expert PDF parsing...')
+    const pdfData = await extractTextFromPDFWithPython(buffer, {
+      max: 10, // Limit to 10 pages for testing
+      normalizeWhitespace: true
+    })
+
+    if (!pdfData.text || pdfData.text.trim().length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'No text content extracted from PDF',
+        fileName: fileName
+      }, { status: 400 })
+    }
+
+    console.log(`✅ Scale Expert PDF extraction successful: ${pdfData.text.length} characters, ${pdfData.numpages} pages`)
 
     return NextResponse.json({
       success: true,
-      text: extractedText,
-      fileName: fileName
+      text: pdfData.text,
+      fileName: fileName,
+      numPages: pdfData.numpages,
+      extractionMethod: 'Scale Expert PDF Parser (Python PyMuPDF)',
+      metadata: {
+        version: pdfData.version,
+        info: pdfData.info
+      }
     })
 
   } catch (error) {
-    console.error('❌ PDF extraction error:', error)
+    console.error('❌ Scale Expert PDF extraction error:', error)
     return NextResponse.json(
-      { error: 'PDF extraction failed' },
+      { 
+        error: 'Scale Expert PDF extraction failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }

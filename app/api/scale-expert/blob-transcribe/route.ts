@@ -62,11 +62,11 @@ export async function POST(request: NextRequest) {
       console.log('📄 Processing document file for text extraction...')
       
       try {
-        // Import the PDF utils
-        const { extractTextFromURL } = await import('@/lib/pdf-utils')
+        // Import the Python PDF utils for superior text extraction
+        const { extractTextFromURLWithPython } = await import('@/lib/python-pdf-utils')
         
-        // Extract text content from the document
-        const textContent = await extractTextFromURL(blobUrl)
+        // Extract text content from the document using Python PyMuPDF
+        const textContent = await extractTextFromURLWithPython(blobUrl)
         
         if (textContent && textContent.trim()) {
           console.log('✅ Document text extracted successfully:', textContent.length, 'characters')

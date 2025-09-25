@@ -143,11 +143,11 @@ export default function TestPDFWorkflowPage() {
                 </div>
                 <div className="text-center p-4 bg-purple-50 rounded-lg">
                   <div className="text-2xl font-bold text-purple-600">
-                    {testResults.knowledgeFetching.knowledgeSource === 'blob-storage' ? '🐍' : '📚'}
+                    {testResults.knowledgeFetching.knowledgeSource === 'blob-storage' ? '📄' : '📚'}
                   </div>
                   <div className="text-sm text-purple-800">Knowledge Source</div>
                   <div className="text-xs text-purple-600">
-                    {testResults.knowledgeFetching.knowledgeSource}
+                    {testResults.knowledgeFetching.knowledgeSource === 'blob-storage' ? 'JavaScript PDF Parser' : 'Local Fallback'}
                   </div>
                 </div>
               </div>
@@ -261,7 +261,7 @@ export default function TestPDFWorkflowPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2 text-sm text-gray-600">
-            <p>1. <strong>Start the Python PDF Parser:</strong> Run <code>python-pdf-parser/start.bat</code> in a separate terminal</p>
+            <p>1. <strong>PDF Parsing:</strong> Uses JavaScript-based PDF extraction (pdf-parse and pdf2json libraries)</p>
             <p>2. <strong>Select a Call Type:</strong> Choose from the dropdown to test different knowledge files</p>
             <p>3. <strong>Run the Test:</strong> Click "Run Test" to see the PDF parsing and prompt enhancement in action</p>
             <p>4. <strong>Check Results:</strong> Review the extracted knowledge, enhancement ratio, and final prompt structure</p>

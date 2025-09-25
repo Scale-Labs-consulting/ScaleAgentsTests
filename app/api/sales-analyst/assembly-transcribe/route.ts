@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getKnowledgeForCallType } from '@/lib/sales-analyst-knowledge'
 
 export async function POST(request: NextRequest) {
   try {
@@ -106,7 +107,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Step 3: Analyze with ChatGPT
+    // Step 3: Get knowledge for analysis
+    console.log('🧠 Fetching knowledge for enhanced analysis...')
+    let knowledge = ''
+    try {
+      // Try to get knowledge for the call type (we'll determine this from the transcription)
+      knowledge = await getKnowledgeForCallType('Chamada Fria', 'python') // Default to cold call, will be enhanced later
+      console.log(`📚 Knowledge fetched: ${knowledge.length} characters`)
+    } catch (knowledgeError) {
+      console.warn('⚠️ Knowledge fetching failed, proceeding without knowledge:', knowledgeError)
+    }
+
+    // Step 4: Analyze with ChatGPT
     console.log('🤖 Analyzing transcription with ChatGPT...')
     
     // Truncate transcription to avoid token limits (keep first 8000 characters)
@@ -118,6 +130,11 @@ export async function POST(request: NextRequest) {
 
 Transcrição:
 ${truncatedTranscription}
+
+${knowledge ? `\n\nCONHECIMENTO ESPECÍFICO PARA ANÁLISE:
+${knowledge}
+
+Usa este conhecimento específico para enriquecer a tua análise com técnicas, estratégias e melhores práticas relevantes.` : ''}
 
 Fornece a tua análise em formato de texto simples, estruturada da seguinte forma:
 
@@ -287,7 +304,15 @@ IMPORTANTE:
     return NextResponse.json({
       success: true,
       analysis: salesAnalysis,
-      transcription: truncatedTranscription
+      transcription: truncatedTranscription,
+      knowledgeExtraction: {
+        enabled: true,
+        method: 'Python PyMuPDF',
+        knowledgeLength: knowledge.length,
+        knowledgePreview: knowledge.substring(0, 200) + (knowledge.length > 200 ? '...' : ''),
+        source: 'blob-storage',
+        filesProcessed: knowledge.length > 0 ? 'Multiple PDF files' : 'None'
+      }
     })
 
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { del } from '@vercel/blob'
+import { getKnowledgeForCallType } from '@/lib/sales-analyst-knowledge'
 import { 
   getMomentosFortesFracosPrompt,
   getAnaliseQuantitativaPrompt,
@@ -685,6 +686,17 @@ function enhanceTranscriptionQuality(transcription: string): string {
 async function performComprehensiveAnalysis(transcription: string, callType?: string) {
   console.log('🔍 Starting streamlined analysis...')
   
+  // Get knowledge for enhanced analysis
+  console.log('🧠 Fetching knowledge for enhanced analysis...')
+  let knowledge = ''
+  try {
+    const knowledgeCallType = callType || 'Chamada Fria'
+    knowledge = await getKnowledgeForCallType(knowledgeCallType, 'python')
+    console.log(`📚 Knowledge fetched: ${knowledge.length} characters`)
+  } catch (knowledgeError) {
+    console.warn('⚠️ Knowledge fetching failed, proceeding without knowledge:', knowledgeError)
+  }
+  
   const MAX_CHUNK_LENGTH = 100000 // GPT-4o Mini can handle much larger chunks (128k context limit)
   
   // Check if we need to chunk the transcription
@@ -1195,24 +1207,7 @@ LEMBRA-TE: A tua resposta deve começar com "Clareza e Fluência da Fala:" e ter
       console.log('📊 Full scoring content length:', scoringContent.length)
       console.log('📊 Full scoring content:', scoringContent)
       
-      // Parse total score
-      const scoringMatch = scoringContent.match(/Total:\s*(\d+)\/40/i)
-      if (scoringMatch) {
-        results.totalScore = parseInt(scoringMatch[1])
-        console.log('✅ Total score parsed:', results.totalScore)
-      } else {
-        console.log('❌ Total score not found in content')
-        // Fallback: calculate total from individual scores
-        const individualScores = [
-          results.clarezaFluenciaFala, results.tomControlo, results.envolvimentoConversacional,
-          results.efetividadeDescobertaNecessidades, results.entregaValorAjusteSolucao,
-          results.habilidadesLidarObjeccoes, results.estruturaControleReuniao, results.fechamentoProximosPassos
-        ]
-        results.totalScore = individualScores.reduce((sum, score) => sum + (score || 0), 0)
-        console.log('📊 Calculated total score from individual scores:', results.totalScore)
-      }
-      
-      // Parse individual scoring fields
+      // Parse individual scoring fields first
       console.log('🔍 Parsing individual scoring fields...')
       const scoringFields = [
         { key: 'clarezaFluenciaFala', pattern: /Clareza e Fluência da Fala[:\s]*(\d+)(?:\/5)?/i },
@@ -1244,6 +1239,16 @@ LEMBRA-TE: A tua resposta deve começar com "Clareza e Fluência da Fala:" e ter
           }
         }
       })
+      
+      // Calculate total score from individual scores to ensure accuracy
+      console.log('📊 Calculating total score from individual scores...')
+      const individualScores = [
+        results.clarezaFluenciaFala, results.tomControlo, results.envolvimentoConversacional,
+        results.efetividadeDescobertaNecessidades, results.entregaValorAjusteSolucao,
+        results.habilidadesLidarObjeccoes, results.estruturaControleReuniao, results.fechamentoProximosPassos
+      ]
+      results.totalScore = individualScores.reduce((sum, score) => sum + (score || 0), 0)
+      console.log('📊 Calculated total score from individual scores:', results.totalScore)
       
       console.log('✅ Scoring analysis completed')
       

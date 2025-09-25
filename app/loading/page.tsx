@@ -34,7 +34,7 @@ export default function LoadingPage() {
       {/* Background */}
       <div className="fixed inset-0 z-0">
         <Image
-          src="/images/background-4.jpg"
+          src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/background-4.jpg"
           alt="Background"
           fill
           className="object-cover opacity-80"
@@ -48,7 +48,7 @@ export default function LoadingPage() {
         {/* Logo */}
         <div className="flex justify-center">
           <Image
-            src="/images/logo-white.png"
+            src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/images/logo-white.png"
             alt="ScaleAgents"
             width={200}
             height={60}

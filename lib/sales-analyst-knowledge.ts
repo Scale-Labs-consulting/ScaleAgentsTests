@@ -1,7 +1,8 @@
 // Sales Analyst Knowledge Service
 // Fetches knowledge files from blob storage based on call type
 
-import { extractTextFromPDF, extractTextFromURL } from './pdf-utils'
+import { extractTextFromPDF, extractTextFromURL, extractTextFromPDFWithPDFJS } from './pdf-utils'
+import { extractTextFromPDFWithPython } from './python-pdf-utils'
 
 export interface KnowledgeFile {
   name: string
@@ -315,7 +316,7 @@ function matchFilesToCallType(availableFiles: string[], callType: string): strin
   return [...new Set(matchedFiles)]
 }
 
-export async function getKnowledgeForCallType(callType: string): Promise<string> {
+export async function getKnowledgeForCallType(callType: string, extractionMethod: 'auto' | 'pdf-parse' | 'pdf2json' | 'pdfjs' | 'python' = 'auto'): Promise<string> {
   try {
     console.log(`\n🧠 ===== FETCHING KNOWLEDGE FOR ${callType.toUpperCase()} =====`)
     
@@ -340,7 +341,7 @@ export async function getKnowledgeForCallType(callType: string): Promise<string>
     console.log(`📋 Matched files for ${callType}:`, matchedFiles)
     
     // Fetch all matched files in parallel
-    const fetchPromises = matchedFiles.map(fileName => fetchKnowledgeFile(fileName))
+    const fetchPromises = matchedFiles.map(fileName => fetchKnowledgeFile(fileName, extractionMethod))
     const results = await Promise.all(fetchPromises)
     
     // Combine all knowledge content
@@ -362,7 +363,7 @@ export async function getKnowledgeForCallType(callType: string): Promise<string>
 /**
  * Fetches a single knowledge file from blob storage
  */
-async function fetchKnowledgeFile(fileName: string): Promise<string> {
+async function fetchKnowledgeFile(fileName: string, extractionMethod: 'auto' | 'pdf-parse' | 'pdf2json' | 'pdfjs' | 'python' = 'auto'): Promise<string> {
   try {
     // Use the STATIC_ASSETS_BLOB_TOKEN blob store
     const storeId = 'yjq0uw1vlhs3s48i' // This should be the store ID for STATIC_ASSETS_BLOB_TOKEN
@@ -375,58 +376,11 @@ async function fetchKnowledgeFile(fileName: string): Promise<string> {
     
     // Check if it's a PDF file
     if (fileName.toLowerCase().endsWith('.pdf')) {
-      console.log(`📄 PDF file detected: ${fileName} - trying Python backend first`)
+      console.log(`📄 PDF file detected: ${fileName} - using JavaScript PDF extraction`)
       
+      // Direct fetch and extract based on specified method
       try {
-        // Try Python backend (Railway/production URL)
-        const pythonServiceUrl = process.env.PYTHON_PDF_SERVICE_URL || 'http://localhost:5000'
-        console.log(`🐍 Trying Python PDF parser at ${pythonServiceUrl} for ${fileName}`)
-        
-        const pythonResponse = await fetch(`${pythonServiceUrl}/extract-pdf`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: blobUrl
-          })
-        })
-
-        if (pythonResponse.ok) {
-          const pythonResult = await pythonResponse.json()
-          if (pythonResult.success && pythonResult.text && pythonResult.text.trim().length > 0) {
-            console.log(`✅ Python extraction successful: ${pythonResult.text.length} characters using ${pythonResult.extraction_method}`)
-            console.log(`📄 Text preview: ${pythonResult.text.substring(0, 200)}...`)
-            return pythonResult.text
-          } else {
-            console.warn(`⚠️ Python extraction returned no text for ${fileName}`)
-          }
-        } else {
-          console.warn(`⚠️ Python backend not available (${pythonResponse.status}): ${pythonResponse.statusText}`)
-        }
-      } catch (pythonError) {
-        console.log(`⚠️ Python backend failed for ${fileName}:`, pythonError instanceof Error ? pythonError.message : 'Unknown error')
-      }
-      
-      // Fallback to Scale Expert's method if Python backend fails
-      try {
-        console.log(`🔄 Trying Scale Expert's extractTextFromURL fallback for ${fileName}`)
-        const extractedText = await extractTextFromURL(blobUrl)
-        
-        if (extractedText && extractedText.trim().length > 0) {
-          console.log(`✅ Scale Expert extraction successful: ${extractedText.length} characters`)
-          console.log(`📄 Text preview: ${extractedText.substring(0, 200)}...`)
-          return extractedText
-        } else {
-          console.warn(`⚠️ Scale Expert extraction returned no text for ${fileName}`)
-        }
-      } catch (scaleExpertError) {
-        console.log(`⚠️ Scale Expert extraction failed for ${fileName}:`, scaleExpertError instanceof Error ? scaleExpertError.message : 'Unknown error')
-      }
-      
-      // Final fallback to direct fetch + pdf-parse
-      try {
-        console.log(`🔄 Trying direct fetch + pdf-parse final fallback for ${fileName}`)
+        console.log(`🔄 Fetching PDF directly for ${fileName} using ${extractionMethod} method`)
         const response = await fetch(blobUrl, {
           method: 'GET',
           headers: {
@@ -443,37 +397,94 @@ async function fetchKnowledgeFile(fileName: string): Promise<string> {
         const arrayBuffer = await response.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
         
-        // Try pdf-parse
+        // Extract text based on specified method
         let extractedText = ''
-        let extractionMethod = 'none'
+        let usedMethod = 'none'
         
-        try {
-          console.log(`🔍 Trying pdf-parse extraction for ${fileName}`)
-          const pdfParse = await import('pdf-parse')
-          const pdfData = await pdfParse.default(buffer)
-          
-          if (pdfData.text && pdfData.text.trim().length > 0) {
-            extractedText = cleanExtractedText(pdfData.text)
-            extractionMethod = 'pdf-parse'
-            console.log(`✅ pdf-parse successful: ${extractedText.length} characters, ${pdfData.numpages} pages`)
+        // Try Python PyMuPDF first (best quality extraction)
+        if (extractionMethod === 'python' || extractionMethod === 'pdfjs' || extractionMethod === 'auto') {
+          try {
+            console.log(`🐍 Trying Python PyMuPDF parser for ${fileName}`)
+            const pdfData = await extractTextFromPDFWithPython(buffer, {
+              max: 20, // Limit to 20 pages for knowledge extraction
+              normalizeWhitespace: true
+            })
+            
+            if (pdfData.text && pdfData.text.trim().length > 0) {
+              extractedText = pdfData.text
+              usedMethod = 'Python PyMuPDF'
+              console.log(`✅ Python PyMuPDF parser successful: ${extractedText.length} characters, ${pdfData.numpages} pages`)
+            }
+          } catch (pythonError) {
+            console.log(`⚠️ Python PyMuPDF parser failed for ${fileName}:`, pythonError instanceof Error ? pythonError.message : 'Unknown error')
           }
-        } catch (pdfParseError) {
-          console.log(`⚠️ pdf-parse failed for ${fileName}:`, pdfParseError instanceof Error ? pdfParseError.message : 'Unknown error')
         }
         
-        // Fallback to pdf2json if pdf-parse failed or returned no text
-        if (!extractedText || extractedText.length === 0) {
+        // Try PDF.js as fallback if Python failed and specifically requested
+        if ((!extractedText || extractedText.length === 0) && extractionMethod === 'pdfjs') {
           try {
-            console.log(`🔄 Trying pdf2json fallback for ${fileName}`)
+            console.log(`🔍 Trying PDF.js enhanced parser for ${fileName}`)
+            const pdfData = await extractTextFromPDFWithPDFJS(buffer, {
+              max: 20, // Limit to 20 pages for knowledge extraction
+              normalizeWhitespace: true
+            })
+            
+            if (pdfData.text && pdfData.text.trim().length > 0) {
+              extractedText = pdfData.text // Already cleaned by PDF.js parser
+              usedMethod = 'PDF.js Enhanced'
+              console.log(`✅ PDF.js enhanced parser successful: ${extractedText.length} characters, ${pdfData.numpages} pages`)
+            }
+          } catch (pdfjsError) {
+            console.log(`⚠️ PDF.js enhanced parser failed for ${fileName}:`, pdfjsError instanceof Error ? pdfjsError.message : 'Unknown error')
+          }
+        }
+        
+        // Try pdf-parse if PDF.js failed or if specifically requested
+        if ((!extractedText || extractedText.length === 0) && (extractionMethod === 'pdf-parse' || extractionMethod === 'auto')) {
+          try {
+            console.log(`🔍 Trying pdf-parse extraction for ${fileName}`)
+            const pdfParse = await import('pdf-parse')
+            const pdfData = await pdfParse.default(buffer)
+            
+            if (pdfData.text && pdfData.text.trim().length > 0) {
+              extractedText = cleanExtractedText(pdfData.text)
+              usedMethod = 'pdf-parse'
+              console.log(`✅ pdf-parse successful: ${extractedText.length} characters, ${pdfData.numpages} pages`)
+            }
+          } catch (pdfParseError) {
+            console.log(`⚠️ pdf-parse failed for ${fileName}:`, pdfParseError instanceof Error ? pdfParseError.message : 'Unknown error')
+          }
+        }
+        
+        // Try pdf2json if other methods failed or if specifically requested
+        if ((!extractedText || extractedText.length === 0) && (extractionMethod === 'pdf2json' || extractionMethod === 'auto')) {
+          try {
+            console.log(`🔄 Trying pdf2json for ${fileName}`)
             const pdfData = await extractTextFromPDF(buffer)
             
             if (pdfData.text && pdfData.text.trim().length > 0) {
               extractedText = cleanExtractedText(pdfData.text)
-              extractionMethod = 'pdf2json'
-              console.log(`✅ pdf2json fallback successful: ${extractedText.length} characters, ${pdfData.numpages} pages`)
+              usedMethod = 'pdf2json'
+              console.log(`✅ pdf2json successful: ${extractedText.length} characters, ${pdfData.numpages} pages`)
             }
           } catch (pdf2jsonError) {
-            console.error(`❌ pdf2json fallback also failed:`, pdf2jsonError)
+            console.error(`❌ pdf2json also failed:`, pdf2jsonError)
+          }
+        }
+        
+        // Final fallback to Scale Expert's extractTextFromURL method
+        if ((!extractedText || extractedText.length === 0) && extractionMethod === 'auto') {
+          try {
+            console.log(`🔄 Final fallback: Trying Scale Expert's extractTextFromURL for ${fileName}`)
+            const extractedText = await extractTextFromURL(blobUrl)
+            
+            if (extractedText && extractedText.trim().length > 0) {
+              console.log(`✅ Scale Expert extraction successful: ${extractedText.length} characters`)
+              console.log(`📄 Text preview: ${extractedText.substring(0, 200)}...`)
+              return extractedText
+            }
+          } catch (scaleExpertError) {
+            console.log(`⚠️ Scale Expert extraction failed for ${fileName}:`, scaleExpertError instanceof Error ? scaleExpertError.message : 'Unknown error')
           }
         }
         

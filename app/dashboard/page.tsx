@@ -1029,19 +1029,100 @@ export default function DashboardPage() {
 
         if (!transcriptionResponse.ok) {
           let errorMessage = 'Transcription failed'
+          let isTimeoutError = false
+          
           try {
             const errorData = await transcriptionResponse.json()
             errorMessage = errorData.error || errorMessage
+            
+            // Check if this is a timeout error
+            if (errorData.timeout || errorData.message?.includes('timeout') || errorData.message?.includes('processing')) {
+              isTimeoutError = true
+              errorMessage = 'A transcrição está a demorar mais tempo do que o esperado. A análise pode estar a ser processada em segundo plano.'
+            }
           } catch (jsonError) {
             // If response is not JSON, try to get text
             try {
               const errorText = await transcriptionResponse.text()
               console.error('❌ Non-JSON error response:', errorText)
               errorMessage = `Server error: ${transcriptionResponse.status} - ${errorText.substring(0, 100)}`
+              
+              // Check for timeout indicators in text response
+              if (errorText.includes('timeout') || errorText.includes('processing') || transcriptionResponse.status === 503) {
+                isTimeoutError = true
+                errorMessage = 'A transcrição está a demorar mais tempo do que o esperado. A análise pode estar a ser processada em segundo plano.'
+              }
             } catch (textError) {
               errorMessage = `Server error: ${transcriptionResponse.status} - ${transcriptionResponse.statusText}`
+              
+              // Check for timeout status codes
+              if (transcriptionResponse.status === 503 || transcriptionResponse.status === 504) {
+                isTimeoutError = true
+                errorMessage = 'A transcrição está a demorar mais tempo do que o esperado. A análise pode estar a ser processada em segundo plano.'
+              }
             }
           }
+          
+          // If it's a timeout error, show a different message to the user
+          if (isTimeoutError) {
+            console.log('⏰ Transcription timeout detected, but analysis may still be processing...')
+            setSalesUploadStatus('A transcrição está a demorar mais tempo do que o esperado...')
+            setSalesUploadProgress(85)
+            
+            // Show timeout message to user
+            toast({
+              title: "Processamento em Segundo Plano",
+              description: "A transcrição está a demorar mais tempo do que o esperado. A análise pode estar a ser processada em segundo plano. Verifique o dashboard em alguns minutos.",
+              variant: "default"
+            })
+            
+            // Don't throw error for timeout - let the user know it's still processing
+            setSalesIsAnalyzing(false)
+            setSalesUploadStatus('Processamento em segundo plano...')
+            setSalesUploadProgress(90)
+            
+            // Check if analysis was actually created despite the timeout
+            try {
+              console.log('🔍 Checking if analysis was created despite timeout...')
+              const { data: { session } } = await supabase.auth.getSession()
+              if (session) {
+                const { data: existingAnalysis } = await supabase
+                  .from('sales_call_analyses')
+                  .select('*')
+                  .eq('user_id', user!.id)
+                  .eq('sales_call_id', tempSalesCallId)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .single()
+                
+                if (existingAnalysis) {
+                  console.log('✅ Analysis found despite timeout!')
+                  setSalesAnalysisResult(existingAnalysis.analysis)
+                  setSalesUploadStatus('Análise encontrada! (Processamento em segundo plano)')
+                  setSalesUploadProgress(100)
+                  
+                  toast({
+                    title: "Análise Encontrada",
+                    description: "A análise foi criada com sucesso, apesar do timeout da transcrição.",
+                    variant: "default"
+                  })
+                }
+              }
+            } catch (checkError) {
+              console.log('⚠️ Could not check for existing analysis:', checkError)
+            }
+            
+            // Reset upload state after 5 seconds for timeout case
+            setTimeout(() => {
+              setSalesUploadedFile(null)
+              setSalesIsUploading(false)
+              setSalesUploadProgress(0)
+              setSalesUploadStatus('')
+            }, 5000)
+            
+            return // Exit without throwing error
+          }
+          
           throw new Error(errorMessage)
         }
 
@@ -4509,8 +4590,8 @@ export default function DashboardPage() {
                         {selectedAnalysis.analysis.insights.improvements.map((improvement: any, index: number) => {
                           // Parse the improvement description to extract title, analysis, and quote
                           const parseImprovement = (text: string) => {
-                            // Enhanced pattern for full phrases with MM:SS timestamps
-                            const titleMatch = text.match(/^- \*\*(.*?)\*\*:\s*(.*?)\s*Timestamp:\s*\[([^\]]+)\]\s*"([^"]+)"/);
+                            // Enhanced pattern for full phrases with MM:SS timestamps (without brackets)
+                            const titleMatch = text.match(/^- \*\*(.*?)\*\*:\s*(.*?)\s*Timestamp:\s*([^\s]+)\s*"([^"]+)"/);
                             
                             if (titleMatch) {
                               return {
@@ -4524,7 +4605,7 @@ export default function DashboardPage() {
                             // Enhanced fallback: try to extract components separately with better regex
                             const titleMatch2 = text.match(/^- \*\*(.*?)\*\*:/);
                             const quoteMatch = text.match(/"([^"]{10,})"/); // Require at least 10 characters for full phrases
-                            const timestampMatch = text.match(/Timestamp:\s*\[([^\]]+)\]/);
+                            const timestampMatch = text.match(/Timestamp:\s*([^\s]+)/);
                             
                             if (titleMatch2 && quoteMatch) {
                               // Extract analysis text between title and timestamp
@@ -4552,18 +4633,27 @@ export default function DashboardPage() {
                           
                           const parsed = parseImprovement(improvement.description);
                           
+                          // Debug logging to help understand parsing
+                          console.log('🔍 Parsing improvement:', {
+                            original: improvement.description,
+                            parsed: parsed,
+                            hasTimestamp: !!parsed.timestamp
+                          });
+                          
                           return (
                             <div key={index} className="bg-gray-500/10 border border-gray-500/20 rounded-lg p-3">
                       <div className="text-white/90 text-sm leading-relaxed">
                                 <div className="flex items-start space-x-2">
                                   <span className="text-white text-lg leading-none">•</span>
                                   <div className="flex-1">
-                                    <em className="text-white font-medium">{parsed.title}</em>
-                                    {parsed.timestamp && (
-                                      <span className="text-white/60 text-xs ml-2 bg-white/10 px-2 py-1 rounded">
-                                        {parsed.timestamp}
-                                      </span>
-                                    )}
+                                    <div className="flex items-center justify-between">
+                                      <em className="text-white font-medium">{parsed.title}</em>
+                                      {parsed.timestamp && (
+                                        <span className="text-white/60 text-sm">
+                                          {parsed.timestamp}
+                                        </span>
+                                      )}
+                                    </div>
                                     {parsed.analysis && (
                                       <div className="mt-1 text-white/90 text-sm">
                                         {parsed.analysis}

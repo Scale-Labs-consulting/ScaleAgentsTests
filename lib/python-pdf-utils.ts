@@ -164,6 +164,29 @@ export async function extractTextFromPDFWithPython(
   } catch (error) {
     console.error('❌ Python PDF extraction error:', error)
     
+    // If Python is not available, fall back to JavaScript PDF parsing
+    if (error instanceof Error && error.message.includes('spawn python ENOENT')) {
+      console.log('🔄 Python not available, falling back to JavaScript PDF parser...')
+      
+      try {
+        // Import the JavaScript PDF parser as fallback
+        const { extractTextFromPDF } = await import('./pdf-utils')
+        const jsResult = await extractTextFromPDF(buffer, options)
+        
+        console.log('✅ JavaScript PDF parser fallback successful')
+        return {
+          text: jsResult.text,
+          numpages: jsResult.numpages,
+          numrender: jsResult.numrender,
+          info: jsResult.info,
+          metadata: jsResult.metadata,
+          version: 'JavaScript PDF.js (Python fallback)'
+        }
+      } catch (jsError) {
+        console.error('❌ JavaScript PDF parser also failed:', jsError)
+      }
+    }
+    
     return {
       text: `PDF file detected (${buffer.length} bytes). Python PyMuPDF extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure Python and PyMuPDF are installed.`,
       numpages: 1,
@@ -233,6 +256,21 @@ export async function extractTextFromURLWithPython(url: string): Promise<string>
     
   } catch (error) {
     console.error('❌ Python URL extraction error:', error)
+    
+    // If Python is not available, fall back to JavaScript PDF parsing
+    if (error instanceof Error && error.message.includes('spawn python ENOENT')) {
+      console.log('🔄 Python not available, falling back to JavaScript PDF parser for URL...')
+      
+      try {
+        // Import the JavaScript PDF parser as fallback
+        const { extractTextFromURL } = await import('./pdf-utils')
+        return await extractTextFromURL(url)
+      } catch (jsError) {
+        console.error('❌ JavaScript PDF parser also failed:', jsError)
+        throw jsError
+      }
+    }
+    
     throw error
   }
 }

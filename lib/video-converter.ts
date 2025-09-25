@@ -4,8 +4,12 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util'
 let ffmpeg: FFmpeg | null = null
 
 export const initFFmpeg = async () => {
-  if (ffmpeg) return ffmpeg
+  if (ffmpeg && ffmpeg.loaded) {
+    console.log('✅ FFmpeg already loaded, reusing instance')
+    return ffmpeg
+  }
 
+  console.log('🔄 Initializing FFmpeg...')
   ffmpeg = new FFmpeg()
 
   // Load FFmpeg from CDN
@@ -14,6 +18,7 @@ export const initFFmpeg = async () => {
     wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
   })
 
+  console.log('✅ FFmpeg loaded successfully')
   return ffmpeg
 }
 
@@ -22,6 +27,17 @@ export const convertVideoToAudio = async (videoFile: File): Promise<File> => {
     console.log('🎵 Starting video to audio conversion...')
     
     const ffmpeg = await initFFmpeg()
+    
+    // Ensure FFmpeg is fully loaded before proceeding
+    if (!ffmpeg.loaded) {
+      console.log('🔄 FFmpeg not loaded, loading now...')
+      await ffmpeg.load({
+        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+        wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
+      })
+    }
+    
+    console.log('✅ FFmpeg loaded successfully, proceeding with conversion...')
     
     // Write the video file to FFmpeg's virtual filesystem
     await ffmpeg.writeFile('input.mp4', await fetchFile(videoFile))
@@ -128,4 +144,14 @@ export const shouldConvertVideo = (file: File): boolean => {
   // Convert all video files to ensure consistent high-quality audio processing
   // This ensures we always use the optimized audio settings for transcription
   return file.type.startsWith('video/')
+}
+
+export const preloadFFmpeg = async (): Promise<void> => {
+  try {
+    console.log('🔄 Preloading FFmpeg for better performance...')
+    await initFFmpeg()
+    console.log('✅ FFmpeg preloaded successfully')
+  } catch (error) {
+    console.warn('⚠️ FFmpeg preload failed, will load on demand:', error)
+  }
 }

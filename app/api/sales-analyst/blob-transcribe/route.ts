@@ -2109,55 +2109,20 @@ export async function POST(request: NextRequest) {
         // Don't fail the entire process if blob deletion fails
       }
       
-      // Create a new analysis record with the same content as the duplicate
-      console.log('💾 Creating new analysis record with duplicate content...')
-      
-      const newAnalysisData = {
-        user_id: userId,
-        title: fileName ? fileName.replace(/\.[^/.]+$/, '') : 'Sales Call Analysis',
-        analysis: existingAnalysis.analysis, // Use the same analysis content
-        feedback: existingAnalysis.feedback || '', // Copy feedback from original or use empty string
-        analysis_metadata: {
-          content_hash: contentHash,
-          transcription_length: transcription.length,
-          is_duplicate: true,
-          original_analysis_id: existingAnalysis.id,
-          original_created_at: existingAnalysis.created_at,
-          file_size: videoBlob?.size || 0,
-          file_type: videoBlob?.type || 'unknown',
-          processing_time: Date.now() - Date.now() // Will be 0 for duplicates
-        },
-        call_type: existingAnalysis.call_type || 'Não identificado',
-        score: existingAnalysis.score || 0
-      }
-      
-      const { data: newAnalysis, error: saveError } = await supabase
-        .from('sales_call_analyses')
-        .insert(newAnalysisData)
-        .select()
-        .single()
-      
-      if (saveError) {
-        console.error('❌ Error saving duplicate analysis:', saveError)
-        return NextResponse.json(
-          { error: 'Failed to save duplicate analysis' },
-          { status: 500 }
-        )
-      }
-      
-      console.log('✅ New duplicate analysis record created with ID:', newAnalysis.id)
+      // Return the existing analysis instead of creating a duplicate
+      console.log('✅ Returning existing analysis to avoid duplicates...')
       
       // Debug: Log the duplicate response being sent to frontend
       console.log('🔍 DUPLICATE RESPONSE TO FRONTEND:')
-      console.log('🔍 newAnalysis.analysis structure:', JSON.stringify(newAnalysis.analysis, null, 2))
-      console.log('🔍 newAnalysis.analysis type:', typeof newAnalysis.analysis)
+      console.log('🔍 existingAnalysis.analysis structure:', JSON.stringify(existingAnalysis.analysis, null, 2))
+      console.log('🔍 existingAnalysis.analysis type:', typeof existingAnalysis.analysis)
       
-      // Return the new analysis result (same content, new record)
+      // Return the existing analysis result
       return NextResponse.json({
         success: true,
-        analysis: newAnalysis.analysis,
-        analysisId: newAnalysis.id,
-        message: 'Duplicate content detected - created new analysis record with same content',
+        analysis: existingAnalysis.analysis,
+        analysisId: existingAnalysis.id,
+        message: 'Duplicate content detected - returning existing analysis',
         isDuplicate: true,
         duplicateInfo: {
           originalId: existingAnalysis.id,

@@ -2,6 +2,7 @@ import { spawn } from 'child_process'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { existsSync } from 'fs'
+import os from 'os'
 
 /**
  * Clean up temporary file silently
@@ -21,7 +22,7 @@ async function cleanupTempFile(filePath: string): Promise<void> {
  */
 export async function cleanupOldTempFiles(): Promise<void> {
   try {
-    const tempDir = path.join(process.cwd(), 'temp')
+    const tempDir = os.tmpdir()
     if (!existsSync(tempDir)) return
 
     const files = await fs.readdir(tempDir)
@@ -70,10 +71,8 @@ export async function extractTextFromPDFWithPython(
     // Clean up old temp files periodically
     await cleanupOldTempFiles()
     
-    // Create a temporary file for the PDF
-    const tempDir = path.join(process.cwd(), 'temp')
-    await fs.mkdir(tempDir, { recursive: true })
-    
+    // Use system temporary directory (works in Vercel serverless environment)
+    const tempDir = os.tmpdir()
     const tempPdfPath = path.join(tempDir, `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.pdf`)
     await fs.writeFile(tempPdfPath, buffer)
     

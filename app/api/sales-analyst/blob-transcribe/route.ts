@@ -1829,7 +1829,7 @@ export async function POST(request: NextRequest) {
     let transcription = ''
     let audioDuration: number | undefined = undefined
     let attempts = 0
-    const maxAttempts = 60 // 5 minutes with 5-second intervals (reduced for Vercel timeout)
+    const maxAttempts = 120 // 10 minutes with 5-second intervals (increased for Pro plan 800s limit)
     
     console.log('⏳ Starting transcription polling (max attempts:', maxAttempts, ')')
 
@@ -1842,9 +1842,9 @@ export async function POST(request: NextRequest) {
       const elapsedMinutes = Math.round(attempts * pollInterval / 60000)
       console.log(`🔄 Polling attempt ${attempts}/${maxAttempts} (${elapsedMinutes} minutes elapsed)`)
       
-      // Warning at 4 minutes (240 seconds) - close to Vercel timeout
-      if (elapsedMinutes >= 4 && attempts === Math.floor(240000 / pollInterval)) {
-        console.log('⚠️ WARNING: Approaching Vercel timeout limit (5 minutes)')
+      // Warning at 12 minutes (720 seconds) - close to Vercel Pro plan timeout
+      if (elapsedMinutes >= 12 && attempts === Math.floor(720000 / pollInterval)) {
+        console.log('⚠️ WARNING: Approaching Vercel Pro plan timeout limit (13+ minutes)')
         console.log('⚠️ If transcription takes longer, consider using async processing')
       }
 

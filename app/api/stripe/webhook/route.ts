@@ -65,7 +65,29 @@ export async function POST(request: NextRequest) {
           const planId = paymentIntent.metadata.plan_id
           const billingPeriod = paymentIntent.metadata.billing_period || 'monthly'
           
-          console.log(`💳 Payment succeeded for user ${userId}, creating subscription...`)
+          console.log(`💳 Payment succeeded for user ${userId}, checking for existing subscription...`)
+          
+          // Check if user already has an active subscription to prevent duplicates
+          const { data: existingUser } = await supabase
+            .from('profiles')
+            .select('stripe_subscription_id, subscription_status, stripe_customer_id')
+            .eq('id', userId)
+            .single()
+          
+          if (existingUser?.stripe_subscription_id && existingUser?.subscription_status === 'active') {
+            console.log(`⚠️ User ${userId} already has an active subscription: ${existingUser.stripe_subscription_id}`)
+            console.log(`⚠️ Skipping subscription creation to prevent duplicates`)
+            break
+          }
+
+          // Check if user already has a Stripe customer ID to prevent duplicate customers
+          if (existingUser?.stripe_customer_id) {
+            console.log(`⚠️ User ${userId} already has a Stripe customer: ${existingUser.stripe_customer_id}`)
+            console.log(`⚠️ Skipping customer creation to prevent duplicates`)
+            break
+          }
+          
+          console.log(`💳 Creating subscription for user ${userId}...`)
           
           // Get plan details
           const plan = getPlanById(planId)
@@ -180,6 +202,26 @@ export async function POST(request: NextRequest) {
 
           if (userId) {
             console.log(`🎉 Processing subscription for user ${userId}, plan: ${planId}`)
+            
+            // Check if user already has an active subscription to prevent duplicates
+            const { data: existingUser } = await supabase
+              .from('profiles')
+              .select('stripe_subscription_id, subscription_status, stripe_customer_id')
+              .eq('id', userId)
+              .single()
+            
+            if (existingUser?.stripe_subscription_id && existingUser?.subscription_status === 'active') {
+              console.log(`⚠️ User ${userId} already has an active subscription: ${existingUser.stripe_subscription_id}`)
+              console.log(`⚠️ Skipping subscription update to prevent duplicates`)
+              break
+            }
+
+            // Check if user already has a Stripe customer ID to prevent duplicate customers
+            if (existingUser?.stripe_customer_id && existingUser.stripe_customer_id !== customerId) {
+              console.log(`⚠️ User ${userId} already has a different Stripe customer: ${existingUser.stripe_customer_id}`)
+              console.log(`⚠️ Skipping customer update to prevent duplicates`)
+              break
+            }
             
             // Update user subscription in database
             const updateData: any = {

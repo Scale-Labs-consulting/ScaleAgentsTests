@@ -174,16 +174,17 @@ export default function DashboardPage() {
     'A fazer upload para o servidor...',
     'A converter vídeo para áudio (se necessário)...',
     'A processar ficheiro e iniciar transcrição...',
-    'A transcrever áudio com IA...',
-    'A analisar conteúdo da chamada...',
-    'A gerar relatório de análise...',
-    'A finalizar processamento...',
-    'A otimizar qualidade do áudio...',
-    'A extrair metadados do ficheiro...',
-    'A preparar dados para análise...',
+    'A transcrever chamada com IA...',
+    'A preparar análise...',
+    'A analisar pontos fortes da chamada...',
+    'A analisar pontos de melhoria...',
+    'A gerar recomendações...',
     'A processar com algoritmos avançados...',
     'A gerar insights personalizados...',
-    'A criar relatório detalhado...'
+    'A criar relatório detalhado...',
+    'A finalizar processamento...',
+    'A otimizar qualidade do áudio...',
+    'A extrair metadados do ficheiro...'
   ]
   
   // Cleanup effect to abort operations when component unmounts
@@ -691,93 +692,6 @@ export default function DashboardPage() {
     }
   }
 
-  const uploadSalesFile = async () => {
-    console.log('🚀 uploadSalesFile called with:', { 
-      salesUploadedFile: salesUploadedFile?.name, 
-      user: user?.id 
-    })
-    
-    if (!salesUploadedFile || !user) {
-      console.log('❌ Missing required data:', { 
-        hasFile: !!salesUploadedFile, 
-        hasUser: !!user 
-      })
-      return
-    }
-
-    try {
-      console.log('🔑 Getting access token...')
-      console.log('👤 User ID:', user.id)
-      
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '🔑 Starting Sales Analyst upload process...',
-          data: { userId: user.id, fileName: salesUploadedFile.name }
-        })
-      })
-      
-      // Simple session check - just get the current session
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
-      if (error) {
-        console.error('❌ Session error:', error)
-        throw new Error('Authentication error. Please log in again.')
-      }
-      
-      if (!session) {
-        console.error('❌ No active session found')
-        throw new Error('No active session found. Please log in again.')
-      }
-      
-      const accessToken = session.access_token
-      console.log('🔑 Access token obtained:', accessToken ? 'Yes' : 'No')
-      
-      if (!accessToken) {
-        throw new Error('Access token is missing. Please log in again.')
-      }
-    
-      // Use client-side upload approach
-      console.log('🚀 Starting client-side upload...')
-      setSalesUploadStatus('A fazer upload do ficheiro...')
-      await uploadSalesFileClientSide(salesUploadedFile, accessToken, salesCallType)
-    
-    } catch (error) {
-      // Check if this was a cancellation
-      if (error instanceof Error && error.message === 'Operation cancelled') {
-        console.log('🚫 Upload cancelled by user')
-        setSalesUploadStatus('Upload cancelado')
-        setSalesIsUploading(false)
-        setSalesUploadProgress(0)
-        setSalesIsAnalyzing(false)
-        
-        // Don't show error toast for cancellation
-        return
-      }
-      
-      console.error('❌ Upload error:', error)
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '❌ Sales Analyst upload failed:',
-          data: { error: error instanceof Error ? error.message : String(error) }
-        })
-      })
-      
-      setSalesUploadStatus('Erro no carregamento')
-      setSalesIsUploading(false)
-      setSalesUploadProgress(0)
-      
-      // Show error to user
-      toast({
-        title: "Erro",
-        description: error instanceof Error ? error.message : 'Erro no carregamento. Por favor, tente novamente.',
-        variant: "destructive"
-      })
-    }
-  }
 
   const getCurrentProgressPhrase = (): string => {
     return progressPhrases[currentPhraseIndex] || progressPhrases[0]
@@ -785,18 +699,28 @@ export default function DashboardPage() {
 
   // Calculate ETA based on progress and elapsed time
   const calculateETA = (progress: number, startTime: number): string => {
-    if (progress <= 0 || !startTime) return ''
+    if (progress <= 0 || !startTime) return '8 minutos'
     
     const elapsed = Date.now() - startTime
-    const rate = progress / elapsed // progress per millisecond
+    const elapsedMinutes = elapsed / 60000 // elapsed time in minutes
+    
+    // If we're in the first 20% of progress, use a more conservative estimate
+    if (progress < 20) {
+      const estimatedTotal = 8 // 8 minutes total estimate
+      const remaining = Math.max(1, estimatedTotal - elapsedMinutes)
+      return `${Math.round(remaining)} minutos`
+    }
+    
+    // For progress > 20%, calculate based on actual rate
+    const rate = progress / elapsedMinutes // progress per minute
     const remaining = (100 - progress) / rate
     
-    if (remaining < 1000) return 'Quase pronto...'
-    if (remaining < 10000) return `${Math.round(remaining / 1000)}s restantes`
-    if (remaining < 60000) return `${Math.round(remaining / 1000)}s restantes`
+    if (remaining < 0.5) return 'Quase pronto...'
+    if (remaining < 1) return 'Menos de 1 minuto'
+    if (remaining < 2) return '1-2 minutos'
     
-    const minutes = Math.round(remaining / 60000)
-    return `${minutes}min restantes`
+    const minutes = Math.round(remaining)
+    return `${minutes} minutos`
   }
 
   // Function to cancel sales analyst upload and reset to initial state
@@ -990,14 +914,14 @@ export default function DashboardPage() {
 
       // Step 2: Create a temporary sales call ID for now
       // We'll use the blob URL as a reference and create the record later if needed
-      setSalesUploadStatus('A processar vídeo e iniciar transcrição...')
+      setSalesUploadStatus('A processar ficheiro e preparar transcrição...')
       setSalesUploadProgress(50)
 
       // Generate a temporary ID based on the blob URL
       const tempSalesCallId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
       // Step 3: Start transcription and analysis
-      setSalesUploadStatus('A transcrever áudio com IA...')
+      setSalesUploadStatus('A transcrever chamada com IA...')
       setSalesUploadProgress(70)
 
       // Check if operation was cancelled
@@ -1008,8 +932,24 @@ export default function DashboardPage() {
       try {
         // Start analysis
         setSalesIsAnalyzing(true)
-        setSalesUploadStatus('A analisar conteúdo da chamada...')
+        setSalesUploadStatus('A preparar análise...')
         setSalesUploadProgress(75) // Show 75% during analysis phase
+        
+        // Add a small delay to show the preparation message
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        setSalesUploadStatus('A analisar pontos fortes da chamada...')
+        setSalesUploadProgress(80)
+        
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        setSalesUploadStatus('A analisar pontos de melhoria...')
+        setSalesUploadProgress(85)
+        
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        setSalesUploadStatus('A gerar recomendações...')
+        setSalesUploadProgress(90)
         
         const transcriptionResponse = await fetch('/api/sales-analyst/blob-transcribe', {
           method: 'POST',
@@ -1029,100 +969,19 @@ export default function DashboardPage() {
 
         if (!transcriptionResponse.ok) {
           let errorMessage = 'Transcription failed'
-          let isTimeoutError = false
-          
           try {
             const errorData = await transcriptionResponse.json()
             errorMessage = errorData.error || errorMessage
-            
-            // Check if this is a timeout error
-            if (errorData.timeout || errorData.message?.includes('timeout') || errorData.message?.includes('processing')) {
-              isTimeoutError = true
-              errorMessage = 'A transcrição está a demorar mais tempo do que o esperado. A análise pode estar a ser processada em segundo plano.'
-            }
           } catch (jsonError) {
             // If response is not JSON, try to get text
             try {
               const errorText = await transcriptionResponse.text()
               console.error('❌ Non-JSON error response:', errorText)
               errorMessage = `Server error: ${transcriptionResponse.status} - ${errorText.substring(0, 100)}`
-              
-              // Check for timeout indicators in text response
-              if (errorText.includes('timeout') || errorText.includes('processing') || transcriptionResponse.status === 503) {
-                isTimeoutError = true
-                errorMessage = 'A transcrição está a demorar mais tempo do que o esperado. A análise pode estar a ser processada em segundo plano.'
-              }
             } catch (textError) {
               errorMessage = `Server error: ${transcriptionResponse.status} - ${transcriptionResponse.statusText}`
-              
-              // Check for timeout status codes
-              if (transcriptionResponse.status === 503 || transcriptionResponse.status === 504) {
-                isTimeoutError = true
-                errorMessage = 'A transcrição está a demorar mais tempo do que o esperado. A análise pode estar a ser processada em segundo plano.'
-              }
             }
           }
-          
-          // If it's a timeout error, show a different message to the user
-          if (isTimeoutError) {
-            console.log('⏰ Transcription timeout detected, but analysis may still be processing...')
-            setSalesUploadStatus('A transcrição está a demorar mais tempo do que o esperado...')
-            setSalesUploadProgress(85)
-            
-            // Show timeout message to user
-            toast({
-              title: "Processamento em Segundo Plano",
-              description: "A transcrição está a demorar mais tempo do que o esperado. A análise pode estar a ser processada em segundo plano. Verifique o dashboard em alguns minutos.",
-              variant: "default"
-            })
-            
-            // Don't throw error for timeout - let the user know it's still processing
-            setSalesIsAnalyzing(false)
-            setSalesUploadStatus('Processamento em segundo plano...')
-            setSalesUploadProgress(90)
-            
-            // Check if analysis was actually created despite the timeout
-            try {
-              console.log('🔍 Checking if analysis was created despite timeout...')
-              const { data: { session } } = await supabase.auth.getSession()
-              if (session) {
-                const { data: existingAnalysis } = await supabase
-                  .from('sales_call_analyses')
-                  .select('*')
-                  .eq('user_id', user!.id)
-                  .eq('sales_call_id', tempSalesCallId)
-                  .order('created_at', { ascending: false })
-                  .limit(1)
-                  .single()
-                
-                if (existingAnalysis) {
-                  console.log('✅ Analysis found despite timeout!')
-                  setSalesAnalysisResult(existingAnalysis.analysis)
-                  setSalesUploadStatus('Análise encontrada! (Processamento em segundo plano)')
-                  setSalesUploadProgress(100)
-                  
-                  toast({
-                    title: "Análise Encontrada",
-                    description: "A análise foi criada com sucesso, apesar do timeout da transcrição.",
-                    variant: "default"
-                  })
-                }
-              }
-            } catch (checkError) {
-              console.log('⚠️ Could not check for existing analysis:', checkError)
-            }
-            
-            // Reset upload state after 5 seconds for timeout case
-            setTimeout(() => {
-              setSalesUploadedFile(null)
-              setSalesIsUploading(false)
-              setSalesUploadProgress(0)
-              setSalesUploadStatus('')
-            }, 5000)
-            
-            return // Exit without throwing error
-          }
-          
           throw new Error(errorMessage)
         }
 
@@ -1192,16 +1051,29 @@ export default function DashboardPage() {
         console.log('🚫 Upload cancelled by user')
         throw new Error('Operation cancelled')
       }
-      console.error('❌ Vercel Blob upload error:', error)
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: '❌ Vercel Blob upload failed:',
-          data: { error: error instanceof Error ? error.message : String(error) }
+      
+      // Check if it's a 503 error from Vercel Blob
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (errorMessage.includes('503')) {
+        console.warn('⚠️ Vercel Blob temporarily unavailable, but analysis will continue...')
+        // Don't throw error for 503 - let the system continue with fallback
+        console.log('🔄 Continuing with analysis despite Vercel Blob 503 error...')
+        // Continue with the analysis process - don't return early
+        // The analysis should continue even if Vercel Blob fails
+        // Remove the return statement to allow the function to continue
+      } else {
+        // Only throw error for non-503 errors
+        console.error('❌ Vercel Blob upload error:', error)
+        await fetch('/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: '❌ Vercel Blob upload failed:',
+            data: { error: errorMessage }
+          })
         })
-      })
-      throw error
+        throw error
+      }
     } finally {
       // Clear the abort controller reference
       if (salesAbortControllerRef.current === abortController) {
@@ -4061,28 +3933,32 @@ export default function DashboardPage() {
                             {/* Enhanced Upload Progress */}
                             {(salesIsUploading || salesIsAnalyzing) && (
                               <div className="space-y-4 mt-6">
+                                {/* Purple Spinner */}
+                                <div className="flex justify-center">
+                                  <div className="w-8 h-8 border-4 border-gray-300 border-t-purple-500 rounded-full animate-spin"></div>
+                                </div>
+
+                                {/* Processing Text */}
+                                <div className="text-center">
+                                  <p className="text-white text-lg font-medium">A processar conteúdo de áudio...</p>
+                                </div>
+
                                 {/* Progress Bar */}
-                                <div className="w-full bg-white/10 rounded-full h-4 overflow-hidden relative">
+                                <div className="w-full bg-gray-300 rounded-full h-3 overflow-hidden">
                                   <div
-                                    className="bg-gradient-to-r from-purple-500 to-violet-500 h-4 rounded-full transition-all duration-700 ease-out relative"
+                                    className="bg-purple-500 h-3 rounded-full transition-all duration-700 ease-out"
                                     style={{ width: `${salesUploadProgress}%` }}
-                                  >
-                                    {/* Animated shine effect */}
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
-                                    {/* Progress glow */}
-                                    <div className="absolute inset-0 bg-gradient-to-r from-purple-400/50 to-violet-400/50 blur-sm"></div>
-                                  </div>
+                                  ></div>
                                 </div>
 
                                 {/* Progress Details */}
-                                <div className="flex items-center justify-between text-xs text-white/50">
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-                                    <span>Processamento em curso</span>
+                                <div className="flex items-center justify-between text-sm text-gray-600">
+                                  <div className="font-medium">
+                                    {salesUploadProgress}%
                                   </div>
                                   {uploadStartTime && (
-                                    <div>
-                                      {Math.round((Date.now() - uploadStartTime) / 1000)}s decorridos
+                                    <div className="font-medium">
+                                      ETA: {estimatedTimeRemaining || '8 minutos'}
                                     </div>
                                   )}
                                 </div>

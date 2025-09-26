@@ -110,7 +110,9 @@ Transcrição para análise:
 {transcription}`
 
 // 3. Pontos Fortes Comercial
-export const PONTOS_FORTES_PROMPT = `Identifica e resume os pontos fortes da reunião de vendas com base na transcrição fornecida.  
+export const PONTOS_FORTES_PROMPT = `Analisa esta transcrição específica e identifica os pontos fortes ÚNICOS desta call de vendas. 
+
+CRÍTICO: Esta análise deve ser ESPECÍFICA para esta transcrição. NÃO uses templates genéricos. Analisa o que realmente aconteceu nesta call.
 
 IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDEDOR/COMERCIAL na transcrição. O comercial é normalmente a pessoa que:
 - Apresenta produtos/serviços
@@ -121,6 +123,14 @@ IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDED
 A tua análise deve focar APENAS no desempenho do VENDEDOR identificado.
 
 CRÍTICO: Na tua resposta, NUNCA uses "Speaker A" ou "Speaker B". Sempre refere-te ao comercial como "o comercial" e ao cliente como "o cliente". NUNCA combines "comercial" com "Speaker A/B" - usa APENAS "o comercial".
+
+    REGRAS ANTI-GENÉRICAS:
+    - NÃO uses frases como "Boa Abordagem Inicial" se não foi realmente boa
+    - NÃO uses templates - cada call é única
+    - Se não há pontos fortes genuínos, identifica poucos ou nenhuns
+    - Cada ponto forte deve ser específico desta call
+    - NÃO identifiques o mesmo comportamento como ponto forte E fraco
+    - Se um comportamento tem aspectos positivos e negativos, escolhe o mais relevante
 
 REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FORTES:
 
@@ -165,7 +175,7 @@ Todas as tuas respostas devem ser exclusivamente em português de Portugal (espe
 
 É ABSOLUTAMENTE ESSENCIAL que todas as respostas sigam estas regras, sem exceção. Em caso de dúvida, opta sempre pela forma utilizada em Portugal, especificamente em Lisboa.
 
-Estrutura da Resposta (formato de lista com bullets):
+Estrutura de uma  Resposta EXEMPLO (formato de lista com bullets):
 
 - **Boa Abordagem Inicial**: Momento em que a introdução foi clara, envolvente e estabeleceu rapport com o cliente. Timestamp: [MM:SS] "[Frase completa do comercial - não apenas palavras soltas, mas a frase inteira que demonstra o ponto forte]"
 
@@ -251,7 +261,9 @@ Transcrição para análise:
 {transcription}`
 
 // 5. Pontos Fracos Comercial
-export const PONTOS_FRACOS_PROMPT = `Identifica e resume os pontos fracos da reunião de vendas com base na transcrição fornecida.  
+export const PONTOS_FRACOS_PROMPT = `Analisa esta transcrição específica e identifica os pontos fracos ÚNICOS desta call de vendas.
+
+CRÍTICO: Esta análise deve ser ESPECÍFICA para esta transcrição. NÃO uses templates genéricos. Analisa o que realmente aconteceu nesta call.
 
 IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDEDOR/COMERCIAL na transcrição. O comercial é normalmente a pessoa que:
 - Apresenta produtos/serviços
@@ -262,6 +274,29 @@ IMPORTANTE: Antes de começar a análise, identifica claramente quem é o VENDED
 A tua análise deve focar APENAS no desempenho do VENDEDOR identificado.
 
 CRÍTICO: Na tua resposta, NUNCA uses "Speaker A" ou "Speaker B". Sempre refere-te ao comercial como "o comercial" e ao cliente como "o cliente". NUNCA combines "comercial" com "Speaker A/B" - usa APENAS "o comercial".
+
+REGRAS ANTI-GENÉRICAS:
+- NÃO uses frases como "Falta de Estrutura" se não foi realmente um problema
+- NÃO uses templates - cada call é única
+- Se não há pontos fracos genuínos, identifica poucos ou nenhuns
+- Cada ponto fraco deve ser específico desta call
+- NÃO identifiques o mesmo comportamento como ponto forte E fraco
+- Se um comportamento tem aspectos positivos e negativos, escolhe o mais relevante
+- **CRÍTICO**: NÃO uses o mesmo timestamp que foi usado nos pontos fortes
+- **CRÍTICO**: NÃO uses a mesma frase/quote que foi usada nos pontos fortes
+- **CRÍTICO**: Cada momento da call deve ser avaliado UMA VEZ apenas
+
+REGRAS ANTI-CRÍTICAS EXCESSIVAS:
+- NÃO consideres como pontos fracos comportamentos NORMAIS de vendas
+- NÃO consideres como pontos fracos introduções de soluções (é normal apresentar soluções)
+- NÃO consideres como pontos fracos perguntas de follow-up (é normal agendar próximos passos)
+- NÃO consideres como pontos fracos explicações de processos (é normal explicar como funciona)
+- NÃO consideres como pontos fracos gestão de tempo (é normal ter limitações de tempo)
+- NÃO consideres como pontos fracos hesitações normais (é normal o cliente pensar)
+- NÃO consideres como pontos fracos repetições de informação (é normal reforçar pontos)
+- NÃO consideres como pontos fracos perguntas de clarificação (é normal esclarecer dúvidas)
+- **CRÍTICO**: Só identifica pontos fracos se houver FALHAS REAIS, não comportamentos normais
+- **CRÍTICO**: Se um comportamento é padrão em vendas, NÃO o consideres como fraco
 
 REGRAS CRÍTICAS PARA IDENTIFICAÇÃO DE PONTOS FRACOS:
 
@@ -307,7 +342,7 @@ Todas as tuas respostas devem ser exclusivamente em português de Portugal (espe
 
 É ABSOLUTAMENTE ESSENCIAL que todas as respostas sigam estas regras, sem exceção. Em caso de dúvida, opta sempre pela forma utilizada em Portugal, especificamente em Lisboa.
 
-Estrutura da Resposta (formato de lista com bullets):
+Estrutura de uma Resposta EXEMPLO (formato de lista com bullets):
 
 - **Falta de Rapport Inicial**: Momento em que a introdução não foi clara, envolvente ou não conseguiu estabelecer conexão com o cliente. Timestamp: [MM:SS] "[Frase completa do comercial - a frase inteira que demonstra a falta de rapport ou introdução inadequada]"
 
@@ -764,6 +799,23 @@ ${pontosFortes}
 - Se o rapport inicial foi identificado como ponto forte acima, NÃO o menciones como ponto fraco
 - Se qualquer outro aspecto foi identificado como forte, NÃO o menciones como fraco
 - Foca apenas em pontos fracos que NÃO foram identificados como pontos fortes
+- NÃO identifiques o mesmo comportamento/timestamp como forte E fraco
+- Se um momento tem aspectos positivos e negativos, escolhe o mais relevante
+- **CRÍTICO**: Se um timestamp já foi usado nos pontos fortes, NÃO o uses nos pontos fracos
+- **CRÍTICO**: Se uma frase/quote já foi usada nos pontos fortes, NÃO a uses nos pontos fracos
+- **CRÍTICO**: Cada momento da call deve ser avaliado UMA VEZ apenas - ou como forte OU como fraco
+
+**REGRAS ANTI-CRÍTICAS EXCESSIVAS:**
+- NÃO consideres como pontos fracos comportamentos NORMAIS de vendas
+- NÃO consideres como pontos fracos introduções de soluções (é normal apresentar soluções)
+- NÃO consideres como pontos fracos perguntas de follow-up (é normal agendar próximos passos)
+- NÃO consideres como pontos fracos explicações de processos (é normal explicar como funciona)
+- NÃO consideres como pontos fracos gestão de tempo (é normal ter limitações de tempo)
+- NÃO consideres como pontos fracos hesitações normais (é normal o cliente pensar)
+- NÃO consideres como pontos fracos repetições de informação (é normal reforçar pontos)
+- NÃO consideres como pontos fracos perguntas de clarificação (é normal esclarecer dúvidas)
+- **CRÍTICO**: Só identifica pontos fracos se houver FALHAS REAIS, não comportamentos normais
+- **CRÍTICO**: Se um comportamento é padrão em vendas, NÃO o consideres como fraco
 
 Agora identifica e resume os pontos fracos da reunião de vendas com base na transcrição fornecida, tendo em conta os pontos fortes já identificados.
 
@@ -860,6 +912,23 @@ ${pontosFortes}
 - Se o rapport inicial foi identificado como ponto forte acima, NÃO o menciones como ponto fraco
 - Se qualquer outro aspecto foi identificado como forte, NÃO o menciones como fraco
 - Foca apenas em pontos fracos que NÃO foram identificados como pontos fortes
+- NÃO identifiques o mesmo comportamento/timestamp como forte E fraco
+- Se um momento tem aspectos positivos e negativos, escolhe o mais relevante
+- **CRÍTICO**: Se um timestamp já foi usado nos pontos fortes, NÃO o uses nos pontos fracos
+- **CRÍTICO**: Se uma frase/quote já foi usada nos pontos fortes, NÃO a uses nos pontos fracos
+- **CRÍTICO**: Cada momento da call deve ser avaliado UMA VEZ apenas - ou como forte OU como fraco
+
+**REGRAS ANTI-CRÍTICAS EXCESSIVAS:**
+- NÃO consideres como pontos fracos comportamentos NORMAIS de vendas
+- NÃO consideres como pontos fracos introduções de soluções (é normal apresentar soluções)
+- NÃO consideres como pontos fracos perguntas de follow-up (é normal agendar próximos passos)
+- NÃO consideres como pontos fracos explicações de processos (é normal explicar como funciona)
+- NÃO consideres como pontos fracos gestão de tempo (é normal ter limitações de tempo)
+- NÃO consideres como pontos fracos hesitações normais (é normal o cliente pensar)
+- NÃO consideres como pontos fracos repetições de informação (é normal reforçar pontos)
+- NÃO consideres como pontos fracos perguntas de clarificação (é normal esclarecer dúvidas)
+- **CRÍTICO**: Só identifica pontos fracos se houver FALHAS REAIS, não comportamentos normais
+- **CRÍTICO**: Se um comportamento é padrão em vendas, NÃO o consideres como fraco
 
 ${formatPrompt(enhancedPrompt, { transcription })}`
 }

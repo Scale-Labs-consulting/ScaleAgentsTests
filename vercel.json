@@ -24,6 +24,10 @@
     },
     "app/api/hr-agent/blob-upload-zip/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/pdf-parser-python/route.ts": {
+      "runtime": "edge",
+      "maxDuration": 60
     }
   }
 }

@@ -2065,10 +2065,7 @@ export async function POST(request: NextRequest) {
       throw new Error('Operation cancelled')
     }
 
-    // DUPLICATE CHECK - Check for existing analysis with same content before expensive GPT analysis
-    console.log('🔍 Checking for duplicate content before analysis...')
-    
-    // Generate SHA-256 hash of the transcription content
+    // Generate SHA-256 hash of the transcription content for metadata
     const encoder = new TextEncoder()
     const data = encoder.encode(transcriptionToAnalyze)
     const hashBuffer = await crypto.subtle.digest('SHA-256', data)
@@ -2076,64 +2073,7 @@ export async function POST(request: NextRequest) {
     const contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
     
     console.log('🔐 Generated content hash:', contentHash.substring(0, 16) + '...')
-    
-    // Check if we already have an analysis with this exact content
-    const { data: existingAnalysis, error: duplicateCheckError } = await supabase
-      .from('sales_call_analyses')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('analysis_metadata->>content_hash', contentHash)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    
-    if (duplicateCheckError && duplicateCheckError.code !== 'PGRST116') {
-      // PGRST116 means "no rows returned" which is expected when no duplicate exists
-      console.warn('⚠️ Error checking for duplicates:', duplicateCheckError)
-    }
-    
-    if (existingAnalysis) {
-      console.log('🔄 Duplicate content detected!')
-      console.log('📊 Existing analysis ID:', existingAnalysis.id)
-      console.log('📅 Created at:', existingAnalysis.created_at)
-      console.log('📝 Title:', existingAnalysis.title)
-      console.log('💰 Creating new analysis record with duplicate content to save AssemblyAI and GPT credits!')
-      
-      // Delete the file from Vercel Blob since it's a duplicate and we don't need it
-      try {
-        console.log('🗑️ Deleting duplicate file from Vercel Blob to save storage costs...')
-        await del(blobUrl)
-        console.log('✅ Duplicate file deleted from Vercel Blob successfully')
-      } catch (deleteError) {
-        console.warn('⚠️ Failed to delete duplicate file from blob storage:', deleteError)
-        // Don't fail the entire process if blob deletion fails
-      }
-      
-      // Return the existing analysis instead of creating a duplicate
-      console.log('✅ Returning existing analysis to avoid duplicates...')
-      
-      // Debug: Log the duplicate response being sent to frontend
-      console.log('🔍 DUPLICATE RESPONSE TO FRONTEND:')
-      console.log('🔍 existingAnalysis.analysis structure:', JSON.stringify(existingAnalysis.analysis, null, 2))
-      console.log('🔍 existingAnalysis.analysis type:', typeof existingAnalysis.analysis)
-      
-      // Return the existing analysis result
-      return NextResponse.json({
-        success: true,
-        analysis: existingAnalysis.analysis,
-        analysisId: existingAnalysis.id,
-        message: 'Duplicate content detected - returning existing analysis',
-        isDuplicate: true,
-        duplicateInfo: {
-          originalId: existingAnalysis.id,
-          originalTitle: existingAnalysis.title,
-          originalDate: existingAnalysis.created_at,
-          contentHash: contentHash.substring(0, 16) + '...'
-        }
-      })
-    }
-    
-    console.log('✅ No duplicate content found, proceeding with GPT analysis...')
+    console.log('✅ Proceeding with GPT analysis...')
 
     // Use direct comprehensive analysis for the transcription
     console.log('🔄 Using direct comprehensive analysis for transcription...')

@@ -66,6 +66,56 @@ export async function extractTextFromPDFWithPython(
   version: string
 }> {
   try {
+    // Check if we're in a Vercel environment or if Python is not available
+    const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
+    
+    if (isVercel) {
+      console.log('🔄 Vercel environment detected, using Edge Function with Python...')
+      try {
+        // Try to use the new Edge Function with Python support
+        const formData = new FormData()
+        const uint8Array = new Uint8Array(buffer)
+        const blob = new Blob([uint8Array], { type: 'application/pdf' })
+        formData.append('file', blob, 'document.pdf')
+        
+        const response = await fetch('/api/pdf-parser-python', {
+          method: 'POST',
+          body: formData
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Edge Function failed: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        
+        console.log('✅ Edge Function PDF parser successful')
+        return {
+          text: result.text,
+          numpages: result.numpages,
+          numrender: result.numrender,
+          info: result.info,
+          metadata: result.metadata,
+          version: result.method || 'edge-function'
+        }
+      } catch (edgeError) {
+        console.warn('⚠️ Edge Function failed, falling back to JavaScript:', edgeError)
+        // Fallback to JavaScript PDF parser
+        const { extractTextFromPDF } = await import('./pdf-utils')
+        const jsResult = await extractTextFromPDF(buffer, { max: options?.max })
+        
+        console.log('✅ JavaScript PDF parser fallback successful')
+        return {
+          text: jsResult.text,
+          numpages: jsResult.numpages,
+          numrender: jsResult.numrender,
+          info: jsResult.info,
+          metadata: jsResult.metadata,
+          version: 'javascript-fallback'
+        }
+      }
+    }
+
     console.log(`🐍 Extracting text from PDF using Python PyMuPDF (${buffer.length} bytes)`)
     
     // Clean up old temp files periodically
@@ -225,6 +275,44 @@ function cleanAndFormatText(text: string): string {
  */
 export async function extractTextFromURLWithPython(url: string): Promise<string> {
   try {
+    // Check if we're in a Vercel environment or if Python is not available
+    const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
+    
+    if (isVercel) {
+      console.log('🔄 Vercel environment detected, using Edge Function with Python for URL...')
+      try {
+        // For URL parsing, we need to download the file first
+        const response = await fetch(url)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch URL: ${response.status}`)
+        }
+        
+        const buffer = Buffer.from(await response.arrayBuffer())
+        const formData = new FormData()
+        const uint8Array = new Uint8Array(buffer)
+        const blob = new Blob([uint8Array], { type: 'application/pdf' })
+        formData.append('file', blob, 'document.pdf')
+        
+        const edgeResponse = await fetch('/api/pdf-parser-python', {
+          method: 'POST',
+          body: formData
+        })
+        
+        if (!edgeResponse.ok) {
+          throw new Error(`Edge Function failed: ${edgeResponse.status}`)
+        }
+        
+        const result = await edgeResponse.json()
+        console.log('✅ Edge Function PDF parser successful for URL')
+        return result.text
+      } catch (edgeError) {
+        console.warn('⚠️ Edge Function failed for URL, falling back to JavaScript:', edgeError)
+        // Fallback to JavaScript PDF parser
+        const { extractTextFromURL } = await import('./pdf-utils')
+        return await extractTextFromURL(url)
+      }
+    }
+
     console.log(`🐍 Extracting text from URL using Python PyMuPDF: ${url}`)
     
     // Download the file from the URL

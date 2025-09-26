@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     console.log('⚠️ Python not yet available in Edge Runtime, using JavaScript fallback')
     
     // Import and use JavaScript PDF parser
-    const { extractTextFromPDF } = await import('../../lib/pdf-utils')
+    const { extractTextFromPDF } = await import('../../../lib/pdf-utils')
     const result = await extractTextFromPDF(buffer, { max: 20 })
     
     return NextResponse.json({

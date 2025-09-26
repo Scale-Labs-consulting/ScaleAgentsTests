@@ -70,15 +70,46 @@ export async function extractTextFromPDFWithPython(
     const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
     
     if (isVercel) {
-      console.log('🔄 Vercel environment detected, using JavaScript PDF parser fallback...')
-      console.log('⚠️ Edge Runtime cannot use pdf2json due to Node.js dependencies')
+      console.log('🔄 Vercel environment detected, using Python serverless function...')
       
       try {
-        // Use JavaScript PDF parser directly since Edge Function has limitations
+        // Use Python serverless function with PyMuPDF
+        const formData = new FormData()
+        const uint8Array = new Uint8Array(buffer)
+        const blob = new Blob([uint8Array], { type: 'application/pdf' })
+        formData.append('file', blob, 'document.pdf')
+        
+        const response = await fetch('/api/pdf-parser-python.py', {
+          method: 'POST',
+          body: formData
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Python function failed: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Python PDF parsing failed')
+        }
+        
+        console.log('✅ Python PDF parser successful in Vercel')
+        return {
+          text: result.text,
+          numpages: result.numpages,
+          numrender: result.numrender,
+          info: result.info,
+          metadata: result.metadata,
+          version: result.version || 'python-serverless'
+        }
+      } catch (pythonError) {
+        console.warn('⚠️ Python function failed, falling back to JavaScript:', pythonError)
+        // Fallback to JavaScript PDF parser
         const { extractTextFromPDF } = await import('./pdf-utils')
         const jsResult = await extractTextFromPDF(buffer, { max: options?.max })
         
-        console.log('✅ JavaScript PDF parser successful in Vercel')
+        console.log('✅ JavaScript PDF parser fallback successful')
         return {
           text: jsResult.text,
           numpages: jsResult.numpages,
@@ -87,9 +118,6 @@ export async function extractTextFromPDFWithPython(
           metadata: jsResult.metadata,
           version: 'javascript-fallback'
         }
-      } catch (jsError) {
-        console.error('❌ JavaScript PDF parser failed:', jsError)
-        throw jsError
       }
     }
 
@@ -256,16 +284,43 @@ export async function extractTextFromURLWithPython(url: string): Promise<string>
     const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
     
     if (isVercel) {
-      console.log('🔄 Vercel environment detected, using JavaScript PDF parser fallback for URL...')
-      console.log('⚠️ Edge Runtime cannot use pdf2json due to Node.js dependencies')
+      console.log('🔄 Vercel environment detected, using Python serverless function for URL...')
       
       try {
-        // Use JavaScript PDF parser directly since Edge Function has limitations
+        // Download the file first, then use Python function
+        const response = await fetch(url)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch URL: ${response.status}`)
+        }
+        
+        const buffer = Buffer.from(await response.arrayBuffer())
+        const formData = new FormData()
+        const uint8Array = new Uint8Array(buffer)
+        const blob = new Blob([uint8Array], { type: 'application/pdf' })
+        formData.append('file', blob, 'document.pdf')
+        
+        const pythonResponse = await fetch('/api/pdf-parser-python.py', {
+          method: 'POST',
+          body: formData
+        })
+        
+        if (!pythonResponse.ok) {
+          throw new Error(`Python function failed: ${pythonResponse.status}`)
+        }
+        
+        const result = await pythonResponse.json()
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Python PDF parsing failed')
+        }
+        
+        console.log('✅ Python PDF parser successful for URL')
+        return result.text
+      } catch (pythonError) {
+        console.warn('⚠️ Python function failed for URL, falling back to JavaScript:', pythonError)
+        // Fallback to JavaScript PDF parser
         const { extractTextFromURL } = await import('./pdf-utils')
         return await extractTextFromURL(url)
-      } catch (jsError) {
-        console.error('❌ JavaScript PDF parser failed for URL:', jsError)
-        throw jsError
       }
     }
 

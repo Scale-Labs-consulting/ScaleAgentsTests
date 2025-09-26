@@ -26,7 +26,6 @@
       "maxDuration": 300
     },
     "app/api/pdf-parser-python/route.ts": {
-      "runtime": "edge",
       "maxDuration": 60
     }
   }

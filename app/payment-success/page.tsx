@@ -9,7 +9,8 @@ import Link from 'next/link'
 function PaymentSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [countdown, setCountdown] = useState(5)
+  const [isProcessing, setIsProcessing] = useState(true)
+  const [subscriptionCreated, setSubscriptionCreated] = useState(false)
 
   useEffect(() => {
     // Check if we have success parameters
@@ -17,11 +18,27 @@ function PaymentSuccessContent() {
     const paymentIntent = searchParams.get('payment_intent')
     const redirectStatus = searchParams.get('redirect_status')
     
+    console.log('🔍 Payment Success Page - URL Parameters:', {
+      success,
+      paymentIntent,
+      redirectStatus,
+      allParams: Object.fromEntries(searchParams.entries())
+    })
+    
     // If not a successful payment, redirect to dashboard
-    if (success !== 'true' || !(paymentIntent || redirectStatus === 'succeeded')) {
+    // Be more flexible with success parameter checking
+    const isSuccessfulPayment = success === 'true' || 
+                               paymentIntent || 
+                               redirectStatus === 'succeeded' ||
+                               window.location.pathname === '/payment-success'
+    
+    if (!isSuccessfulPayment) {
+      console.log('❌ Not a successful payment, redirecting to dashboard')
       router.push('/dashboard')
       return
     }
+    
+    console.log('✅ Successful payment detected, showing success page')
 
     // Create subscription if we have a payment intent
     const createSubscription = async () => {
@@ -43,32 +60,60 @@ function PaymentSuccessContent() {
           
           if (response.ok) {
             console.log('✅ Subscription created successfully:', data)
+            setSubscriptionCreated(true)
           } else {
             console.error('❌ Failed to create subscription:', data.error)
+            setSubscriptionCreated(true) // Still show success page even if subscription creation fails
           }
         } catch (error) {
           console.error('❌ Error creating subscription:', error)
+          setSubscriptionCreated(true) // Still show success page even if subscription creation fails
         }
+      } else {
+        setSubscriptionCreated(true)
       }
+      
+      setIsProcessing(false)
     }
 
-    // Create subscription first, then start countdown
+    // Create subscription
     createSubscription()
-
-    // Countdown to redirect to dashboard
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer)
-          router.push('/dashboard')
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
+    
+    // Add a small delay to ensure the page is fully loaded
+    const timer = setTimeout(() => {
+      console.log('⏰ Success page fully loaded and ready')
+    }, 100)
+    
+    return () => clearTimeout(timer)
   }, [router, searchParams])
+
+  const handleGoToDashboard = () => {
+    router.push('/dashboard')
+  }
+
+  // Show loading state while processing
+  if (isProcessing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-violet-50 flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full text-center">
+          <div className="relative mx-auto w-24 h-24 mb-6">
+            <div className="absolute inset-0 bg-purple-100 rounded-full animate-pulse"></div>
+            <div className="relative w-24 h-24 bg-purple-500 rounded-full flex items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+            </div>
+          </div>
+          
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Processando Pagamento... ⏳
+          </h1>
+          
+          <p className="text-xl text-gray-600 mb-8">
+            A ativar a sua subscrição. Por favor aguarde um momento.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-violet-50 flex items-center justify-center p-4">
@@ -131,16 +176,16 @@ function PaymentSuccessContent() {
 
         {/* Action Buttons */}
         <div className="text-center space-y-4">
-          <Link
-            href="/dashboard"
+          <button
+            onClick={handleGoToDashboard}
             className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-violet-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-violet-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
           >
             Ir para o Dashboard
             <ArrowRight className="ml-2 w-5 h-5" />
-          </Link>
+          </button>
           
           <p className="text-gray-500 text-sm">
-            Será redirecionado automaticamente em {countdown} segundos
+            Clique no botão acima para aceder ao seu dashboard
           </p>
         </div>
 

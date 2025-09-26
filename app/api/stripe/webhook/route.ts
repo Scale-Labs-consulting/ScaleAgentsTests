@@ -55,6 +55,10 @@ export async function POST(request: NextRequest) {
       case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object as Stripe.PaymentIntent
         
+        console.log(`💳 Payment succeeded - ID: ${paymentIntent.id}`)
+        console.log(`💳 Customer: ${paymentIntent.customer}`)
+        console.log(`💳 Metadata:`, paymentIntent.metadata)
+        
         // Only handle subscription setup payments
         if (paymentIntent.metadata?.plan_id && paymentIntent.metadata?.user_id) {
           const userId = paymentIntent.metadata.user_id
@@ -72,6 +76,16 @@ export async function POST(request: NextRequest) {
           
           // Get the appropriate price ID
           const priceId = billingPeriod === 'yearly' ? plan.stripeYearlyPriceId : plan.stripePriceId
+          console.log(`🔍 Using price ID: ${priceId}`)
+          
+          // Verify price exists before creating subscription
+          try {
+            const price = await stripe.prices.retrieve(priceId)
+            console.log(`✅ Price exists: ${price.id} - ${price.unit_amount} ${price.currency}`)
+          } catch (priceError) {
+            console.error('❌ Price does not exist:', priceError)
+            break
+          }
           
           // Create subscription using the payment method from the payment intent
           const subscription = await stripe.subscriptions.create({
@@ -96,6 +110,8 @@ export async function POST(request: NextRequest) {
             subscription_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           }
 
+          console.log('📝 Payment Intent - Updating database with:', updateData)
+
           const { error: updateError } = await supabase
             .from('profiles')
             .update(updateData)
@@ -104,8 +120,11 @@ export async function POST(request: NextRequest) {
           if (updateError) {
             console.error('❌ Error updating user subscription:', updateError)
           } else {
+            console.log(`✅ Database updated successfully for user ${userId}`)
             console.log(`✅ Subscription created for user ${userId}: ${subscription.id}`)
           }
+        } else {
+          console.log('ℹ️ Payment succeeded but no subscription metadata found')
         }
         break
       }
@@ -175,6 +194,8 @@ export async function POST(request: NextRequest) {
               updateData.subscription_plan = planId
             }
 
+            console.log('📝 Updating database with:', updateData)
+            
             const { error: updateError } = await supabase
               .from('profiles')
               .update(updateData)
@@ -183,6 +204,7 @@ export async function POST(request: NextRequest) {
             if (updateError) {
               console.error('❌ Error updating user subscription:', updateError)
             } else {
+              console.log(`✅ Database updated successfully for user ${userId}`)
               console.log(`✅ Subscription created for user ${userId}: ${subscription.id}`)
             }
           } else {

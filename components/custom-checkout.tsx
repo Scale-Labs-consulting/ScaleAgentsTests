@@ -77,7 +77,7 @@ function CheckoutForm({ plan, billingPeriod, clientSecret, userId, onSuccess }: 
     const result = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/dashboard?success=true`,
+        return_url: `${window.location.origin}/payment-success?success=true`,
         payment_method_data: {
           billing_details: {
             name: userInfo?.name || 'ScaleAgents Customer',

@@ -77,17 +77,23 @@ export async function POST(request: NextRequest) {
       try {
         // Verify the customer exists in Stripe
         console.log('🔍 Validating existing customer ID in Stripe...')
-        await stripe.customers.retrieve(customerId)
-        console.log('✅ Existing customer validated')
+        const existingCustomer = await stripe.customers.retrieve(customerId)
+        console.log('✅ Existing customer validated:', existingCustomer.id)
       } catch (customerError: any) {
         console.warn('⚠️ Existing customer ID is invalid:', customerError.message)
         console.log('🧹 Clearing invalid customer ID from database')
         
         // Clear the invalid customer ID from database
-        await supabase
+        const { error: clearError } = await supabase
           .from('profiles')
           .update({ stripe_customer_id: null })
           .eq('id', userId)
+        
+        if (clearError) {
+          console.error('❌ Failed to clear invalid customer ID:', clearError)
+        } else {
+          console.log('✅ Invalid customer ID cleared from database')
+        }
         
         // Set to null so we create a new one
         customerId = null

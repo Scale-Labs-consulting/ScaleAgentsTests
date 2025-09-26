@@ -76,10 +76,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Histórico de análises'
     ],
     stripeProductId: 'prod_SzaQSOBw40d82a',
-    stripePriceId: 'price_1S7YT92cuDLLRqcPYvJvQMhw', // Monthly price ID
-    stripeYearlyPriceId: 'price_1S7YUC2cuDLLRqcPouPsZAeP', // Yearly price ID
-    stripeCheckoutUrl: 'https://buy.stripe.com/test_7sY6oA6sqakYdWcfkWbo401',
-    stripeYearlyCheckoutUrl: 'https://buy.stripe.com/test_cNicMY9ECct67xO8Wybo406',
+    stripePriceId: 'price_1SBYwB2cuDLLRqcP2tiSxjNc', // Monthly price ID
+    stripeYearlyPriceId: 'price_1SBYwB2cuDLLRqcPNMstuj5f', // Yearly price ID
+    stripeCheckoutUrl: 'https://buy.stripe.com/test_fZu14g7wu8cQf0g2yabo409',
+    stripeYearlyCheckoutUrl: 'https://buy.stripe.com/test_bJebIU2cabp2f0g8Wybo40a',
     maxAnalyses: 10,
     maxFileSize: null, // No file size limit
     priority: 'low',
@@ -106,10 +106,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Análise de tendências'
     ],
     stripeProductId: 'prod_SzaQ0Rm5hs2psP',
-    stripePriceId: 'price_1S7Z5J2cuDLLRqcPkdwXnYzf', // Monthly price ID
-    stripeYearlyPriceId: 'price_1S7Z5a2cuDLLRqcPQN2Ky9hU', // Yearly price ID
-    stripeCheckoutUrl: 'https://buy.stripe.com/test_cNi7sE04278M05m6Oqbo402',
-    stripeYearlyCheckoutUrl: 'https://buy.stripe.com/test_eVqdR2cQO64IdWcdcObo407',
+    stripePriceId: 'price_1SBYzE2cuDLLRqcPjnI3VHUu', // Monthly price ID
+    stripeYearlyPriceId: 'price_1SBYzP2cuDLLRqcPrZwgAZv6', // Yearly price ID
+    stripeCheckoutUrl: 'https://buy.stripe.com/test_4gM7sE1863WA5pG4Gibo40b',
+    stripeYearlyCheckoutUrl: 'https://buy.stripe.com/test_00weV6bMKgJm6tKegSbo40c',
     maxAnalyses: 50,
     maxFileSize: null, // No file size limit
     priority: 'medium',
@@ -139,10 +139,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'White-label options'
     ],
     stripeProductId: 'prod_SzaQRovKIXLDGr',
-    stripePriceId: 'price_1S7YQO2cuDLLRqcPBH2rRMhj', // Monthly price ID
-    stripeYearlyPriceId: 'price_1S7YQw2cuDLLRqcPHszvueiT', // Yearly price ID
-    stripeCheckoutUrl: 'https://buy.stripe.com/test_eVqbIU0429gUaK0fkWbo403',
-    stripeYearlyCheckoutUrl: 'https://buy.stripe.com/test_bJe4gs9EC8cQg4kb4Gbo404',
+    stripePriceId: 'price_1SBZ1L2cuDLLRqcPPBIYxVe1', // Monthly price ID
+    stripeYearlyPriceId: 'price_1SBZ1L2cuDLLRqcPnyO1XYrq', // Yearly price ID
+    stripeCheckoutUrl: 'https://buy.stripe.com/test_28E7sEeYW3WAcS83Cebo40d',
+    stripeYearlyCheckoutUrl: 'https://buy.stripe.com/test_4gM00cdUSgJmf0ggp0bo40e',
     maxAnalyses: -1, // -1 means unlimited
     maxFileSize: null, // No file size limit
     priority: 'high',

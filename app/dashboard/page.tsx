@@ -230,7 +230,9 @@ export default function DashboardPage() {
     if (success === 'true' && (sessionId || (paymentIntent && redirectStatus === 'succeeded'))) {
       // Set redirecting state and redirect to payment success page immediately
       setIsRedirecting(true)
-      router.replace('/payment-success')
+      // Add the payment parameters to the success page URL
+      const successUrl = `/payment-success?success=true&payment_intent=${paymentIntent || ''}&redirect_status=${redirectStatus || ''}&session_id=${sessionId || ''}`
+      router.replace(successUrl)
       return
     }
     
@@ -2864,19 +2866,6 @@ export default function DashboardPage() {
 
                   {/* Navigation Links */}
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 cursor-pointer">
-                      <div className="flex items-center space-x-2">
-                        <HelpCircle className="w-4 h-4 text-white/60" />
-                        <span className="text-white text-sm">Centro de Ajuda</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 cursor-pointer">
-                      <div className="flex items-center space-x-2">
-                        <Moon className="w-4 h-4 text-white/60" />
-                        <span className="text-white text-sm">Aparência</span>
-                      </div>
-                      <ChevronRight className="w-3 h-3 text-white/60" />
-                    </div>
                     <button 
                       className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-red-500/10 cursor-pointer transition-colors text-left" 
                       onClick={(e) => {

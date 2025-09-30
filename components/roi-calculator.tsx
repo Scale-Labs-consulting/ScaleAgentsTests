@@ -20,38 +20,36 @@ export default function ROICalculator() {
   // Calculate ROI based on inputs
   const calculateROI = () => {
     if (monthlyRevenue > 0 && averageDealSize > 0 && currentCloseRate > 0 && numberOfSalesReps > 0) {
-      // Dynamic close rate increase based on current performance and agent capabilities
+      // Realistic close rate increase based on AI assistance
       const calculateCloseRateIncrease = () => {
-        // Base improvement from Scale Expert + Sales Analyst
+        // More realistic improvements based on industry standards
+        // Normal close rates are 15-20%, so we use conservative but meaningful improvements
+        
         let baseImprovement = 0
         
-        // Scale Expert provides strategic insights and process optimization
-        // Sales Analyst provides data-driven recommendations and performance analysis
-        // Combined effect is higher for lower-performing teams
-        
-        if (currentCloseRate < 30) {
-          // Low performers see biggest improvement (80%+ for very low rates like 10%)
-          baseImprovement = 83.3
-        } else if (currentCloseRate < 50) {
-          // Medium performers see good improvement (15-22%)
-          baseImprovement = 18
-        } else if (currentCloseRate < 60) {
-          // Good performers see moderate improvement (12-18%)
-          baseImprovement = 15
-        } else if (currentCloseRate < 80) {
-          // High performers see smaller but still significant improvement (10-15%)
-          baseImprovement = 12.5
+        if (currentCloseRate < 10) {
+          // Very low performers can see significant improvement
+          baseImprovement = 8
+        } else if (currentCloseRate < 15) {
+          // Low performers see good improvement
+          baseImprovement = 6
+        } else if (currentCloseRate < 25) {
+          // Average performers see moderate improvement
+          baseImprovement = 4
+        } else if (currentCloseRate < 35) {
+          // Good performers see smaller improvement
+          baseImprovement = 3
         } else {
-          // Top performers see modest improvement (5-8%)
-          baseImprovement = 6.5
+          // High performers see minimal improvement
+          baseImprovement = 2
         }
         
         // Add variance based on deal size (larger deals = more complex = more AI value)
-        const dealSizeMultiplier = averageDealSize > 10000 ? 1.2 : averageDealSize > 5000 ? 1.1 : 1.0
+        const dealSizeMultiplier = averageDealSize > 10000 ? 1.1 : averageDealSize > 5000 ? 1.05 : 1.0
         
         const avgImprovement = baseImprovement * dealSizeMultiplier
-        const minImprovement = Math.max(2, avgImprovement * 0.06) // Minimum 2%
-        const maxImprovement = Math.min(30, avgImprovement * 0.12) // Maximum 30%, more conservative multiplier
+        const minImprovement = Math.max(1, avgImprovement * 0.8) // Conservative minimum
+        const maxImprovement = Math.min(10, avgImprovement * 1.2) // Realistic maximum
         
         return {
           min: Math.round(minImprovement * 10) / 10,
@@ -68,8 +66,8 @@ export default function ROICalculator() {
       // Calculate additional deals with average improvement
       const additionalDeals = Math.round(currentDealsPerMonth * (closeRateIncrease.avg / 100))
       
-      // Monthly investment: €269 per sales rep
-      const monthlyInvestment = numberOfSalesReps * 269
+      // Monthly investment: €64 per sales rep
+      const monthlyInvestment = numberOfSalesReps * 64
       
       // Monthly revenue increase from additional deals
       const monthlyRevenueIncrease = additionalDeals * averageDealSize
@@ -213,13 +211,13 @@ export default function ROICalculator() {
                 {/* Monthly Investment */}
                 <div className="p-6 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg">
                   <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
-                    Investimento Mensal ScaleAgents
+                    Investimento Mensal
                   </h4>
                   <div className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                     {formatCurrency(roi.monthlyInvestment)}
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 text-sm">
-                    {numberOfSalesReps} vendedores × €269/mês
+                    {numberOfSalesReps} vendedores × €64/mês
                   </p>
                 </div>
 
@@ -255,8 +253,8 @@ export default function ROICalculator() {
           {/* Disclaimer */}
           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-              Todos os cálculos baseados em vendedores treinando uma hora por dia na ScaleAgents durante 22 dias por mês. 
-              Os nossos dados sugerem que o treino com ScaleAgents uma hora por dia pode aumentar o desempenho em 5-10% no mínimo. Investimento baseado no Plano Pro (€269/mês por vendedor).
+              Todos os cálculos baseados em vendedores treinando uma hora por dia com os agentes de IA da Scale Labs durante 22 dias por mês. 
+              Os nossos dados sugerem que o treino com os agentes de IA uma hora por dia pode aumentar o desempenho em 5-10% no mínimo. Investimento baseado no Plano Pro (€64/mês por vendedor).
             </p>
           </div>
         </div>

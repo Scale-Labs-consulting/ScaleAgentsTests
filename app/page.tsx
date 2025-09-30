@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
 import ROICalculator from '@/components/roi-calculator'
 import { SUBSCRIPTION_PLANS } from '@/lib/subscription-plans'
-import { ArrowRight, Bot, TrendingUp, Users, Zap, MessageSquare, BarChart3, UserCheck, ChevronLeft, ChevronRight, Play, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowRight, Bot, TrendingUp, Users, Zap, MessageSquare, BarChart3, UserCheck, ChevronLeft, ChevronRight, Play, ChevronDown, ChevronUp, Target, ShoppingCart } from 'lucide-react'
 
 export default function HomePage() {
   const [currentCase, setCurrentCase] = useState(0)
@@ -508,25 +508,25 @@ export default function HomePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-6xl">
               {[
                 {
-                  icon: "👥",
+                  icon: <Users className="w-8 h-8" />,
                   title: "Equipas Sem Performance Optimizada",
                   description: "Contratar vendedores custa €50k+ por pessoa/ano. Já que o investimento é alto, mais vale garantir que eles performam ao máximo com sistemas e formação adequada.",
                   gradient: "from-purple-600 to-violet-700"
                 },
                 {
-                  icon: "🎯",
+                  icon: <Target className="w-8 h-8" />,
                   title: "Investem nos Sítios Errados",
                   description: "Sem dados precisos, os diretores investem em marketing quando o problema é o fecho de negócio, ou em leads quando o problema é a oferta. Desperdiçam recursos no sintoma, não na causa.",
                   gradient: "from-purple-600 to-violet-700"
                 },
                 {
-                  icon: "🛒",
+                  icon: <ShoppingCart className="w-8 h-8" />,
                   title: "Ofertas Que Não Convertem",
                   description: "Scripts genéricos, ofertas não testadas, processos amadores. Como esperas competir contra empresas com sistemas profissionais e dados reais?",
                   gradient: "from-purple-600 to-violet-700"
                 },
                 {
-                  icon: "📊",
+                  icon: <BarChart3 className="w-8 h-8" />,
                   title: "Falta de Dados Para Optimizar",
                   description: "A maioria dos negócios não analisa as suas reuniões de venda nem têm feedback baseado em dados reais. Como vais melhorar sem saber onde estás a falhar?",
                   gradient: "from-purple-600 to-violet-700"
@@ -941,10 +941,6 @@ export default function HomePage() {
                   {
                     question: "Quanto tempo demora a ver resultados?",
                     answer: "A maioria dos nossos clientes vê melhorias significativas nas primeiras 2-4 semanas. Para resultados mais profundos e transformação completa dos processos, recomendamos um período de 3-6 meses de utilização consistente."
-                  },
-                  {
-                    question: "Oferecem suporte e formação?",
-                    answer: "Sim! Todos os planos incluem suporte por email. O Plano Pro inclui suporte prioritário, e o Plano Enterprise inclui suporte 24/7 e um gestor de conta dedicado. Também oferecemos webinars de formação e documentação completa."
                   },
                   {
                     question: "O que acontece se precisar de mais agents no futuro?",
@@ -1892,7 +1888,7 @@ export default function HomePage() {
                 visibleElements.has('final-cta-description') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
               }`}
             >
-              Early access limitado. Apenas para sérios.
+              Early access limitado.
             </p>
 
             <div 

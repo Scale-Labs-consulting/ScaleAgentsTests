@@ -63,8 +63,13 @@ export default function ROICalculator() {
       // Calculate current deals per month
       const currentDealsPerMonth = monthlyRevenue / averageDealSize
       
-      // Calculate additional deals with average improvement
-      const additionalDeals = Math.round(currentDealsPerMonth * (closeRateIncrease.avg / 100))
+      // Calculate total deals worked on (deals closed ÷ close rate)
+      const totalDealsWorkedOn = currentDealsPerMonth / (currentCloseRate / 100)
+      
+      // Calculate additional deals with improved close rate
+      const newCloseRate = currentCloseRate + closeRateIncrease.avg
+      const newDealsClosed = totalDealsWorkedOn * (newCloseRate / 100)
+      const additionalDeals = Math.round(newDealsClosed - currentDealsPerMonth)
       
       // Monthly investment: €64 per sales rep
       const monthlyInvestment = numberOfSalesReps * 64

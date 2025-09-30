@@ -130,7 +130,6 @@ export default function RegisterPage() {
   const handleGoogleSignUp = async () => {
     setIsGoogleLoading(true)
     setGeneralError('')
-    setSuccessMessage('')
     
     try {
       await signInWithGoogle()

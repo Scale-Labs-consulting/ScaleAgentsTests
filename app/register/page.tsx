@@ -25,7 +25,6 @@ export default function RegisterPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [generalError, setGeneralError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
   const { signUp, signInWithGoogle } = useAuth()
   const { isFirstTime } = useFirstTimeUser()
@@ -65,13 +64,11 @@ export default function RegisterPage() {
 
     setIsLoading(true)
     setGeneralError('')
-    setSuccessMessage('')
     
     try {
       const result = await signUp(formData.email, formData.password)
       
       // Show success message with email verification instructions
-      setSuccessMessage('Conta criada com sucesso!')
       
       toast({
         title: "Conta criada com sucesso! 🎉",
@@ -248,17 +245,6 @@ export default function RegisterPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {successMessage && (
-                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-md">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-400" />
-                    <p className="text-green-400 text-sm font-medium">{successMessage}</p>
-                  </div>
-                  <p className="text-green-300 text-xs mt-2">
-                    Verifique o seu email e clique no link de confirmação para ativar a sua conta.
-                  </p>
-                </div>
-              )}
               
               {generalError && (
                 <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md">

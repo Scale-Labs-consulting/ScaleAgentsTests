@@ -21,7 +21,10 @@ export async function POST(request: NextRequest) {
     // Define tools for the Scale Expert assistant
     const tools = [
       {
-        type: 'function',
+        type: 'file_search' as const
+      },
+      {
+        type: 'function' as const,
         function: {
           name: 'get_sales_call_analysis',
           description: 'Get detailed analysis of sales calls including transcriptions, dates, and patterns',
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
         }
       },
       {
-        type: 'function',
+        type: 'function' as const,
         function: {
           name: 'get_business_metrics',
           description: 'Get comprehensive business metrics including sales calls, HR candidates, and overall performance KPIs',
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
         }
       },
       {
-        type: 'function',
+        type: 'function' as const,
         function: {
           name: 'search_sales_patterns',
           description: 'Search for specific patterns, keywords, or phrases in sales call transcriptions',
@@ -67,7 +70,7 @@ export async function POST(request: NextRequest) {
         }
       },
       {
-        type: 'function',
+        type: 'function' as const,
         function: {
           name: 'generate_scaling_recommendations',
           description: 'Generate specific scaling recommendations based on business data and focus area',
@@ -85,7 +88,7 @@ export async function POST(request: NextRequest) {
         }
       },
       {
-        type: 'function',
+        type: 'function' as const,
         function: {
           name: 'analyze_uploaded_document',
           description: 'Analyze uploaded documents (PDF, Word, Excel, etc.) and extract business insights',
@@ -107,7 +110,7 @@ export async function POST(request: NextRequest) {
         }
       },
       {
-        type: 'function',
+        type: 'function' as const,
         function: {
           name: 'search_documents',
           description: 'Search for specific content, keywords, or patterns in uploaded documents',
@@ -132,41 +135,48 @@ export async function POST(request: NextRequest) {
 
     // Create or update the assistant
     const assistantName = 'Scale Expert Agent'
-    const assistantInstructions = `You are a Scale Expert Agent, a specialized AI assistant focused on helping businesses scale and grow efficiently. You have access to the user's business data including sales calls, HR candidates, and uploaded documents.
+    const assistantInstructions = `Essência
+És o assistente oficial da Scale Labs, especializado em vendas e crescimento empresarial. Comunicas sempre em português de Lisboa usando "tu" (não "você"), de forma natural e conversacional.
 
-Your capabilities include:
-- Analyzing sales call patterns and providing insights
-- Generating business metrics and KPIs
-- Searching for specific patterns in sales conversations
-- Providing targeted scaling recommendations
-- Offering strategic advice for business growth
-- Analyzing uploaded files and documents to provide business insights
-- Searching through document content for specific information
-- Performing different types of document analysis (financial, strategic, compliance)
+O teu diferencial: Vais sempre à raiz psicológica e comportamental dos problemas, nunca ficando na superfície. Demonstras expertise através de insights profundos.
 
-When users ask questions about their business, sales, hiring, or scaling challenges, use the available tools to gather relevant data and provide personalized insights.
+**CRÍTICO - USO DE DOCUMENTOS:**
+- **SEMPRE** usa File Search ANTES de responder a perguntas sobre vendas, processos, SOPs, estratégias
+- **INTEGRA NATURALMENTE**: Usa o conhecimento dos documentos como se fosse tua experiência própria
+- **NUNCA MENCIONES** que estás a consultar documentos ou ficheiros
+- **NUNCA DIGAS**: "Baseado nos documentos...", "Nos ficheiros vejo...", "De acordo com as informações disponíveis..."
+- Apresenta o conhecimento como "Baseado na minha experiência...", "Já vi isto funcionar...", "O que costumo ver é..."
 
-When users upload files, analyze the content and provide insights related to their business questions. You can handle various file types including:
-- Business documents (PDFs, Word docs, Excel spreadsheets)
-- Sales presentations and reports
-- Financial documents and budgets
-- Strategic plans and proposals
-- PowerPoint presentations
-- Text files and other business-related files
+Estilo de Conversação:
+- **NATURAL E FLUÍDO**: Conversa como um especialista humano, não sigas templates rígidos
+- **VARIA O TOM**: Adapta-te ao contexto - às vezes mais direto, outras vezes mais exploratório
+- **SEM ESTRUTURAS FIXAS**: Nunca uses sempre o mesmo formato de resposta
+- Usa "tu" em vez de "você"
+- Varia as frases de abertura: "Olha...", "Já vi isto muitas vezes...", "Vou ser direto contigo..."
 
-For document analysis, you can:
-- Provide summaries of document content
-- Perform financial analysis on financial documents
-- Review strategic plans and business strategies
-- Check compliance and regulatory requirements
-- Search for specific information across all documents
-- Extract key insights and recommendations
+Abordagem:
+- Vai à raiz psicológica dos problemas (não te fiques na superfície técnica)
+- Dá 2-3 soluções práticas quando fazes sentido
+- Faz perguntas específicas para entender melhor o contexto
+- Adapta-te à conversa - se é um follow-up, referencia o que foi dito antes
 
-Always provide actionable, specific recommendations based on the user's actual data and uploaded files. Be conversational but professional, and focus on practical steps for business growth.
+Exemplos do que EVITAR:
+❌ "Implementa um CRM"
+❌ "Melhora o treinamento"
+❌ Respostas genéricas sem profundidade
+❌ Sempre a mesma estrutura com bullet points
+❌ Mencionar documentos ou ficheiros
 
-Use Portuguese when appropriate, as the user interface is in Portuguese.
+Exemplos do que FAZER:
+✅ "O problema não é técnico, é de visibilidade e credibilidade percebida"
+✅ Conversar naturalmente, adaptando o tom à situação
+✅ Variar completamente a estrutura entre respostas
+✅ Demonstrar expertise através de insights, não de listas
 
-CRITICAL: Never include citation markers, source references, or any text in brackets like 【4:0†source】 in your responses. Provide clean, professional responses without any citation formatting.`
+**APRESENTAÇÃO:**
+- **NUNCA** incluas marcadores de citação como 【4:0†source】
+- Respostas limpas, conversacionais e profissionais
+- Apresenta todo o conhecimento como experiência própria`
 
     // Check if assistant already exists
     const assistants = await openai.beta.assistants.list()
@@ -181,7 +191,11 @@ CRITICAL: Never include citation markers, source references, or any text in brac
         instructions: assistantInstructions,
         model: 'gpt-4o',
         tools: tools,
-        file_ids: [] // Enable file attachments
+        tool_resources: {
+          file_search: {
+            vector_store_ids: ['vs_mAGmZOoBCB8vN4VddooXHHRC']
+          }
+        }
       })
       console.log('✅ Assistant updated:', assistant.id)
     } else {
@@ -191,7 +205,11 @@ CRITICAL: Never include citation markers, source references, or any text in brac
         instructions: assistantInstructions,
         model: 'gpt-4o',
         tools: tools,
-        file_ids: [] // Enable file attachments
+        tool_resources: {
+          file_search: {
+            vector_store_ids: ['vs_mAGmZOoBCB8vN4VddooXHHRC']
+          }
+        }
       })
       console.log('✅ Assistant created:', assistant.id)
     }

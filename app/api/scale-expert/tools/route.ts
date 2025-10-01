@@ -8,62 +8,60 @@ const supabase = createClient(
 
 // Tool functions for the Scale Expert agent
 const tools = {
-  // Get detailed sales call analysis
-  get_sales_call_analysis: async (userId: string, callId?: string) => {
+  // Check if user has uploaded documents
+  check_user_documents: async (userId: string, parameters: {}) => {
     try {
-      // Only fetch sales calls when specifically requested
-      let query = supabase
-        .from('sales_call_analyses')
-        .select('*')
+      console.log('📋 Checking user documents for userId:', userId)
+      
+      const { data: documents, error } = await supabase
+        .from('uploaded_documents')
+        .select('id, file_name, file_type, created_at')
         .eq('user_id', userId)
-        .eq('status', 'completed')
         .order('created_at', { ascending: false })
 
-      if (callId) {
-        query = query.eq('id', callId)
-      } else {
-        query = query.limit(5) // Limit to last 5 calls to avoid overwhelming context
-      }
-
-      const { data: salesCalls, error } = await query
-
       if (error) {
-        console.error('❌ Error fetching sales calls:', error)
-        return { error: 'Failed to fetch sales calls' }
+        console.error('❌ Error fetching user documents:', error)
+        return { error: 'Failed to check user documents' }
       }
 
-      if (!salesCalls || salesCalls.length === 0) {
-        return { message: 'No sales calls found for analysis. Please upload a sales call first to get insights.' }
+      if (!documents || documents.length === 0) {
+        return {
+          hasDocuments: false,
+          totalDocuments: 0,
+          message: 'Nenhum documento carregado. Podes carregar documentos para análises mais específicas.'
+        }
       }
 
-      // Analyze the sales calls data
-      const analysis = {
-        totalCalls: salesCalls.length,
-        dateRange: {
-          earliest: new Date(salesCalls[salesCalls.length - 1].created_at).toLocaleDateString('pt-PT'),
-          latest: new Date(salesCalls[0].created_at).toLocaleDateString('pt-PT')
-        },
-        calls: salesCalls.map(call => ({
-          id: call.id,
-          title: call.title || 'Análise de Chamada',
-          date: new Date(call.created_at).toLocaleDateString('pt-PT'),
-          transcription: call.transcription || 'Transcrição não disponível',
-          duration: call.duration_seconds ? `${Math.round(call.duration_seconds / 60)} min` : 'Análise completa',
-          status: call.status,
-          score: call.score || 'N/A',
-          callType: call.call_type || 'Não especificado',
-          feedback: call.feedback || 'Sem feedback disponível'
+      // Group documents by type
+      const documentsByType = documents.reduce((acc, doc) => {
+        const type = doc.file_type || 'unknown'
+        if (!acc[type]) acc[type] = []
+        acc[type].push(doc)
+        return acc
+      }, {} as Record<string, any[]>)
+
+      return {
+        hasDocuments: true,
+        totalDocuments: documents.length,
+        documentsByType,
+        recentDocuments: documents.slice(0, 5).map(doc => ({
+          id: doc.id,
+          fileName: doc.file_name,
+          fileType: doc.file_type,
+          uploadedAt: new Date(doc.created_at).toLocaleDateString('pt-PT')
         })),
-        insights: [
-          `Total de ${salesCalls.length} análises de chamadas`,
-          `Período: ${new Date(salesCalls[salesCalls.length - 1].created_at).toLocaleDateString('pt-PT')} a ${new Date(salesCalls[0].created_at).toLocaleDateString('pt-PT')}`,
-          'Dados baseados em análises completas de chamadas de vendas'
-        ]
+        message: `Encontrados ${documents.length} documento(s) carregado(s). Posso analisar estes documentos para dar conselhos mais específicos.`
       }
-
-      return analysis
     } catch (error) {
-      return { error: 'Failed to analyze sales calls' }
+      console.error('❌ Error in check_user_documents:', error)
+      return { error: 'Failed to check user documents' }
+    }
+  },
+
+  // Get detailed sales call analysis (deprecated - transcriptions now passed in chat context)
+  get_sales_call_analysis: async (userId: string, callId?: string) => {
+    return {
+      message: 'As transcrições das chamadas de vendas são agora incluídas automaticamente quando fazes upload de um ficheiro. Não precisas de pedir análises separadas - já tens todo o contexto da chamada disponível nesta conversa.'
     }
   },
 
@@ -408,16 +406,18 @@ const tools = {
     }
   },
 
-  // Search documents
+  // Search documents with enhanced semantic search
   search_documents: async (userId: string, parameters: { searchTerm: string, documentType?: string }) => {
     try {
       const { searchTerm, documentType } = parameters
       
+      console.log('🔍 Enhanced document search:', { searchTerm, userId, documentType })
+
+      // Get user's documents
       let query = supabase
         .from('uploaded_documents')
         .select('*')
         .eq('user_id', userId)
-        .ilike('extracted_text', `%${searchTerm}%`)
 
       if (documentType && documentType !== 'all') {
         query = query.eq('file_type', documentType)
@@ -426,51 +426,84 @@ const tools = {
       const { data: documents, error } = await query
 
       if (error) {
-        return { error: 'Failed to search documents' }
+        console.error('❌ Error fetching documents:', error)
+        return { error: 'Failed to fetch documents' }
       }
 
       if (!documents || documents.length === 0) {
         return { 
           message: `Nenhum documento encontrado com o termo "${searchTerm}"`,
           searchTerm,
-          documentType: documentType || 'all'
+          documentType: documentType || 'all',
+          totalResults: 0,
+          results: []
         }
       }
 
-      // Extract relevant snippets from documents
-      const results = documents.map(doc => {
-        const text = doc.extracted_text || ''
-        const searchIndex = text.toLowerCase().indexOf(searchTerm.toLowerCase())
-        
-        let snippet = ''
-        if (searchIndex !== -1) {
-          const start = Math.max(0, searchIndex - 100)
-          const end = Math.min(text.length, searchIndex + searchTerm.length + 100)
-          snippet = text.substring(start, end)
-          if (start > 0) snippet = '...' + snippet
-          if (end < text.length) snippet = snippet + '...'
-        }
+      // Try enhanced semantic search first
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/scale-expert/improved-search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            searchTerm,
+            userId,
+            documentType
+          })
+        })
 
-        return {
-          id: doc.id,
-          fileName: doc.file_name,
-          fileType: doc.file_type,
-          uploadedAt: new Date(doc.created_at).toLocaleDateString('pt-PT'),
-          snippet: snippet || 'Conteúdo encontrado mas snippet não disponível',
-          relevanceScore: text.toLowerCase().split(searchTerm.toLowerCase()).length - 1
+        if (response.ok) {
+          const enhancedResults = await response.json()
+          console.log(`✅ Enhanced search completed: ${enhancedResults.totalResults} documents found`)
+          return enhancedResults
         }
-      })
+      } catch (enhancedError) {
+        console.log('⚠️ Enhanced search failed, falling back to basic search:', enhancedError)
+      }
+
+      // Fallback to basic text search
+      console.log('📝 Using basic text search as fallback')
+      
+      const basicResults = documents
+        .filter(doc => doc.extracted_text && doc.extracted_text.toLowerCase().includes(searchTerm.toLowerCase()))
+        .map(doc => {
+          const text = doc.extracted_text || ''
+          const searchIndex = text.toLowerCase().indexOf(searchTerm.toLowerCase())
+          
+          let snippet = ''
+          if (searchIndex !== -1) {
+            const start = Math.max(0, searchIndex - 100)
+            const end = Math.min(text.length, searchIndex + searchTerm.length + 100)
+            snippet = text.substring(start, end)
+            if (start > 0) snippet = '...' + snippet
+            if (end < text.length) snippet = snippet + '...'
+          }
+
+          return {
+            id: doc.id,
+            fileName: doc.file_name,
+            fileType: doc.file_type,
+            uploadedAt: new Date(doc.created_at).toLocaleDateString('pt-PT'),
+            snippet: snippet || 'Conteúdo encontrado mas snippet não disponível',
+            relevanceScore: text.toLowerCase().split(searchTerm.toLowerCase()).length - 1,
+            similarity: 0.5 // Default for basic search
+          }
+        })
 
       // Sort by relevance score
-      results.sort((a, b) => b.relevanceScore - a.relevanceScore)
+      basicResults.sort((a, b) => b.relevanceScore - a.relevanceScore)
 
       return {
         searchTerm,
         documentType: documentType || 'all',
-        totalResults: results.length,
-        results
+        totalResults: basicResults.length,
+        results: basicResults,
+        searchMethod: 'basic_text'
       }
     } catch (error) {
+      console.error('❌ Search documents error:', error)
       return { error: 'Failed to search documents' }
     }
   }

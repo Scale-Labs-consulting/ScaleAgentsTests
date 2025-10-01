@@ -449,7 +449,33 @@ export default function DashboardPage() {
     if (!user) return
     
     try {
-      // Load usage data from the dedicated usage_tracking table
+      // Load usage data from profiles table (faster than querying usage_tracking)
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('scale_expert_messages_monthly, sales_analyst_uploads_monthly')
+        .eq('id', user.id)
+        .single()
+      
+      if (error) {
+        console.error('Error loading usage data from profiles:', error)
+        // Fallback to usage_tracking table
+        await loadUsageDataFromTrackingTable()
+        return
+      }
+      
+      setScaleExpertUsage(profile.scale_expert_messages_monthly || 0)
+      setSalesAnalystUsage(profile.sales_analyst_uploads_monthly || 0)
+    } catch (error) {
+      console.error('Error loading usage data:', error)
+      // Fallback to old method if profiles table doesn't have usage fields yet
+      await loadUsageDataFromTrackingTable()
+    }
+  }
+
+  const loadUsageDataFromTrackingTable = async () => {
+    if (!user) return
+    
+    try {
       const startOfMonth = new Date()
       startOfMonth.setDate(1)
       startOfMonth.setHours(0, 0, 0, 0)
@@ -474,9 +500,9 @@ export default function DashboardPage() {
       
       setScaleExpertUsage(scaleExpertUsage?.length || 0)
       setSalesAnalystUsage(salesAnalystUsage?.length || 0)
-    } catch (error) {
-      console.error('Error loading usage data:', error)
-      // Fallback to old method if usage_tracking table doesn't exist yet
+    } catch (fallbackError) {
+      console.error('Fallback usage loading also failed:', fallbackError)
+      // Final fallback to sales_calls table for sales analyst
       try {
         const startOfMonth = new Date()
         startOfMonth.setDate(1)
@@ -489,10 +515,9 @@ export default function DashboardPage() {
           .gte('created_at', startOfMonth.toISOString())
         
         setSalesAnalystUsage(salesAnalystUploads?.length || 0)
-        // Scale Expert usage will be 0 until proper tracking is implemented
         setScaleExpertUsage(0)
-      } catch (fallbackError) {
-        console.error('Fallback usage loading also failed:', fallbackError)
+      } catch (finalError) {
+        console.error('All usage loading methods failed:', finalError)
       }
     }
   }
@@ -890,7 +915,7 @@ export default function DashboardPage() {
 
       // Step 1: Upload to Vercel Blob using client upload
       setSalesUploadStatus('A fazer upload para Vercel Blob...')
-      setSalesUploadProgress(20)
+      setSalesUploadProgress(15)
 
       // Check if operation was cancelled
       if (abortController.signal.aborted) {
@@ -899,6 +924,8 @@ export default function DashboardPage() {
 
       // Import the upload function from @vercel/blob/client
       const { upload } = await import('@vercel/blob/client')
+
+      setSalesUploadProgress(25) // Upload starting
 
       const blob = await upload(fileToUpload.name, fileToUpload, {
         access: 'public',
@@ -917,41 +944,37 @@ export default function DashboardPage() {
       // Step 2: Create a temporary sales call ID for now
       // We'll use the blob URL as a reference and create the record later if needed
       setSalesUploadStatus('A processar ficheiro e preparar transcrição...')
-      setSalesUploadProgress(50)
+      setSalesUploadProgress(35)
 
       // Generate a temporary ID based on the blob URL
       const tempSalesCallId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
       // Step 3: Start transcription and analysis
-      setSalesUploadStatus('A transcrever chamada com IA...')
-      setSalesUploadProgress(70)
+      setSalesUploadStatus('A iniciar transcrição com IA...')
+      setSalesUploadProgress(40)
 
-      // Check if operation was cancelled
-      if (abortController.signal.aborted) {
-        throw new Error('Operation cancelled')
-      }
-
+      // Simulate gradual progress during transcription
+      // Declare interval ID outside try block so it's accessible in error handling
+      let transcriptionProgressInterval: NodeJS.Timeout | null = null
+      
       try {
+        transcriptionProgressInterval = setInterval(() => {
+          setSalesUploadProgress(prev => {
+            if (prev < 65) return prev + 2 // Slowly increment during transcription
+            return prev
+          })
+        }, 2000) // Update every 2 seconds
+
+        // Check if operation was cancelled
+        if (abortController.signal.aborted) {
+          if (transcriptionProgressInterval) clearInterval(transcriptionProgressInterval)
+          throw new Error('Operation cancelled')
+        }
         // Start analysis
         setSalesIsAnalyzing(true)
-        setSalesUploadStatus('A preparar análise...')
-        setSalesUploadProgress(75) // Show 75% during analysis phase
         
-        // Add a small delay to show the preparation message
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        setSalesUploadStatus('A analisar pontos fortes da chamada...')
-        setSalesUploadProgress(80)
-        
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        setSalesUploadStatus('A analisar pontos de melhoria...')
-        setSalesUploadProgress(85)
-        
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        setSalesUploadStatus('A gerar recomendações...')
-        setSalesUploadProgress(90)
+        setSalesUploadStatus('A transcrever conteúdo de áudio...')
+        setSalesUploadProgress(45)
         
         const transcriptionResponse = await fetch('/api/sales-analyst/blob-transcribe', {
           method: 'POST',
@@ -968,6 +991,13 @@ export default function DashboardPage() {
           }),
           signal: abortController.signal // Add abort signal to the fetch request
         })
+
+        // Clear the transcription progress interval
+        if (transcriptionProgressInterval) clearInterval(transcriptionProgressInterval)
+        
+        // Transcription completed, now analyzing
+        setSalesUploadStatus('A preparar análise detalhada...')
+        setSalesUploadProgress(70)
 
         if (!transcriptionResponse.ok) {
           let errorMessage = 'Transcription failed'
@@ -987,6 +1017,9 @@ export default function DashboardPage() {
           throw new Error(errorMessage)
         }
 
+        setSalesUploadStatus('A analisar pontos fortes...')
+        setSalesUploadProgress(78)
+        
         let result
         try {
           result = await transcriptionResponse.json()
@@ -996,6 +1029,9 @@ export default function DashboardPage() {
           console.error('❌ Response text:', responseText.substring(0, 200))
           throw new Error('Invalid response format from server')
         }
+
+        setSalesUploadStatus('A analisar pontos de melhoria...')
+        setSalesUploadProgress(85)
 
         await fetch('/api/log', {
           method: 'POST',
@@ -1008,6 +1044,9 @@ export default function DashboardPage() {
             }
           })
         })
+
+        setSalesUploadStatus('A gerar recomendações finais...')
+        setSalesUploadProgress(93)
 
         // Analysis completed
         setSalesIsAnalyzing(false)
@@ -1041,6 +1080,10 @@ export default function DashboardPage() {
         }, 3000)
         
       } catch (error) {
+        // Clear the interval in case of error
+        if (transcriptionProgressInterval) {
+          clearInterval(transcriptionProgressInterval)
+        }
         if (abortController.signal.aborted) {
           console.log('🚫 Transcription cancelled by user')
           throw new Error('Operation cancelled')
@@ -1534,7 +1577,7 @@ export default function DashboardPage() {
     }
 
     try {
-      const newConversation = await chatService.createConversation()
+      const newConversation = await chatService.createConversation('Novo Chat')
       setCurrentConversationId(newConversation.id)
       setThreadId(null) // Reset OpenAI thread for new conversation
       setMessages([])
@@ -1644,7 +1687,7 @@ export default function DashboardPage() {
     if (!currentConversationId && chatService) {
       try {
         console.log('🆕 Creating new database conversation...')
-        const newConversation = await chatService.createConversation()
+        const newConversation = await chatService.createConversation('Novo Chat')
         setCurrentConversationId(newConversation.id)
         console.log('✅ Database conversation created:', newConversation.id)
         
@@ -2492,7 +2535,7 @@ export default function DashboardPage() {
               <div className="flex-1 overflow-y-auto mt-6">
                 {/* Past Chats Section */}
                 <div className="px-4 pb-2">
-                  <h3 className="text-xs font-semibold text-white/40 mb-2 uppercase tracking-wider">Past Chats</h3>
+                  <h3 className="text-xs font-semibold text-white/40 mb-2 uppercase tracking-wider">Chats Antigos</h3>
                   <div className="space-y-0.5">
                     {conversations.length === 0 ? (
                       <div className="p-1.5">
@@ -3583,7 +3626,10 @@ export default function DashboardPage() {
                                         <Button
                                           variant="outline"
                                           size="sm"
-                                          onClick={() => setSelectedAnalysis(analysis)}
+                                          onClick={() => {
+                                            setSelectedAnalysis(analysis)
+                                            setShowAnalysisModal(true)
+                                          }}
                                           className="border-white/20 text-white hover:bg-white/10 bg-white/5"
                                         >
                                           Ver Detalhes
@@ -4259,53 +4305,82 @@ export default function DashboardPage() {
                           return <p className="text-white/60 text-sm">Transcrição não disponível</p>
                         }
                         
-                        // Check if transcription has speaker diarization (contains "Speaker" or similar patterns)
-                        const hasSpeakerDiarization = transcription.includes('Speaker') || 
-                          transcription.includes('speaker') || 
-                          transcription.match(/Speaker \d+/i)
+                        // Parse and format transcription with speaker segments
+                        const parseTranscription = (text: string) => {
+                          // Match patterns like "Speaker A (00:00) - text"
+                          const speakerPattern = /Speaker ([AB]|\d+) \((\d{2}:\d{2})\) - /gi
+                          const segments: Array<{ speaker: string, timestamp: string, text: string }> = []
+                          
+                          let lastIndex = 0
+                          let match
+                          
+                          while ((match = speakerPattern.exec(text)) !== null) {
+                            if (segments.length > 0) {
+                              // Set the text of the previous segment
+                              segments[segments.length - 1].text = text.substring(lastIndex, match.index).trim()
+                            }
+                            
+                            segments.push({
+                              speaker: match[1],
+                              timestamp: match[2],
+                              text: ''
+                            })
+                            
+                            lastIndex = match.index + match[0].length
+                          }
+                          
+                          // Set text for the last segment
+                          if (segments.length > 0) {
+                            segments[segments.length - 1].text = text.substring(lastIndex).trim()
+                          }
+                          
+                          return segments
+                        }
                         
-                        if (hasSpeakerDiarization) {
+                        const segments = parseTranscription(transcription)
+                        
+                        if (segments.length > 0) {
                           // Format with speaker diarization
-                          const lines = transcription.split('\n')
                           return (
-                            <div className="space-y-3">
-                              {lines.map((line: string, index: number) => {
-                                if (line.trim() === '') return null
+                            <div className="space-y-2">
+                              {segments.map((segment, segmentIndex) => {
+                                // Split each segment's text into sentences for better readability
+                                const sentences = segment.text
+                                  .split(/(?<=[.!?])\s+/)
+                                  .filter(s => s.trim().length > 0)
                                 
-                                // Check if line contains speaker information
-                                const speakerMatch = line.match(/^(Speaker \d+)/i)
-                                if (speakerMatch) {
-                                  const speaker = speakerMatch[1]
-                                  const text = line.replace(/^Speaker \d+/i, '').trim()
-                                  const isEven = index % 2 === 0
-                                  
-                                  return (
-                                    <div key={index} className="p-3 rounded-lg border bg-gray-500/10 border-gray-500/20">
-                                      <div className="flex items-start space-x-3">
-                                        <div className={`px-2 py-1 rounded text-xs font-medium ${
-                                          isEven ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'
-                                        }`}>
-                                          {speaker}
-                                        </div>
-                                        <p className="text-white/90 text-sm leading-relaxed flex-1">
-                                          {text}
-                                        </p>
+                                const isEven = segmentIndex % 2 === 0
+                                
+                                return (
+                                  <div key={segmentIndex} className="p-3 rounded-lg border bg-gray-500/10 border-gray-500/20">
+                                    <div className="flex items-start space-x-3">
+                                      <div className={`px-2 py-1 rounded text-xs font-medium shrink-0 ${
+                                        isEven ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'
+                                      }`}>
+                                        Speaker {segment.speaker}
+                                      </div>
+                                      <div className="text-xs text-white/50 shrink-0">
+                                        {segment.timestamp}
+                                      </div>
+                                      <div className="text-white/90 text-sm leading-relaxed flex-1">
+                                        {sentences.map((sentence, sentenceIndex) => (
+                                          <div key={sentenceIndex} className="mb-2 last:mb-0">
+                                            {sentence}
+                                          </div>
+                                        ))}
                                       </div>
                                     </div>
-                                  )
-                                } else {
-                                  // Regular text without speaker identification
-                                  return (
-                                    <p key={index} className="text-white/80 text-sm leading-relaxed">
-                                      {line}
-                                    </p>
-                                  )
-                                }
+                                  </div>
+                                )
                               })}
                             </div>
                           )
                         } else {
-                          // No speaker diarization - show as plain text
+                          // No speaker diarization - split by sentences
+                          const sentences = transcription
+                            .split(/(?<=[.!?])\s+/)
+                            .filter((s: string) => s.trim().length > 0)
+                          
                           return (
                             <>
                               <div className="p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg mb-4">
@@ -4318,9 +4393,13 @@ export default function DashboardPage() {
                                   certifique-se de que o speaker diarization está ativado.
                                 </p>
                               </div>
-                      <p className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">
-                                {transcription}
-                      </p>
+                              <div className="space-y-2 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                                {sentences.map((sentence: string, index: number) => (
+                                  <div key={index} className="text-white/80 text-sm leading-relaxed">
+                                    {sentence}
+                                  </div>
+                                ))}
+                              </div>
                             </>
                           )
                         }

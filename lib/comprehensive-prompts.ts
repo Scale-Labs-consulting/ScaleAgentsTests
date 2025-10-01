@@ -795,15 +795,16 @@ export function getPontosFracosPromptWithContext(transcription: string, pontosFo
 PONTOS FORTES IDENTIFICADOS:
 ${pontosFortes}
 
-**INSTRUÇÕES CRÍTICAS:**
-- Se o rapport inicial foi identificado como ponto forte acima, NÃO o menciones como ponto fraco
-- Se qualquer outro aspecto foi identificado como forte, NÃO o menciones como fraco
-- Foca apenas em pontos fracos que NÃO foram identificados como pontos fortes
-- NÃO identifiques o mesmo comportamento/timestamp como forte E fraco
-- Se um momento tem aspectos positivos e negativos, escolhe o mais relevante
-- **CRÍTICO**: Se um timestamp já foi usado nos pontos fortes, NÃO o uses nos pontos fracos
-- **CRÍTICO**: Se uma frase/quote já foi usada nos pontos fortes, NÃO a uses nos pontos fracos
-- **CRÍTICO**: Cada momento da call deve ser avaliado UMA VEZ apenas - ou como forte OU como fraco
+**INSTRUÇÕES CRÍTICAS - REGRA DE OURO DE NÃO CONTRADIÇÃO:**
+- **ABSOLUTAMENTE PROIBIDO**: Usar o MESMO timestamp que foi usado nos pontos fortes
+- **ABSOLUTAMENTE PROIBIDO**: Analisar o MESMO momento da call de forma diferente
+- **ABSOLUTAMENTE PROIBIDO**: Identificar um momento como tendo QUALQUER aspecto negativo se já foi identificado como forte
+- Exemplo: Se [16:05] foi identificado como ponto forte de "Gestão de Objeções", NÃO podes dizer que [16:05] é fraco em "Falta de Urgência"
+- Exemplo: Se rapport inicial foi identificado como forte, NÃO podes criticar o rapport inicial
+- **REGRA SIMPLES**: Se um timestamp/momento aparece nos pontos fortes, IGNORA completamente esse momento na análise de pontos fracos
+- **ANTES DE IDENTIFICAR QUALQUER PONTO FRACO**: Verifica se aquele timestamp JÁ está nos pontos fortes. Se sim, PULA para outro momento
+- Foca APENAS em momentos COMPLETAMENTE DIFERENTES que não foram mencionados nos pontos fortes
+- Se não existirem pontos fracos GENUÍNOS e DISTINTOS, é melhor identificar MENOS pontos fracos do que criar contradições
 
 **REGRAS ANTI-CRÍTICAS EXCESSIVAS:**
 - NÃO consideres como pontos fracos comportamentos NORMAIS de vendas
@@ -908,15 +909,16 @@ export async function getEnhancedPontosFracosPromptWithContext(transcription: st
 PONTOS FORTES IDENTIFICADOS:
 ${pontosFortes}
 
-**INSTRUÇÕES CRÍTICAS:**
-- Se o rapport inicial foi identificado como ponto forte acima, NÃO o menciones como ponto fraco
-- Se qualquer outro aspecto foi identificado como forte, NÃO o menciones como fraco
-- Foca apenas em pontos fracos que NÃO foram identificados como pontos fortes
-- NÃO identifiques o mesmo comportamento/timestamp como forte E fraco
-- Se um momento tem aspectos positivos e negativos, escolhe o mais relevante
-- **CRÍTICO**: Se um timestamp já foi usado nos pontos fortes, NÃO o uses nos pontos fracos
-- **CRÍTICO**: Se uma frase/quote já foi usada nos pontos fortes, NÃO a uses nos pontos fracos
-- **CRÍTICO**: Cada momento da call deve ser avaliado UMA VEZ apenas - ou como forte OU como fraco
+**INSTRUÇÕES CRÍTICAS - REGRA DE OURO DE NÃO CONTRADIÇÃO:**
+- **ABSOLUTAMENTE PROIBIDO**: Usar o MESMO timestamp que foi usado nos pontos fortes
+- **ABSOLUTAMENTE PROIBIDO**: Analisar o MESMO momento da call de forma diferente
+- **ABSOLUTAMENTE PROIBIDO**: Identificar um momento como tendo QUALQUER aspecto negativo se já foi identificado como forte
+- Exemplo: Se [16:05] foi identificado como ponto forte de "Gestão de Objeções", NÃO podes dizer que [16:05] é fraco em "Falta de Urgência"
+- Exemplo: Se rapport inicial foi identificado como forte, NÃO podes criticar o rapport inicial
+- **REGRA SIMPLES**: Se um timestamp/momento aparece nos pontos fortes, IGNORA completamente esse momento na análise de pontos fracos
+- **ANTES DE IDENTIFICAR QUALQUER PONTO FRACO**: Verifica se aquele timestamp JÁ está nos pontos fortes. Se sim, PULA para outro momento
+- Foca APENAS em momentos COMPLETAMENTE DIFERENTES que não foram mencionados nos pontos fortes
+- Se não existirem pontos fracos GENUÍNOS e DISTINTOS, é melhor identificar MENOS pontos fracos do que criar contradições
 
 **REGRAS ANTI-CRÍTICAS EXCESSIVAS:**
 - NÃO consideres como pontos fracos comportamentos NORMAIS de vendas

@@ -354,10 +354,17 @@ export default function HomePage() {
                 }`}
               >
                 <div className="relative max-w-4xl mx-auto bg-gray-900/50 dark:bg-black/50 rounded-2xl overflow-hidden border border-gray-200/20 dark:border-white/10">
-                  <div className="aspect-video bg-gradient-to-br from-purple-600/20 to-violet-600/20 dark:from-purple-900/30 dark:to-violet-900/30 flex items-center justify-center">
-                    <div className="w-20 h-20 bg-white/20 dark:bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 dark:hover:bg-white/30 transition-all duration-300 cursor-pointer group">
-                      <div className="w-0 h-0 border-l-[12px] border-l-white border-y-[8px] border-y-transparent ml-1 group-hover:scale-110 transition-transform"></div>
-                    </div>
+                  <div className="aspect-video">
+                    <video
+                      className="w-full h-full object-cover"
+                      controls
+                      playsInline
+                      preload="metadata"
+                      poster="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/vsl/v3.PIETRO-VSL.jpg"
+                    >
+                      <source src="https://yjq0uw1vlhs3s48i.public.blob.vercel-storage.com/vsl/Scalelabs%20-%20Pietro%20VSL%20LF%20Setembro%20%28Apex%20Reach%29%20FIXED.mp4" type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
                   </div>
                 </div>
               </div>

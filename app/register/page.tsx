@@ -110,6 +110,14 @@ export default function RegisterPage() {
       } else if (error.message?.includes('Rate limit exceeded')) {
         errorTitle = 'Demasiadas tentativas'
         errorMessage = 'Demasiadas tentativas de registo. Por favor, aguarde alguns minutos antes de tentar novamente.'
+      } else if (error.message?.includes('For security purposes')) {
+        // Supabase cooldown when sending confirmation emails repeatedly
+        errorTitle = 'Aguarda alguns segundos'
+        const match = error.message.match(/after\s+(\d+)\s+seconds?/i)
+        const seconds = match ? match[1] : undefined
+        errorMessage = seconds
+          ? `Por motivos de segurança, só podes voltar a tentar dentro de ${seconds} segundo${seconds === '1' ? '' : 's'}.`
+          : 'Por motivos de segurança, tens de aguardar alguns segundos antes de voltar a tentar.'
       } else if (error.message) {
         errorMessage = error.message
       }

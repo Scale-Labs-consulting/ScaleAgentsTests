@@ -104,6 +104,13 @@ export default function LoginPage() {
       } else if (error.message?.includes('Too many requests')) {
         errorTitle = 'Demasiadas tentativas'
         errorMessage = 'Demasiadas tentativas de login. Por favor, aguarde 15 minutos antes de tentar novamente.'
+      } else if (error.message?.includes('For security purposes')) {
+        errorTitle = 'Aguarda alguns segundos'
+        const match = error.message.match(/after\s+(\d+)\s+seconds?/i)
+        const seconds = match ? match[1] : undefined
+        errorMessage = seconds
+          ? `Por motivos de segurança, só podes voltar a tentar dentro de ${seconds} segundo${seconds === '1' ? '' : 's'}.`
+          : 'Por motivos de segurança, tens de aguardar alguns segundos antes de voltar a tentar.'
       } else if (error.message?.includes('User not found')) {
         errorTitle = 'Conta não encontrada'
         errorMessage = 'Não existe uma conta com este email. Verifique o email ou registe-se.'

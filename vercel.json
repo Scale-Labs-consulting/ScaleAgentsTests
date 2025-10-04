@@ -27,9 +27,6 @@
     },
     "app/api/pdf-parser-python/route.ts": {
       "maxDuration": 60
-    },
-    "api/pdf-parser-python.py": {
-      "maxDuration": 60
     }
   }
 }

@@ -44,7 +44,6 @@ async function performChunkedAnalysis(transcription: string, maxChunkLength: num
   const fieldResults = {
     pontosFortes: '',
     pontosFracos: '',
-    resumoDaCall: '',
     dicasGerais: '',
     focoParaProximasCalls: '',
     scoring: {
@@ -63,76 +62,6 @@ async function performChunkedAnalysis(transcription: string, maxChunkLength: num
   const fieldsToAnalyze = [
     { name: 'Pontos Fortes', key: 'pontosFortes', systemPrompt: SYSTEM_PROMPTS.PONTOS_FORTES, userPrompt: getPontosFortesPrompt },
     { name: 'Pontos Fracos', key: 'pontosFracos', systemPrompt: SYSTEM_PROMPTS.PONTOS_FRACOS, userPrompt: getPontosFracosPrompt },
-    { name: 'Resumo da Call', key: 'resumoDaCall', systemPrompt: 'És um assistente especializado em análise de calls de vendas. A tua única função é analisar a transcrição da call e identificar os momentos de maior e menor desempenho do comercial.', userPrompt: (transcription: string) => `Quando eu te fornecer uma transcrição completa de uma call de vendas, a tua resposta deve ser objetiva e fornecer um feedback generalizado sobre três momentos-chave: início, meio e fim da reunião. Não precisas de analisar cada segundo ou minuto da conversa, apenas destacar os pontos essenciais do desempenho do comercial nos seguintes aspetos:
-
-Início da Call:
-- Apresentação inicial: Como foi a introdução? O comercial gerou rapport com a lead?  
-- Perguntas: O comercial fez boas perguntas para entender as necessidades da lead?  
-
-Meio da Call:
-- Apresentação do serviço/proposta: O comercial explicou bem a solução? Conseguiu manter o interesse?  
-- Lidar com objeções: Como o comercial geriu dúvidas e preocupações da lead?  
-
-Fim da Call:
-- Fecho e/ou próximos passos: O comercial conduziu bem o encerramento? O lead ficou com clareza sobre os próximos passos?  
-
-Estrutura da Resposta:
-
-Momentos Fortes do Comercial:
-- Início: [Destaca um ponto forte do início da call]  
-- Meio: [Destaca um ponto forte do meio da call]  
-- Fim: [Destaca um ponto forte do final da call]  
-
-Momentos Fracos do Comercial:
-- Início: [Identifica um ponto fraco do início da call]  
-- Meio: [Identifica um ponto fraco do meio da call]  
-- Fim: [Identifica um ponto fraco do final da call]  
-
-Regras Importantes:
-- A tua resposta deve ser clara e objetiva – apenas o essencial.  
-- NÃO uses emojis, números, markdowns (como **texto** ou ## títulos) ou qualquer tipo de formatação especial. Apenas texto normal.  
-- Usa apenas texto limpo, pois o resultado será inserido diretamente no Google Sheets.  
-- Mantém o foco na qualidade do discurso, técnicas de venda, persuasão e fechamento.  
-- Se não houver momentos fortes ou fracos evidentes em alguma parte (início, meio ou fim), diz "Não foi identificado".  
-- NÃO uses asteriscos (**) para negrito - escreve apenas o texto normal.
-
-Todas as tuas respostas devem ser exclusivamente em português de Portugal (especificamente de Lisboa), respeitando as seguintes regras:  
-
-1. Tratamento: Utiliza "tu" em vez de "você" para tratamento informal e "o senhor/a senhora" para tratamento formal.  
-
-2. Pronomes e Conjugações:  
-   - Utiliza "tu fazes" em vez de "você faz"  
-   - Utiliza os pronomes "te/ti/contigo" em vez de formas com "você"  
-   - Utiliza a 2ª pessoa do singular nas conjugações verbais: "tu estás", "tu vais", etc.  
-
-3. Evita gerúndios:  
-   - Utiliza "estou a fazer" em vez de "estou fazendo"  
-   - Utiliza "estamos a analisar" em vez de "estamos analisando"  
-   - Substitui todas as construções com gerúndio pela estrutura "a + infinitivo"  
-
-4. Colocação dos pronomes clíticos:  
-   - Prefere a ênclise na maioria dos contextos ("Disse-me" em vez de "Me disse").  
-
-5. Preserva os sons e sotaque lisboeta, que tende a reduzir as vogais átonas.  
-
-6. Utiliza sempre o pretérito perfeito simples em vez do composto em situações de ações concluídas ("Eu comi" em vez de "Eu tenho comido").  
-
-É ABSOLUTAMENTE ESSENCIAL que todas as respostas sigam estas regras, sem exceção. Em caso de dúvida, opta sempre pela forma utilizada em Portugal, especificamente em Lisboa.
-
-Exemplo de Resposta:
-
-Momentos Fortes do Comercial:
-- Início: O comercial fez uma introdução confiante e demonstrou interesse genuíno pela lead, criando um bom rapport.  
-- Meio: Explicou a proposta de forma clara e destacou um case de sucesso relevante, o que manteve a lead envolvido.  
-- Fim: Encerrou com um call-to-action direto e estabeleceu um próximo passo concreto.  
-
-Momentos Fracos do Comercial:
-- Início: A introdução foi vaga e pouco estruturada, o que pode ter reduzido a credibilidade inicial.  
-- Meio: O comercial não lidou bem com uma objeção importante, desviando o assunto em vez de fornecer uma resposta convincente.  
-- Fim: Não reforçou a urgência nem alinhou um follow-up claro, deixando o próximo passo indefinido.
-
-Transcrição:
-${transcription}` },
     { name: 'Dicas Gerais', key: 'dicasGerais', systemPrompt: 'És um especialista em vendas. Fornece dicas gerais de melhoria baseadas na análise da call.', userPrompt: (transcription: string) => `Analisa a seguinte transcrição de uma reunião de vendas e fornece dicas gerais para melhorar o desempenho do vendedor.
 
 IMPORTANTE: Primeiro identifica quem é o COMERCIAL e quem é o CLIENTE na transcrição. Procura por:
@@ -201,16 +130,24 @@ ${transcription}
 - **Explicações e Técnicas Concretas:** Instruções específicas que o vendedor pode aplicar facilmente.
 - **Objetivos Claros:** Resultados esperados ao implementar cada ponto de foco.
 
+**CRÍTICO - ORDENAÇÃO POR IMPORTÂNCIA:**
+ORDENA os pontos de foco por ordem de IMPORTÂNCIA (do mais importante para o menos importante). Considera:
+- Impacto imediato no resultado da próxima call
+- Urgência para resolver o problema identificado
+- Facilidade de implementação vs. impacto no resultado
+- Prioridade estratégica para o sucesso da venda
+
 **Instruções Críticas:**
 
 1. NUNCA COLOQUES MARKDOWNS, SÍMBOLOS OU EMOJIS;
-2. CRIA SEMPRE UMA LISTA NÃO ORDENADA;
+2. CRIA SEMPRE UMA LISTA NUMERADA (1., 2., 3., etc.) para mostrar a ordem de importância;
 3. O OUTPUT DEVE CONTER APENAS TAGS HTML DE TITULAÇÃO (<h2>, <h3>, <h4>, etc.), PARÁGRAFOS (<p>) E LISTAS NÃO ORDENADAS (<ul>, <li>);
 4. SE EXISTIREM TÍTULOS, DEVEM SEMPRE USAR AS TAGS HTML APROPRIADAS (<h2>, <h3>, <h4>, etc.);
 5. NÃO INCLUIR BLOCOS DE CÓDIGO OU QUALQUER FORMATAÇÃO COMO \`\`\` OU "html";
 6. ESCREVE SEMPRE EM PORTUGUÊS DE LISBOA;
 7. **CRÍTICO: NÃO INCLUAS QUALQUER TEXTO INTRODUTÓRIO** - começa diretamente com a lista numerada (1., 2., 3., etc.) sem frases como "Com base na transcrição" ou "Aqui estão as áreas";
-8. **NÃO INCLUAS TÍTULOS COMO "Foco para Próximas Calls"** - começa diretamente com o conteúdo da lista.
+8. **NÃO INCLUAS TÍTULOS COMO "Foco para Próximas Calls"** - começa diretamente com o conteúdo da lista;
+9. **ORDENA POR IMPORTÂNCIA** - o ponto 1 deve ser o mais crítico/importante, o ponto 2 o segundo mais importante, etc.
 
 **EXEMPLO CORRETO:**
 1. **Otimização de Conteúdos:** Desenvolver uma estratégia de conteúdo mais robusta para o site Governance.Business, focando em artigos técnicos e case studies que demonstrem expertise.
@@ -279,7 +216,6 @@ Todas as tuas respostas devem ser exclusivamente em português de Portugal (espe
     totalScore: Object.values(fieldResults.scoring).reduce((sum, score) => sum + score, 0),
     pontosFortes: fieldResults.pontosFortes,
     pontosFracos: fieldResults.pontosFracos,
-    resumoDaCall: fieldResults.resumoDaCall,
     dicasGerais: fieldResults.dicasGerais,
     focoParaProximasCalls: fieldResults.focoParaProximasCalls,
     clarezaFluenciaFala: fieldResults.scoring.clarezaFluenciaFala,
@@ -500,7 +436,6 @@ async function extractChunkInsights(chunk: string) {
 {
   "pontosFortes": "Pontos fortes específicos desta parte (se houver)",
   "pontosFracos": "Pontos fracos específicos desta parte (se houver)", 
-  "resumoDaCall": "Resumo específico desta parte (se houver)",
   "dicasGerais": "Dicas específicas desta parte (se houver)",
   "focoParaProximasCalls": "Foco específico desta parte (se houver)"
 }
@@ -543,7 +478,7 @@ function combineSmartChunkResults(firstChunkResult: any, additionalInsights: any
   const combined = { ...firstChunkResult }
   
   // Combine text fields from additional insights
-  const textFields = ['pontosFortes', 'pontosFracos', 'resumoDaCall', 'dicasGerais', 'focoParaProximasCalls']
+  const textFields = ['pontosFortes', 'pontosFracos', 'dicasGerais', 'focoParaProximasCalls']
   
   textFields.forEach(field => {
     const additionalTexts = additionalInsights[field].filter((text: string) => text && text.trim())
@@ -562,7 +497,6 @@ function combineChunkResults(chunkResults: any[]): any {
     totalScore: 0,
     pontosFortes: '',
     pontosFracos: '',
-    resumoDaCall: '',
     dicasGerais: '',
     focoParaProximasCalls: '',
     clarezaFluenciaFala: 0,
@@ -577,7 +511,7 @@ function combineChunkResults(chunkResults: any[]): any {
   }
   
   // Combine text fields
-  const textFields = ['pontosFortes', 'pontosFracos', 'resumoDaCall', 'dicasGerais', 'focoParaProximasCalls']
+  const textFields = ['pontosFortes', 'pontosFracos', 'dicasGerais', 'focoParaProximasCalls']
   const scoreFields = ['clarezaFluenciaFala', 'tomControlo', 'envolvimentoConversacional', 'efetividadeDescobertaNecessidades', 'entregaValorAjusteSolucao', 'habilidadesLidarObjeccoes', 'estruturaControleReuniao', 'fechamentoProximosPassos']
   
   for (const result of chunkResults) {
@@ -715,7 +649,6 @@ async function performComprehensiveAnalysis(transcription: string, callType?: st
     totalScore: 0,
     pontosFortes: '',
     pontosFracos: '',
-    resumoDaCall: '',
     dicasGerais: '',
     focoParaProximasCalls: '',
     // 8 scoring fields
@@ -786,94 +719,6 @@ async function performComprehensiveAnalysis(transcription: string, callType?: st
         }
       },
       {
-        name: 'Resumo da Call',
-        request: {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.OPENAI_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: 'És um assistente especializado em análise de calls de vendas. A tua única função é analisar a transcrição da call e identificar os momentos de maior e menor desempenho do comercial.' },
-                             { role: 'user', content: `Quando eu te fornecer uma transcrição completa de uma call de vendas, a tua resposta deve ser objetiva e fornecer um feedback generalizado sobre três momentos-chave: início, meio e fim da reunião. Não precisas de analisar cada segundo ou minuto da conversa, apenas destacar os pontos essenciais do desempenho do comercial nos seguintes aspetos:
-
-Início da Call:
-- Apresentação inicial: Como foi a introdução? O comercial gerou rapport com a lead?  
-- Perguntas: O comercial fez boas perguntas para entender as necessidades da lead?  
-
-Meio da Call:
-- Apresentação do serviço/proposta: O comercial explicou bem a solução? Conseguiu manter o interesse?  
-- Lidar com objeções: Como o comercial geriu dúvidas e preocupações da lead?  
-
-Fim da Call:
-- Fecho e/ou próximos passos: O comercial conduziu bem o encerramento? O lead ficou com clareza sobre os próximos passos?  
-
-Estrutura da Resposta:
-
-Momentos Fortes do Comercial:
-- Início: [Destaca um ponto forte do início da call]  
-- Meio: [Destaca um ponto forte do meio da call]  
-- Fim: [Destaca um ponto forte do final da call]  
-
-Momentos Fracos do Comercial:
-- Início: [Identifica um ponto fraco do início da call]  
-- Meio: [Identifica um ponto fraco do meio da call]  
-- Fim: [Identifica um ponto fraco do final da call]  
-
-Regras Importantes:
-- A tua resposta deve ser clara e objetiva – apenas o essencial.  
-- NÃO uses emojis, números, markdowns (como **texto** ou ## títulos) ou qualquer tipo de formatação especial. Apenas texto normal.  
-- Usa apenas texto limpo, pois o resultado será inserido diretamente no Google Sheets.  
-- Mantém o foco na qualidade do discurso, técnicas de venda, persuasão e fechamento.  
-- Se não houver momentos fortes ou fracos evidentes em alguma parte (início, meio ou fim), diz "Não foi identificado".  
-- NÃO uses asteriscos (**) para negrito - escreve apenas o texto normal.
-
-Todas as tuas respostas devem ser exclusivamente em português de Portugal (especificamente de Lisboa), respeitando as seguintes regras:  
-
-1. Tratamento: Utiliza "tu" em vez de "você" para tratamento informal e "o senhor/a senhora" para tratamento formal.  
-
-2. Pronomes e Conjugações:  
-   - Utiliza "tu fazes" em vez de "você faz"  
-   - Utiliza os pronomes "te/ti/contigo" em vez de formas com "você"  
-   - Utiliza a 2ª pessoa do singular nas conjugações verbais: "tu estás", "tu vais", etc.  
-
-3. Evita gerúndios:  
-   - Utiliza "estou a fazer" em vez de "estou fazendo"  
-   - Utiliza "estamos a analisar" em vez de "estamos analisando"  
-   - Substitui todas as construções com gerúndio pela estrutura "a + infinitivo"  
-
-4. Colocação dos pronomes clíticos:  
-   - Prefere a ênclise na maioria dos contextos ("Disse-me" em vez de "Me disse").  
-
-5. Preserva os sons e sotaque lisboeta, que tende a reduzir as vogais átonas.  
-
-6. Utiliza sempre o pretérito perfeito simples em vez do composto em situações de ações concluídas ("Eu comi" em vez de "Eu tenho comido").  
-
-É ABSOLUTAMENTE ESSENCIAL que todas as respostas sigam estas regras, sem exceção. Em caso de dúvida, opta sempre pela forma utilizada em Portugal, especificamente em Lisboa.
-
-Exemplo de Resposta:
-
-Momentos Fortes do Comercial:
-- Início: O comercial fez uma introdução confiante e demonstrou interesse genuíno pela lead, criando um bom rapport.  
-- Meio: Explicou a proposta de forma clara e destacou um case de sucesso relevante, o que manteve a lead envolvido.  
-- Fim: Encerrou com um call-to-action direto e estabeleceu um próximo passo concreto.  
-
-Momentos Fracos do Comercial:
-- Início: A introdução foi vaga e pouco estruturada, o que pode ter reduzido a credibilidade inicial.  
-- Meio: O comercial não lidou bem com uma objeção importante, desviando o assunto em vez de fornecer uma resposta convincente.  
-- Fim: Não reforçou a urgência nem alinhou um follow-up claro, deixando o próximo passo indefinido.
-
-Transcrição:
-${transcription}` }
-            ],
-            max_tokens: 500,
-            temperature: 0.3,
-          }),
-        }
-      },
-      {
         name: 'Dicas Gerais',
         request: {
           method: 'POST',
@@ -903,7 +748,7 @@ ${transcription}` }
           body: JSON.stringify({
             model: 'gpt-4o-mini',
             messages: [
-              { role: 'system', content: 'És um especialista em vendas. Identifica áreas específicas para focar nas próximas calls.' },
+              { role: 'system', content: 'És um especialista em vendas. Identifica áreas específicas para focar nas próximas calls, ordenando-as por ordem de importância (do mais importante para o menos importante).' },
               { role: 'user', content: callType ? await getEnhancedFocoProximasCallsPrompt(transcription, callType) : `Com base na seguinte transcrição de call de vendas, identifica 3-5 áreas específicas para focar nas próximas calls em português de Lisboa (máx. 150 palavras):\n\n${transcription}` }
             ],
             max_tokens: 400,
@@ -933,82 +778,215 @@ IMPORTANTE: Primeiro identifica quem é o vendedor na transcrição. Procura por
 - Quem conduz a reunião
 - Quem fala sobre preços, propostas, ou próximos passos
 
-Depois analisa APENAS o desempenho do vendedor identificado.
+TIPO DE REUNIÃO: ${callType || 'Chamada Fria'}
+
+Depois analisa APENAS o desempenho do vendedor identificado, considerando os objetivos específicos do tipo de reunião indicado acima.
 
 TRANSCRIÇÃO:
 ${transcription}
 
-CRITÉRIOS DE AVALIAÇÃO DETALHADOS:
+OBJETIVOS POR TIPO DE REUNIÃO DE VENDAS:
+
+1. Reunião de Descoberta (Discovery Call)
+🎯 Grande objetivo:
+- Entender se o cliente tem a dor
+- Validar se a empresa realmente tem a solução
+- Confirmar se o cliente é qualificado
+- Se for qualificado → agendar próxima reunião criando urgência
+
+🔹 Exemplo prático de sucesso:
+Comercial: "Qual é o maior desafio que estão a enfrentar na conversão das leads?"
+Cliente: "Geramos muitas leads, mas quase nenhuma fecha."
+Comercial: "E qual o impacto disso no vosso trimestre em termos de receita?"
+Cliente: "Estamos a perder perto de 300k em oportunidades."
+Comercial (resumindo): "Então o que identifico é que existe uma perda financeira relevante. A boa notícia é que trabalhamos exatamente este tipo de problema. Faz sentido marcarmos uma próxima reunião já para vos mostrar como podemos resolver?"
+
+👉 IA deve validar: se o comercial explorou dores, se criou urgência e se agendou próximo passo.
+
+2. Reunião de Proposta (Follow-up / Closing Meeting)
+🎯 Grande objetivo:
+- Relembrar as dores identificadas
+- Mostrar que a solução resolve essas dores
+- Colocar o cliente em estado de compra (buying state) antes de apresentar o preço
+- Direcionar para fecho ou decisão
+
+🔹 Exemplo prático de sucesso:
+Comercial: "Na primeira reunião falámos da baixa taxa de conversão e do impacto de 300k por trimestre. Se resolvermos isso, o vosso ROI pode ultrapassar 5x em menos de um ano."
+Cliente: "Isso é exatamente o que precisamos."
+Comercial: "Então o próximo passo é implementarmos esta solução. Posso partilhar consigo como funcionaria o investimento?"
+
+👉 IA deve validar: se o comercial recapitula dores, cria alinhamento, não apresenta preço cedo demais e conduz ao fecho.
+
+3. Reunião One-Call-Close (Monopólio)
+🎯 Grande objetivo:
+- Fazer discovery e proposta na mesma reunião
+- Identificar dores, apresentar solução e fechar sem follow-up
+
+🔹 Exemplo prático de sucesso:
+Comercial: "Qual o vosso maior desafio hoje?"
+Cliente: "Perdemos muito tempo com follow-ups que não dão em nada."
+Comercial: "Entendo. Se resolvermos isso, conseguem aumentar a produtividade em 20%. A nossa solução automatiza esse processo. Se implementássemos já, fazia sentido para si?"
+Cliente: "Sim, quanto custa?"
+Comercial: "O investimento é X, mas o retorno médio é 5x em 6 meses. Avançamos?"
+
+👉 IA deve validar: rapidez em descobrir dores, clareza da proposta, gestão imediata de objeções, tentativa clara de fecho.
+
+4. Chamada de Venda Rápida (Call ágil/Inbound Lead)
+🎯 Grande objetivo:
+- Garantir que o cliente tem tempo disponível
+- Captar atenção rapidamente
+- Explorar dor e criar urgência em minutos
+- Levar o cliente a marcar reunião detalhada ou fechar algo simples
+
+🔹 Exemplo prático de sucesso:
+Comercial: "Tem 10 minutos para falarmos agora? Quero entender melhor como estão a gerir o vosso processo X."
+Cliente: "Sim, pode ser rápido."
+Comercial: "Perfeito. Muitos dos nossos clientes tinham o mesmo desafio que mencionou no formulário. Isso está a custar-vos tempo e leads perdidas? Faz sentido agendarmos uma reunião esta semana para explorarmos como resolver?"
+
+👉 IA deve validar: se o comercial pediu tempo, foi direto ao ponto e tentou converter para próximo passo/fecho rápido.
+
+5. Reunião de Cross-Sell (Produtos/Serviços Complementares)
+🎯 Grande objetivo:
+- Mostrar resultados já alcançados
+- Posicionar novos produtos como complementares e naturais
+- Reforçar relação e confiança
+
+🔹 Exemplo prático de sucesso:
+Comercial: "Com a solução atual conseguiram aumentar em 25% as conversões. Se adicionarem a ferramenta de automação, podem ganhar ainda mais tempo e escalar a equipa sem contratar mais pessoas."
+Cliente: "Interessante, quanto custa esse módulo adicional?"
+Comercial: "O investimento é X, mas o ROI é em média recuperado em 3 meses."
+
+👉 IA deve validar: se o comercial usou resultados anteriores como base, apresentou valor adicional claro e não forçou a sugestão.
+
+6. Reunião de Upsell (Versão mais avançada/upgrade)
+🎯 Grande objetivo:
+- Ligar a proposta a necessidades atuais ou futuras
+- Mostrar que a versão avançada resolve algo maior ou acelera resultados
+- Fazer o cliente verbalizar os benefícios antes de preço
+
+🔹 Exemplo prático de sucesso:
+Comercial: "Atualmente têm o plano básico. Mas como a vossa equipa cresceu 50% este trimestre, o plano avançado vai permitir-vos integrar todas as operações sem atritos. Isso ajudaria a vossa expansão?"
+Cliente: "Sim, faria muito sentido."
+Comercial: "Então faz sentido falarmos do investimento?"
+
+👉 IA deve validar: se o comercial ligou ao contexto atual do cliente, usou linguagem de oportunidade (não pressão) e deixou o cliente verbalizar valor antes do preço.
+
+7. Venda Proativa (Outbound / New Business)
+🎯 Grande objetivo:
+- Mapear dores antes mesmo do cliente procurar solução
+- Posicionar a empresa como especialista
+- Abrir porta para reunião mais detalhada
+
+🔹 Exemplo prático de sucesso:
+Comercial: "Notei que a vossa empresa está a expandir para novos mercados. Muitos players no vosso setor enfrentam dificuldades em gerir equipas distribuídas. Está a ser um desafio para vocês também?"
+Cliente: "Sim, bastante."
+Comercial: "Temos ajudado empresas semelhantes a reduzir esse problema. Posso mostrar-lhe exemplos numa reunião rápida esta semana?"
+
+👉 IA deve validar: se o comercial fez diagnóstico breve, gerou curiosidade e tentou marcar reunião.
+
+⚡ RESUMO DOS OBJETIVOS:
+- Discovery: Diagnosticar → Qualificar → Agendar
+- Proposta: Recapitular → Apresentar solução → Buying state → Fecho
+- One-Call-Close: Discovery + Proposta + Fecho imediato
+- Chamada rápida: Atenção → Urgência → Próximo passo rápido
+- Cross-sell: Base na relação/resultados → Complemento natural
+- Upsell: Base em necessidades atuais/futuras → Upgrade como oportunidade
+- Venda proativa: Diagnóstico breve → Abrir porta → Marcar reunião
+
+IMPORTANTE: O tipo de reunião é ${callType || 'Chamada Fria'}. Avalia se o comercial cumpriu os objetivos específicos deste tipo de reunião conforme descrito acima.
+
+CRITÉRIOS DE AVALIAÇÃO DETALHADOS (SISTEMA RIGOROSO):
 
 1. Clareza e Fluência da Fala (1-5):
-- 5: Comunicação cristalina, sem hesitações, vocabulário rico e preciso
-- 4: Comunicação clara, poucas hesitações, vocabulário adequado
-- 3: Comunicação compreensível, algumas hesitações, vocabulário básico
-- 2: Comunicação confusa, muitas hesitações, vocabulário limitado
-- 1: Comunicação ininteligível, constantes hesitações, vocabulário inadequado
+- 5: Comunicação EXCEPCIONAL - sem hesitações, vocabulário rico e preciso, ritmo perfeito, articulação impecável, domínio total da linguagem
+- 4: Comunicação MUITO BOA - raras hesitações, vocabulário avançado, ritmo adequado, boa articulação
+- 3: Comunicação ADEQUADA - algumas hesitações, vocabulário básico mas adequado, ritmo aceitável
+- 2: Comunicação DEFICIENTE - muitas hesitações, vocabulário limitado, ritmo irregular, dificuldades de expressão
+- 1: Comunicação INADEQUADA - constantes hesitações, vocabulário pobre, ritmo caótico, comunicação confusa
 
 2. Tom e Controlo (1-5):
-- 5: Tom perfeito, controlo total da conversa, confiança natural
-- 4: Tom adequado, bom controlo, confiança evidente
-- 3: Tom aceitável, controlo moderado, confiança básica
-- 2: Tom inadequado, pouco controlo, falta de confiança
-- 1: Tom inapropriado, sem controlo, sem confiança
+- 5: Tom EXCEPCIONAL - confiança natural, controlo total, autoridade sem arrogância
+- 4: Tom MUITO BOM - boa confiança, controlo adequado, presença forte
+- 3: Tom ADEQUADO - confiança básica, controlo moderado, presença aceitável
+- 2: Tom DEFICIENTE - pouca confiança, controlo limitado, presença fraca
+- 1: Tom INADEQUADO - sem confiança, sem controlo, presença inexistente
 
 3. Envolvimento Conversacional (1-5):
-- 5: Envolvimento máximo, cliente totalmente engajado, interação fluida
-- 4: Bom envolvimento, cliente interessado, boa interação
-- 3: Envolvimento moderado, cliente participativo, interação aceitável
-- 2: Pouco envolvimento, cliente desinteressado, interação limitada
-- 1: Sem envolvimento, cliente passivo, interação inexistente
+- 5: Envolvimento EXCEPCIONAL - cliente totalmente engajado, interação fluida, rapport perfeito
+- 4: Envolvimento MUITO BOM - cliente interessado, boa interação, rapport adequado
+- 3: Envolvimento ADEQUADO - cliente participativo, interação aceitável, rapport básico
+- 2: Envolvimento DEFICIENTE - cliente desinteressado, interação limitada, rapport fraco
+- 1: Envolvimento INADEQUADO - cliente passivo, interação inexistente, sem rapport
 
 4. Efetividade na Descoberta de Necessidades (1-5):
-- 5: Descoberta completa, necessidades claramente identificadas, perguntas estratégicas
-- 4: Boa descoberta, necessidades bem identificadas, perguntas relevantes
-- 3: Descoberta moderada, necessidades básicas identificadas, perguntas adequadas
-- 2: Descoberta limitada, necessidades superficiais, perguntas básicas
-- 1: Sem descoberta, necessidades não identificadas, perguntas inadequadas
+- 5: Descoberta EXCEPCIONAL - necessidades profundamente identificadas, perguntas estratégicas e perspicazes, insights valiosos, compreensão completa das dores do cliente
+- 4: Descoberta MUITO BOA - necessidades bem identificadas, perguntas relevantes e bem formuladas, boa compreensão das necessidades
+- 3: Descoberta ADEQUADA - necessidades básicas identificadas, perguntas adequadas, compreensão superficial mas suficiente
+- 2: Descoberta DEFICIENTE - necessidades superficiais, perguntas básicas ou inadequadas, compreensão limitada
+- 1: Descoberta INADEQUADA - necessidades não identificadas, perguntas inadequadas ou ausentes, sem compreensão das necessidades
 
 5. Entrega de Valor e Ajuste da Solução (1-5):
-- 5: Valor claramente entregue, solução perfeitamente ajustada, benefícios evidentes
-- 4: Valor bem entregue, solução bem ajustada, benefícios claros
-- 3: Valor adequadamente entregue, solução ajustada, benefícios básicos
-- 2: Valor mal entregue, solução pouco ajustada, benefícios confusos
-- 1: Valor não entregue, solução não ajustada, benefícios inexistentes
+- 5: Entrega EXCEPCIONAL - valor claramente demonstrado, solução perfeitamente ajustada, benefícios tangíveis
+- 4: Entrega MUITO BOA - valor bem demonstrado, solução bem ajustada, benefícios claros
+- 3: Entrega ADEQUADA - valor adequadamente demonstrado, solução ajustada, benefícios básicos
+- 2: Entrega DEFICIENTE - valor mal demonstrado, solução pouco ajustada, benefícios confusos
+- 1: Entrega INADEQUADA - valor não demonstrado, solução não ajustada, benefícios inexistentes
 
 6. Habilidades de Lidar com Objeções (1-5):
-- 5: Objeções perfeitamente resolvidas, respostas convincentes, confiança restaurada
-- 4: Objeções bem resolvidas, respostas adequadas, confiança mantida
-- 3: Objeções moderadamente resolvidas, respostas básicas, confiança parcial
-- 2: Objeções mal resolvidas, respostas inadequadas, confiança abalada
-- 1: Objeções não resolvidas, respostas inexistentes, confiança perdida
+- 5: Gestão EXCEPCIONAL - objeções perfeitamente resolvidas, respostas convincentes, confiança restaurada
+- 4: Gestão MUITO BOA - objeções bem resolvidas, respostas adequadas, confiança mantida
+- 3: Gestão ADEQUADA - objeções moderadamente resolvidas, respostas básicas, confiança parcial
+- 2: Gestão DEFICIENTE - objeções mal resolvidas, respostas inadequadas, confiança abalada
+- 1: Gestão INADEQUADA - objeções não resolvidas, respostas inexistentes, confiança perdida
 
 7. Estrutura e Controle da Reunião (1-5):
-- 5: Estrutura perfeita, controlo total, fluxo ideal
-- 4: Estrutura adequada, bom controlo, fluxo satisfatório
-- 3: Estrutura básica, controlo moderado, fluxo aceitável
-- 2: Estrutura confusa, pouco controlo, fluxo problemático
-- 1: Sem estrutura, sem controlo, fluxo caótico
+- 5: Estrutura EXCEPCIONAL - fluxo perfeito, controlo total, timing impecável
+- 4: Estrutura MUITO BOA - fluxo adequado, bom controlo, timing adequado
+- 3: Estrutura ADEQUADA - fluxo aceitável, controlo moderado, timing básico
+- 2: Estrutura DEFICIENTE - fluxo problemático, pouco controlo, timing inadequado
+- 1: Estrutura INADEQUADA - fluxo caótico, sem controlo, timing inexistente
 
 8. Fechamento e Próximos Passos (1-5):
-- 5: Fechamento claro, próximos passos bem definidos, compromisso obtido
-- 4: Fechamento adequado, próximos passos claros
-- 3: Fechamento básico, próximos passos definidos
-- 2: Fechamento confuso, próximos passos pouco claros
-- 1: Sem fechamento ou próximos passos indefinidos
+- 5: Fechamento EXCEPCIONAL - compromisso claro obtido, próximos passos bem definidos, urgência criada
+- 4: Fechamento MUITO BOM - próximos passos claros, compromisso adequado, direção definida
+- 3: Fechamento ADEQUADO - próximos passos definidos, compromisso básico, direção aceitável
+- 2: Fechamento DEFICIENTE - próximos passos pouco claros, compromisso fraco, direção confusa
+- 1: Fechamento INADEQUADO - próximos passos indefinidos, sem compromisso, direção inexistente
 
-REGRAS IMPORTANTES PARA AVALIAÇÃO:
+REGRAS IMPORTANTES PARA AVALIAÇÃO RIGOROSA:
 
 1. CONSISTÊNCIA: A mesma transcrição deve sempre receber a mesma pontuação, independentemente do nome do ficheiro.
 
-2. CONTEXTO DE VENDAS: Considera que:
+2. PADRÕES ELEVADOS DE AVALIAÇÃO:
+   - 5/5 = EXCEPCIONAL - Performance que demonstra maestria total na área
+   - 4/5 = MUITO BOM - Performance claramente superior, com poucas falhas
+   - 3/5 = ADEQUADO - Performance que cumpre os requisitos básicos
+   - 2/5 = DEFICIENTE - Performance com falhas significativas
+   - 1/5 = INADEQUADO - Performance muito fraca com múltiplas falhas
+
+3. CRITÉRIOS RIGOROSOS:
+   - Para dar 5/5: O comercial deve demonstrar excelência excepcional, sem falhas notáveis
+   - Para dar 4/5: O comercial deve ter performance muito boa, com apenas falhas menores
+   - Para dar 3/5: O comercial deve cumprir adequadamente os requisitos básicos
+   - Para dar 2/5: O comercial deve ter falhas significativas que impactam a eficácia
+   - Para dar 1/5: O comercial deve ter múltiplas falhas graves
+
+4. CONTEXTO DE VENDAS: Considera que:
    - Perguntas como "Porquê de nos terem contactado?" são estratégicas para fazer a lead abrir-se
    - Linguagem coloquial/informal pode ser apropriada para criar rapport
    - Validações como "Consegues ver?" são importantes para confirmar compreensão
    - Partilha de ecrã é uma ferramenta essencial, não um ponto forte
 
-3. AVALIAÇÃO COMPLETA: TODOS os 8 critérios devem ser avaliados, mesmo que alguns não sejam muito evidentes na call.
+5. AVALIAÇÃO COMPLETA: TODOS os 8 critérios devem ser avaliados, mesmo que alguns não sejam muito evidentes na call.
 
-4. JUSTIFICAÇÃO: Cada pontuação deve ter uma justificação clara baseada na transcrição.
+6. JUSTIFICAÇÃO: Cada pontuação deve ter uma justificação clara baseada na transcrição.
+
+7. RIGOR NA AVALIAÇÃO: Seja rigoroso na avaliação. Analisa objetivamente o desempenho real e atribui a pontuação que melhor reflete a qualidade demonstrada.
+
+8. AVALIAÇÃO POR TIPO DE REUNIÃO: 
+   - O tipo de reunião já foi identificado acima: ${callType || 'Chamada Fria'}
+   - Avalia se o comercial cumpriu os objetivos específicos deste tipo de reunião
+   - Considera os objetivos específicos ao atribuir pontuações, especialmente para "Efetividade na Descoberta de Necessidades", "Entrega de Valor e Ajuste da Solução", e "Fechamento e Próximos Passos"
 
 CRÍTICO: Fornece APENAS a pontuação seguindo EXATAMENTE este formato. NÃO incluas títulos, introduções, ou análises adicionais.
 
@@ -1175,33 +1153,26 @@ LEMBRA-TE: A tua resposta deve começar com "Clareza e Fluência da Fala:" e ter
       console.error('❌ Pontos Fracos failed:', analysisResults[1]?.status || 'Unknown error')
     }
     
+
     if (analysisResults[2]?.ok) {
       const data = analysisResults[2].data
-      results.resumoDaCall = data.choices[0].message.content
-      console.log('✅ Resumo da Call:', results.resumoDaCall.length, 'characters')
+      results.dicasGerais = data.choices[0].message.content
+      console.log('✅ Dicas Gerais:', results.dicasGerais.length, 'characters')
     } else {
-      console.error('❌ Resumo da Call failed:', analysisResults[2]?.status || 'Unknown error')
+      console.error('❌ Dicas Gerais failed:', analysisResults[2]?.status || 'Unknown error')
     }
 
     if (analysisResults[3]?.ok) {
       const data = analysisResults[3].data
-      results.dicasGerais = data.choices[0].message.content
-      console.log('✅ Dicas Gerais:', results.dicasGerais.length, 'characters')
-    } else {
-      console.error('❌ Dicas Gerais failed:', analysisResults[3]?.status || 'Unknown error')
-    }
-
-    if (analysisResults[4]?.ok) {
-      const data = analysisResults[4].data
       results.focoParaProximasCalls = data.choices[0].message.content
       console.log('✅ Foco para Próximas Calls:', results.focoParaProximasCalls.length, 'characters')
     } else {
-      console.error('❌ Foco para Próximas Calls failed:', analysisResults[4]?.status || 'Unknown error')
+      console.error('❌ Foco para Próximas Calls failed:', analysisResults[3]?.status || 'Unknown error')
     }
 
     // Process scoring analysis
-    if (analysisResults[5]?.ok) {
-      const data = analysisResults[5].data
+    if (analysisResults[4]?.ok) {
+      const data = analysisResults[4].data
       const scoringContent = data.choices[0].message.content
       console.log('📊 Raw scoring content:', scoringContent.substring(0, 500) + '...')
       console.log('📊 Full scoring content length:', scoringContent.length)
@@ -1323,7 +1294,6 @@ LEMBRA-TE: A tua resposta deve começar com "Clareza e Fluência da Fala:" e ter
       totalScore: results.totalScore,
       pontosFortesLength: results.pontosFortes?.length || 0,
       pontosFracosLength: results.pontosFracos?.length || 0,
-      resumoDaCallLength: results.resumoDaCall?.length || 0,
       dicasGeraisLength: results.dicasGerais?.length || 0,
       focoParaProximasCallsLength: results.focoParaProximasCalls?.length || 0,
       individualScores: {
@@ -1413,7 +1383,6 @@ async function performSlidingWindowAnalysis(transcription: string, audioDuration
     totalScore: 0,
     pontosFortes: '',
     pontosFracos: '',
-    resumoDaCall: '',
     dicasGerais: '',
     focoParaProximasCalls: '',
     clarezaFluenciaFala: 0,
@@ -1441,10 +1410,6 @@ async function performSlidingWindowAnalysis(transcription: string, audioDuration
       .filter(w => w && w.trim())
       .join('\n\n')
     
-    combinedResults.resumoDaCall = windowAnalyses
-      .map(w => w.analysis.resumoDaCall)
-      .filter(r => r && r.trim())
-      .join('\n\n')
     
     combinedResults.dicasGerais = windowAnalyses
       .map(w => w.analysis.dicasGerais)
@@ -1672,18 +1637,50 @@ export async function POST(request: NextRequest) {
     const serverContentType = videoResponse.headers.get('content-type')
     let mimeType = 'video/mp4' // Default
     
+    console.log('🔍 MIME type detection:')
+    console.log('  - Server Content-Type:', serverContentType)
+    console.log('  - File extension:', fileName.split('.').pop()?.toLowerCase())
+    
     // First, check if the server already detected the correct content type
-    if (serverContentType && serverContentType.startsWith('audio/')) {
+    if (serverContentType && (serverContentType.startsWith('audio/') || serverContentType.startsWith('video/'))) {
       mimeType = serverContentType
-      console.log('✅ Using server-detected audio type:', serverContentType)
+      console.log('✅ Using server-detected type:', serverContentType)
+    } else if (serverContentType === 'application/octet-stream') {
+      // Handle case where Vercel Blob serves files as application/octet-stream
+      console.log('⚠️ Server returned application/octet-stream, using file extension for MIME type')
+      if (fileName.toLowerCase().endsWith('.mp4')) {
+        mimeType = 'video/mp4'
+        console.log('✅ Overriding with video/mp4 for MP4 file')
+      } else if (fileName.toLowerCase().endsWith('.mp3')) {
+        mimeType = 'audio/mpeg'
+        console.log('✅ Overriding with audio/mpeg for MP3 file')
+      } else if (fileName.toLowerCase().endsWith('.wav')) {
+        mimeType = 'audio/wav'
+        console.log('✅ Overriding with audio/wav for WAV file')
+      } else if (fileName.toLowerCase().endsWith('.m4a')) {
+        mimeType = 'audio/mp4'
+        console.log('✅ Overriding with audio/mp4 for M4A file')
+      }
     } else if (fileName.toLowerCase().endsWith('.mp3')) {
       mimeType = 'audio/mpeg'
+      console.log('✅ Using MP3 MIME type')
     } else if (fileName.toLowerCase().endsWith('.wav')) {
       mimeType = 'audio/wav'
+      console.log('✅ Using WAV MIME type')
     } else if (fileName.toLowerCase().endsWith('.m4a')) {
       mimeType = 'audio/mp4'
+      console.log('✅ Using M4A MIME type')
     } else if (fileName.toLowerCase().endsWith('.mp4')) {
       mimeType = 'video/mp4'
+      console.log('✅ Using MP4 MIME type')
+    } else if (fileName.toLowerCase().endsWith('.mov')) {
+      mimeType = 'video/quicktime'
+      console.log('✅ Using MOV MIME type')
+    } else if (fileName.toLowerCase().endsWith('.avi')) {
+      mimeType = 'video/x-msvideo'
+      console.log('✅ Using AVI MIME type')
+    } else {
+      console.log('⚠️ Unknown file extension, using default video/mp4')
     }
     
     const videoBlob = new Blob([videoBuffer], { type: mimeType })
@@ -1691,6 +1688,29 @@ export async function POST(request: NextRequest) {
     // Validate that we have a proper audio/video file
     if (videoBuffer.byteLength === 0) {
       throw new Error('Downloaded file is empty - no content received')
+    }
+    
+    // Additional validation for video files - check file headers
+    const header = new Uint8Array(videoBuffer.slice(0, 12))
+    const headerHex = Array.from(header).map(b => b.toString(16).padStart(2, '0')).join(' ')
+    console.log('🔍 File header (first 12 bytes):', headerHex)
+    
+    // Check for common video/audio file signatures
+    const isValidVideo = 
+      // MP4 signature (ftyp box)
+      (header[4] === 0x66 && header[5] === 0x74 && header[6] === 0x79 && header[7] === 0x70) ||
+      // QuickTime signature
+      (header[4] === 0x71 && header[5] === 0x74 && header[6] === 0x00 && header[7] === 0x00) ||
+      // AVI signature
+      (header[0] === 0x52 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x46) ||
+      // WAV signature
+      (header[0] === 0x52 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x46 && 
+       header[8] === 0x57 && header[9] === 0x41 && header[10] === 0x56 && header[11] === 0x45)
+    
+    if (!isValidVideo && mimeType.startsWith('video/')) {
+      console.warn('⚠️ Warning: File may not be a valid video format based on header analysis')
+      console.warn('⚠️ Header analysis:', headerHex)
+      console.warn('⚠️ This may cause AssemblyAI to reject the file')
     }
     
     // Log file information for debugging
@@ -1751,6 +1771,12 @@ export async function POST(request: NextRequest) {
     console.log('  - Blob size:', (videoBlob.size / 1024 / 1024).toFixed(2), 'MB')
     
     formData.append('file', videoBlob, assemblyFileName)
+    
+    console.log('📤 Uploading to AssemblyAI with details:')
+    console.log('  - FormData file name:', assemblyFileName)
+    console.log('  - FormData file type:', videoBlob.type)
+    console.log('  - FormData file size:', (videoBlob.size / 1024 / 1024).toFixed(2), 'MB')
+    console.log('  - FormData entries count:', Array.from(formData.entries()).length)
 
     const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
       method: 'POST',
@@ -1760,6 +1786,9 @@ export async function POST(request: NextRequest) {
       body: formData,
       signal: abortController.signal // Add abort signal
     })
+
+    let uploadResult: any
+    let audioUrl: string
 
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text()
@@ -1771,20 +1800,59 @@ export async function POST(request: NextRequest) {
       console.error('  - Response status:', uploadResponse.status)
       console.error('  - Response status text:', uploadResponse.statusText)
       
-      // Provide more specific error messages
-      if (uploadResponse.status === 400) {
-        throw new Error(`AssemblyAI upload failed: Invalid file format. The file appears to be ${videoBlob.type} but AssemblyAI expects audio/video. Please ensure the file is a valid audio or video file.`)
-      } else if (uploadResponse.status === 413) {
-        throw new Error(`AssemblyAI upload failed: File too large. The file is ${(videoBlob.size / 1024 / 1024).toFixed(2)}MB, which exceeds AssemblyAI's size limits.`)
+      // Try alternative approach for MP4 files that might be causing issues
+      if (uploadResponse.status === 400 && fileName.toLowerCase().endsWith('.mp4')) {
+        console.log('🔄 Attempting alternative upload approach for MP4 file...')
+        
+        // Try uploading as audio/mp4 instead of video/mp4
+        const alternativeBlob = new Blob([videoBuffer], { type: 'audio/mp4' })
+        const alternativeFormData = new FormData()
+        alternativeFormData.append('file', alternativeBlob, assemblyFileName)
+        
+        console.log('📤 Retrying with audio/mp4 MIME type...')
+        const retryResponse = await fetch('https://api.assemblyai.com/v2/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': process.env.ASSEMBLY_AI_API_KEY!
+          },
+          body: alternativeFormData,
+          signal: abortController.signal
+        })
+        
+        if (retryResponse.ok) {
+          console.log('✅ Alternative upload successful!')
+          uploadResult = await retryResponse.json()
+          audioUrl = uploadResult.upload_url
+          console.log('✅ File uploaded to AssemblyAI (retry):', audioUrl)
+        } else {
+          console.error('❌ Alternative upload also failed')
+          const retryErrorText = await retryResponse.text()
+          console.error('❌ Retry error:', retryErrorText)
+          
+          // If retry didn't work, throw the original error
+          if (uploadResponse.status === 400) {
+            throw new Error(`AssemblyAI upload failed: Invalid file format. The file appears to be ${videoBlob.type} but AssemblyAI expects audio/video. Please ensure the file is a valid audio or video file.`)
+          } else if (uploadResponse.status === 413) {
+            throw new Error(`AssemblyAI upload failed: File too large. The file is ${(videoBlob.size / 1024 / 1024).toFixed(2)}MB, which exceeds AssemblyAI's size limits.`)
+          } else {
+            throw new Error(`AssemblyAI upload failed: ${uploadResponse.statusText}. File type: ${videoBlob.type}, Size: ${(videoBlob.size / 1024 / 1024).toFixed(2)}MB`)
+          }
+        }
       } else {
-        throw new Error(`AssemblyAI upload failed: ${uploadResponse.statusText}. File type: ${videoBlob.type}, Size: ${(videoBlob.size / 1024 / 1024).toFixed(2)}MB`)
+        // If retry didn't work or wasn't applicable, throw the original error
+        if (uploadResponse.status === 400) {
+          throw new Error(`AssemblyAI upload failed: Invalid file format. The file appears to be ${videoBlob.type} but AssemblyAI expects audio/video. Please ensure the file is a valid audio or video file.`)
+        } else if (uploadResponse.status === 413) {
+          throw new Error(`AssemblyAI upload failed: File too large. The file is ${(videoBlob.size / 1024 / 1024).toFixed(2)}MB, which exceeds AssemblyAI's size limits.`)
+        } else {
+          throw new Error(`AssemblyAI upload failed: ${uploadResponse.statusText}. File type: ${videoBlob.type}, Size: ${(videoBlob.size / 1024 / 1024).toFixed(2)}MB`)
+        }
       }
+    } else {
+      uploadResult = await uploadResponse.json()
+      audioUrl = uploadResult.upload_url
+      console.log('✅ File uploaded to AssemblyAI:', audioUrl)
     }
-
-    const uploadResult = await uploadResponse.json()
-    const audioUrl = uploadResult.upload_url
-
-    console.log('✅ File uploaded to AssemblyAI:', audioUrl)
 
     // Check for cancellation before starting transcription
     if (abortController.signal.aborted) {
@@ -1956,7 +2024,46 @@ export async function POST(request: NextRequest) {
         
         break
       } else if (statusResult.status === 'error') {
-        throw new Error(`Transcription failed: ${statusResult.error}`)
+        console.error('❌ AssemblyAI transcription error details:')
+        console.error('  - Error message:', statusResult.error)
+        console.error('  - File details:')
+        console.error('    - File name:', fileName)
+        console.error('    - File type:', videoBlob.type)
+        console.error('    - File size:', (videoBlob.size / 1024 / 1024).toFixed(2), 'MB')
+        console.error('    - AssemblyAI URL:', audioUrl)
+        
+        // Provide more specific error messages based on common issues
+        let errorMessage = `Transcription failed: ${statusResult.error}`
+        
+        if (statusResult.error && statusResult.error.includes('File does not appear to contain audio')) {
+          errorMessage = `Transcription failed: The file does not contain detectable audio. This could be due to:
+1. The file is corrupted or not a valid audio/video format
+2. The file contains only video without audio track
+3. The audio track is too quiet or silent
+4. The file format is not supported by AssemblyAI
+
+File details:
+- Name: ${fileName}
+- Type: ${videoBlob.type}
+- Size: ${(videoBlob.size / 1024 / 1024).toFixed(2)}MB
+- Header: ${headerHex}
+
+Please try with a different file that contains clear audio.`
+        } else if (statusResult.error && statusResult.error.includes('Transcoding failed')) {
+          errorMessage = `Transcription failed: File transcoding failed. This usually means:
+1. The file format is not supported by AssemblyAI
+2. The file is corrupted or incomplete
+3. The file is too large or complex
+
+File details:
+- Name: ${fileName}
+- Type: ${videoBlob.type}
+- Size: ${(videoBlob.size / 1024 / 1024).toFixed(2)}MB
+
+Please try with a supported audio/video format (MP3, WAV, MP4, M4A).`
+        }
+        
+        throw new Error(errorMessage)
       }
     }
 
@@ -1975,7 +2082,6 @@ export async function POST(request: NextRequest) {
           totalScore: 0,
           pontosFortes: [],
           pontosFracos: [],
-          resumoDaCall: 'Transcription is still processing. Please check back later.',
           dicasGerais: [],
           focoParaProximasCalls: [],
           clarezaFluenciaFala: 0,
@@ -2221,7 +2327,6 @@ export async function POST(request: NextRequest) {
       score: analysisResults.totalScore,
       pontosFortes: analysisResults.pontosFortes?.substring(0, 100) + '...',
       pontosFracos: analysisResults.pontosFracos?.substring(0, 100) + '...',
-      resumoDaCall: analysisResults.resumoDaCall?.substring(0, 100) + '...',
       dicasGerais: analysisResults.dicasGerais?.substring(0, 100) + '...',
       focoParaProximasCalls: analysisResults.focoParaProximasCalls?.substring(0, 100) + '...',
       clarezaFluenciaFala: analysisResults.clarezaFluenciaFala,
@@ -2257,7 +2362,6 @@ export async function POST(request: NextRequest) {
         justificacaoGS: '',
         tipoCall: analysisResults.tipoCall || '',
         // New required fields
-        resumoDaCall: analysisResults.resumoDaCall || '',
         dicasGerais: analysisResults.dicasGerais || '',
         focoParaProximasCalls: analysisResults.focoParaProximasCalls || '',
         // 8 scoring fields
@@ -2382,7 +2486,6 @@ export async function POST(request: NextRequest) {
         analysis: {
           pontosFortes: analysisResults.pontosFortes || '',
           pontosFracos: analysisResults.pontosFracos || '',
-          resumoDaCall: analysisResults.resumoDaCall || '',
           dicasGerais: analysisResults.dicasGerais || '',
           focoParaProximasCalls: analysisResults.focoParaProximasCalls || '',
           clarezaFluenciaFala: analysisResults.clarezaFluenciaFala || 0,

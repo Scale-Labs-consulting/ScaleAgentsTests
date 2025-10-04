@@ -110,7 +110,7 @@ export interface Database {
           id: string
           user_id: string
           name: string
-          type: 'scale_expert' | 'sales_analyst' | 'hr_agent'
+          type: 'scale_expert' | 'sales_analyst' | 'hr_agent' | 'sales_optimizer'
           description: string | null
           is_active: boolean
           config: Record<string, any>
@@ -121,7 +121,7 @@ export interface Database {
           id?: string
           user_id: string
           name: string
-          type: 'scale_expert' | 'sales_analyst' | 'hr_agent'
+          type: 'scale_expert' | 'sales_analyst' | 'hr_agent' | 'sales_optimizer'
           description?: string | null
           is_active?: boolean
           config?: Record<string, any>
@@ -132,7 +132,7 @@ export interface Database {
           id?: string
           user_id?: string
           name?: string
-          type?: 'scale_expert' | 'sales_analyst' | 'hr_agent'
+          type?: 'scale_expert' | 'sales_analyst' | 'hr_agent' | 'sales_optimizer'
           description?: string | null
           is_active?: boolean
           config?: Record<string, any>
@@ -629,7 +629,7 @@ export type UsageLog = Database['public']['Tables']['usage_logs']['Row']
 export type Credits = Database['public']['Tables']['credits']['Row']
 
 // Agent types
-export type AgentType = 'scale_expert' | 'sales_analyst' | 'hr_agent'
+export type AgentType = 'scale_expert' | 'sales_analyst' | 'hr_agent' | 'sales_optimizer'
 
 // Status types
 export type ConversationStatus = 'active' | 'archived' | 'deleted'

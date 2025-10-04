@@ -480,9 +480,9 @@ Tarefas principais:
 4. Compara os rácios reais com os rácios ideais;
 5. Dá feedback objectivo e claro sobre como melhorar o equilíbrio da conversa e o envolvimento do cliente.
 
-No final da análise, inclui também o seguinte sistema de pontuação (escala de 40 pontos):
+No final da análise, inclui também o seguinte sistema de pontuação RIGOROSO (escala de 40 pontos):
 
-Sistema de Pontuação:
+Sistema de Pontuação RIGOROSO:
 - Clareza e Fluência da Fala: X/5
 - Tom e Controlo: X/5
 - Envolvimento Conversacional: X/5
@@ -493,6 +493,15 @@ Sistema de Pontuação:
 - Conclusão e Próximos Passos: X/5
 
 Pontuação Total: X/40
+
+CRITÉRIOS RIGOROSOS:
+- 5/5 = EXCEPCIONAL - Performance que demonstra maestria total na área
+- 4/5 = MUITO BOM - Performance claramente superior, com poucas falhas
+- 3/5 = ADEQUADO - Performance que cumpre os requisitos básicos
+- 2/5 = DEFICIENTE - Performance com falhas significativas
+- 1/5 = INADEQUADO - Performance muito fraca com múltiplas falhas
+
+IMPORTANTE: Seja rigoroso na avaliação. Analisa objetivamente o desempenho real e atribui a pontuação que melhor reflete a qualidade demonstrada. Para dar pontuações altas (4-5), o comercial deve demonstrar excelência genuína. Considera os objetivos específicos do tipo de reunião ao avaliar o desempenho.
 
 INSTRUÇÕES CRÍTICAS:
 1. NUNCA utilizes markdowns, símbolos ou emojis do ChatGPT;

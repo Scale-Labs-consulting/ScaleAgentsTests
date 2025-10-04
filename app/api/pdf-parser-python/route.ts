@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { extractTextFromPDF } from '@/lib/pdf-utils'
 
-export const runtime = 'edge'
+// Use Node.js runtime for PDF parsing (not Edge Runtime)
+export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,33 +13,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    console.log('🐍 Python PDF parser in Edge Runtime')
+    console.log('🐍 PDF parser in Node.js Runtime')
     console.log('📄 File:', file.name, 'Size:', file.size)
 
     // Convert file to buffer
     const buffer = Buffer.from(await file.arrayBuffer())
     
-    // For now, we'll return a placeholder response since Edge Runtime doesn't support
-    // the Node.js dependencies required by pdf2json (node:fs, node:console, etc.)
-    console.log('⚠️ Edge Runtime cannot use pdf2json due to Node.js dependencies')
+    // Use the existing PDF parsing utility
+    console.log('📄 Extracting text from PDF using pdf2json...')
+    const pdfData = await extractTextFromPDF(buffer, {
+      max: 20, // Limit to 20 pages for performance
+      normalizeWhitespace: true
+    })
     
-    // Return a placeholder response that indicates the Edge Function is working
-    // but cannot parse PDFs due to runtime limitations
+    console.log(`✅ PDF extraction successful: ${pdfData.text.length} characters, ${pdfData.numpages} pages`)
+    
     return NextResponse.json({
       success: true,
-      text: 'PDF parsing not available in Edge Runtime due to Node.js dependencies',
-      numpages: 0,
-      numrender: 0,
-      info: { title: 'Edge Runtime Limitation' },
-      metadata: { method: 'edge-runtime-limitation' },
-      method: 'edge-runtime-limitation',
-      error: 'Edge Runtime cannot access Node.js file system APIs required by pdf2json'
+      text: pdfData.text,
+      numpages: pdfData.numpages,
+      numrender: pdfData.numrender,
+      info: pdfData.info || { title: 'PDF Document' },
+      metadata: {
+        method: 'nodejs-pdf2json',
+        filename: file.name,
+        file_size: file.size
+      },
+      version: 'nodejs-pdf2json'
     })
 
   } catch (error) {
-    console.error('❌ Python PDF parser error:', error)
+    console.error('❌ PDF parser error:', error)
     return NextResponse.json(
-      { error: 'PDF parsing failed', details: error instanceof Error ? error.message : String(error) },
+      { 
+        success: false,
+        error: 'PDF parsing failed', 
+        details: error instanceof Error ? error.message : String(error) 
+      },
       { status: 500 }
     )
   }

@@ -18,6 +18,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if SCALE_EXPERT environment variable is set
+    if (!process.env.SCALE_EXPERT) {
+      console.error('❌ SCALE_EXPERT environment variable is not set')
+      return NextResponse.json(
+        { error: 'SCALE_EXPERT environment variable is required' },
+        { status: 500 }
+      )
+    }
+
+    // Check if VECTOR_STORE_ID environment variable is set
+    if (!process.env.VECTOR_STORE_ID) {
+      console.error('❌ VECTOR_STORE_ID environment variable is not set')
+      return NextResponse.json(
+        { error: 'VECTOR_STORE_ID environment variable is required' },
+        { status: 500 }
+      )
+    }
+
     // Define tools for the Scale Expert assistant
     const tools = [
       {
@@ -135,10 +153,54 @@ export async function POST(request: NextRequest) {
 
     // Create or update the assistant
     const assistantName = 'Scale Expert Agent'
-    const assistantInstructions = `Essência
-És o assistente oficial da Scale Labs, especializado em vendas e crescimento empresarial. Comunicas sempre em português de Lisboa usando "tu" (não "você"), de forma natural e conversacional.
+    const assistantInstructions = `## Core Identity
+És o assistente oficial da Scale Labs, especializado em vendas e crescimento empresarial. Comunicas sempre em português de Lisboa usando "tu", de forma direta e profissional, mas natural.
 
-O teu diferencial: Vais sempre à raiz psicológica e comportamental dos problemas, nunca ficando na superfície. Demonstras expertise através de insights profundos.
+## Metodologia
+- **Insight First**: Sempre demonstra conhecimento profundo antes de fazer perguntas
+- **Context Aware**: Usa toda a conversa anterior para dar respostas personalizadas
+- **Natural Flow**: Adapta o tom e estrutura conforme a situação
+
+## Estilo de Comunicação
+- Usa "tu" em vez de "você"
+- Tom de especialista confiante mas humano
+- Varia as frases de abertura:
+  - "Olha, o que se passa aqui é..."
+  - "Já vi isto muitas vezes..."
+  - "Baseado na minha experiência..."
+  - "O problema real não é esse, é..."
+  - "Vou ser direto contigo..."
+
+## Estrutura Flexível (NÃO OBRIGATÓRIA)
+**Para problemas novos:**
+1. Diagnóstico psicológico/comportamental
+2. 2-3 soluções específicas
+3. Uma pergunta para confirmar
+
+**Para follow-ups:**
+- Referencia a conversa anterior
+- Dá continuidade natural
+- Não repete o mesmo formato
+
+## Regras Importantes
+- **NUNCA** uses a mesma estrutura em todas as respostas
+- **SEMPRE** referencia a conversa anterior quando relevante
+- **VARIA** as frases de abertura e estrutura
+- **ADAPTA** o tom conforme a situação
+- **MANTÉM** a expertise mas com naturalidade
+
+## Diagnósticos Profundos
+Vai sempre à raiz psicológica, não superficialidades:
+
+❌ **ERRADO**: "Implementa um CRM", "Melhora o treinamento"
+✅ **CORRETO**: "O problema não é técnico, é de visibilidade e credibilidade percebida"
+
+## Finalização
+Termina com perguntas específicas que permitam dar conselhos mais precisos, mas varia o formato:
+- "Agora diz-me: [pergunta específica]"
+- "Diz-me uma coisa: [pergunta específica]"
+- "Para te ajudar melhor: [pergunta específica]"
+- "Só mais uma coisa: [pergunta específica]"
 
 **CRÍTICO - USO DE DOCUMENTOS:**
 - **SEMPRE** usa File Search ANTES de responder a perguntas sobre vendas, processos, SOPs, estratégias
@@ -147,79 +209,34 @@ O teu diferencial: Vais sempre à raiz psicológica e comportamental dos problem
 - **NUNCA DIGAS**: "Baseado nos documentos...", "Nos ficheiros vejo...", "De acordo com as informações disponíveis..."
 - Apresenta o conhecimento como "Baseado na minha experiência...", "Já vi isto funcionar...", "O que costumo ver é..."
 
-Estilo de Conversação:
-- **NATURAL E FLUÍDO**: Conversa como um especialista humano, não sigas templates rígidos
-- **VARIA O TOM**: Adapta-te ao contexto - às vezes mais direto, outras vezes mais exploratório
-- **SEM ESTRUTURAS FIXAS**: Nunca uses sempre o mesmo formato de resposta
-- Usa "tu" em vez de "você"
-- Varia as frases de abertura: "Olha...", "Já vi isto muitas vezes...", "Vou ser direto contigo..."
-
-Abordagem:
-- Vai à raiz psicológica dos problemas (não te fiques na superfície técnica)
-- Dá 2-3 soluções práticas quando fazes sentido
-- Faz perguntas específicas para entender melhor o contexto
-- Adapta-te à conversa - se é um follow-up, referencia o que foi dito antes
-
-Exemplos do que EVITAR:
-❌ "Implementa um CRM"
-❌ "Melhora o treinamento"
-❌ Respostas genéricas sem profundidade
-❌ Sempre a mesma estrutura com bullet points
-❌ Mencionar documentos ou ficheiros
-
-Exemplos do que FAZER:
-✅ "O problema não é técnico, é de visibilidade e credibilidade percebida"
-✅ Conversar naturalmente, adaptando o tom à situação
-✅ Variar completamente a estrutura entre respostas
-✅ Demonstrar expertise através de insights, não de listas
-
 **APRESENTAÇÃO:**
 - **NUNCA** incluas marcadores de citação como 【4:0†source】
 - Respostas limpas, conversacionais e profissionais
 - Apresenta todo o conhecimento como experiência própria`
 
-    // Check if assistant already exists
-    const assistants = await openai.beta.assistants.list()
-    let existingAssistant = assistants.data.find(assistant => assistant.name === assistantName)
-
-    let assistant
-
-    if (existingAssistant) {
-      console.log('🔄 Updating existing assistant...')
-      assistant = await openai.beta.assistants.update(existingAssistant.id, {
-        name: assistantName,
-        instructions: assistantInstructions,
-        model: 'gpt-4o',
-        tools: tools,
-        tool_resources: {
-          file_search: {
-            vector_store_ids: ['vs_mAGmZOoBCB8vN4VddooXHHRC']
-          }
+    // Update the existing assistant using the SCALE_EXPERT environment variable
+    console.log('🔄 Updating existing assistant with ID:', process.env.SCALE_EXPERT)
+    
+    const assistant = await openai.beta.assistants.update(process.env.SCALE_EXPERT, {
+      name: assistantName,
+      instructions: assistantInstructions,
+      model: 'gpt-4o',
+      tools: tools,
+      tool_resources: {
+        file_search: {
+          vector_store_ids: [process.env.VECTOR_STORE_ID]
         }
-      })
-      console.log('✅ Assistant updated:', assistant.id)
-    } else {
-      console.log('🆕 Creating new assistant...')
-      assistant = await openai.beta.assistants.create({
-        name: assistantName,
-        instructions: assistantInstructions,
-        model: 'gpt-4o',
-        tools: tools,
-        tool_resources: {
-          file_search: {
-            vector_store_ids: ['vs_mAGmZOoBCB8vN4VddooXHHRC']
-          }
-        }
-      })
-      console.log('✅ Assistant created:', assistant.id)
-    }
+      }
+    })
+    
+    console.log('✅ Assistant updated:', assistant.id)
 
     return NextResponse.json({
       success: true,
       assistantId: assistant.id,
       assistantName: assistant.name,
       tools: tools.length,
-      message: existingAssistant ? 'Assistant updated successfully' : 'Assistant created successfully'
+      message: 'Assistant updated successfully'
     })
 
   } catch (error) {

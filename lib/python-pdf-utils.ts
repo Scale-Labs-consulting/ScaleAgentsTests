@@ -299,7 +299,7 @@ export async function extractTextFromURLWithPython(url: string): Promise<string>
         const blob = new Blob([uint8Array], { type: 'application/pdf' })
         formData.append('file', blob, 'document.pdf')
         
-        const pythonResponse = await fetch('/api/pdf-parser-python.py', {
+        const pythonResponse = await fetch('/api/pdf-parser-python', {
           method: 'POST',
           body: formData
         })

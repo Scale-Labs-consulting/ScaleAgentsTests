@@ -861,8 +861,9 @@ export default function DashboardPage() {
             
             console.log('🎵 Converting video to audio for better processing...')
             
-            // Add timeout for large files
-            const conversionTimeout = file.size > 200 * 1024 * 1024 ? 300000 : 60000 // 5min for large files, 1min for smaller
+            // Add timeout for large files - increased timeout for 200-500MB range
+            const conversionTimeout = file.size > 500 * 1024 * 1024 ? 600000 : 
+                                     file.size > 200 * 1024 * 1024 ? 600000 : 60000 // 10min for 200MB+, 1min for smaller
             console.log(`⏱️ Conversion timeout set to ${conversionTimeout / 1000}s for ${(file.size / (1024 * 1024)).toFixed(1)}MB file`)
             
             const conversionPromise = convertVideoToAudio(file)
@@ -936,7 +937,9 @@ export default function DashboardPage() {
           originalFileName: file.name,
           isConverted: isConverted,
           callType: callType
-        })
+        }),
+        // Add timeout for large file uploads (15 minutes)
+        timeout: 900000
       })
 
       console.log('✅ File uploaded to Vercel Blob:', blob.url)
@@ -2126,7 +2129,9 @@ export default function DashboardPage() {
           accessToken: accessToken,
           originalFileName: file.name,
           isConverted: isConverted
-        })
+        }),
+        // Add timeout for large file uploads (15 minutes)
+        timeout: 900000
       })
 
       console.log('✅ File uploaded to Vercel Blob:', blob.url)
